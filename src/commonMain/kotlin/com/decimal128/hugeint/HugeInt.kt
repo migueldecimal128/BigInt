@@ -1,0 +1,1969 @@
+@file:Suppress("NOTHING_TO_INLINE")
+
+package com.decimal128.hugeint
+
+import kotlin.math.absoluteValue
+import kotlin.math.min
+import kotlin.random.Random
+
+/**
+ * Arbitrary-precision signed integers for Kotlin multi-platform, providing
+ * a replacement for [java.math.BigInteger].
+ *
+ * Provides basic arithmetic operations `+ - * / %` plus comparator operators
+ * `< <= == != >= >` thru kotlin operator overloading. Also provides overloaded
+ * operator functions where the
+ * other operand is a primitive integer type, thereby allowing standard expression
+ * syntax for arithmetic and comparator expressions involving a mixture of HugeInt and
+ * Int/UInt/Long/ULong values.
+ *
+ * Implementation is sign-magnitude, with the zero value always
+ * non-negative.
+ *
+ * Comparison with java.math.BigInteger:
+ *
+ * HugeInt is a smaller, simpler implementation than []java.math.BigInteger].
+ * It is generally intended for hundreds of digits, not tens-of-thousands.
+ * All multiplication is performed using the schoolbook method, and Knuth
+ * Algorithm-D is used for all divisions. HugeInt does not offer the prime
+ * number generation and testing functions found in java.math.BigInteger.
+ *
+ * HugeInt differs from java.math.BigInteger in the handling of binary and bit
+ * manipulation functions. HugeInt binary boolean and bit manipulation
+ * functions generally work only on the magnitude, ignore the sign, and return
+ * non-negative results.
+ * This differs from java.math.BigInteger which claims:
+ * _All operations behave as if BigIntegers were represented in twos-complement
+ * notation (like Java's primitive integer types)._
+ *
+ * HugeInt arithmetic operator and comparator functions allow primitive types
+ * `Int/UInt/Long/ULong` as the other operand. Contrast this with BigInteger
+ * where arguments must be boxed as BigInteger before being passed to
+ * BigInteger methods. This reduces heap allocation pressure.
+ */
+class HugeInt private constructor(val sign: Boolean, val magia: IntArray): Comparable<HugeInt> {
+
+    companion object {
+        /**
+         * The canonical zero value for [HugeInt].
+         *
+         * All representations of zero **must** reference this single instance.
+         * This ensures that identity comparisons and optimizations relying on
+         * reference equality (`===`) for zero values are valid.
+         */
+                val ZERO = HugeInt(false, Magia.ZERO)
+
+        private val MAGIA_ONE = intArrayOf(1)
+                val ONE = HugeInt(false, MAGIA_ONE)
+
+                val TEN = HugeInt(false, intArrayOf(10))
+
+                val NEG_ONE = HugeInt(true, MAGIA_ONE) // share magia .. but no mutation allowed
+
+        private inline fun U32(n: Int) = n.toLong() and 0xFFFF_FFFFL
+
+        /**
+         * Converts a 32-bit signed [Int] into a signed [HugeInt].
+         *
+         * Positive values produce a non-negative (positive) [HugeInt],
+         * and negative values produce a [HugeInt] with `sign == true`.
+         * Zero values return the canonical [ZERO] instance.
+         *
+         * @param n the signed 32-bit integer to convert.
+         * @return the corresponding [HugeInt] representation.
+         */
+                fun from(n: Int): HugeInt = when {
+            n > 0 -> HugeInt(false, intArrayOf(n))
+            n < 0 -> HugeInt(true, intArrayOf(-n))
+            else -> ZERO
+        }
+
+        /**
+         * Converts a 32-bit *unsigned* value, stored in a signed [Int] primitive,
+         * into a non-negative [HugeInt].
+         *
+         * @param n the unsigned 32-bit value (stored in an [Int]) to convert.
+         * @return a non-negative [HugeInt] equivalent to `n.toUInt()`.
+         */
+                fun fromUnsigned(n: Int) = from(n.toUInt())
+
+        /**
+         * Converts a 32-bit unsigned [UInt] into a non-negative [HugeInt].
+         *
+         * The resulting value always has `sign == false`.
+         * Zero returns the canonical [ZERO] instance.
+         *
+         * @param w the unsigned integer to convert.
+         * @return the corresponding non-negative [HugeInt].
+         */
+                fun from(w: UInt) = if (w != 0u) HugeInt(false, intArrayOf(w.toInt())) else ZERO
+
+        /**
+         * Converts a 64-bit signed [Long] into a signed [HugeInt].
+         *
+         * Positive values produce a non-negative (positive) [HugeInt],
+         * and negative values produce a [HugeInt] with `sign == true`.
+         * Zero values return the canonical [ZERO] instance.
+         *
+         * @param l the signed 64-bit integer to convert.
+         * @return the corresponding [HugeInt] representation.
+         */
+                fun from(l: Long) = when {
+            (l > 0L) && (l shr 32) == 0L -> HugeInt(false, intArrayOf(l.toInt()))
+            l > 0L -> HugeInt(false, intArrayOf(l.toInt(), (l ushr 32).toInt()))
+            l < 0L && (l shr 32) == -1L -> HugeInt(true, intArrayOf(-l.toInt()))
+            l < 0L -> HugeInt(true, intArrayOf(-l.toInt(), (-l ushr 32).toInt()))
+            else -> ZERO
+        }
+
+        /**
+         * Converts a 64-bit *unsigned* value, stored in a signed [Long] primitive,
+         * into a non-negative [HugeInt].
+         *
+         * @param l the unsigned 64-bit value (stored in a [Long]) to convert.
+         * @return a non-negative [HugeInt] equivalent to `l.toULong()`.
+         */
+                fun fromUnsigned(l: Long) = from(l.toULong())
+
+        /**
+         * Converts a 64-bit unsigned [ULong] into a non-negative [HugeInt].
+         *
+         * The resulting value always has `sign == false`.
+         * Zero returns the canonical [ZERO] instance.
+         *
+         * @param dw the unsigned long integer to convert.
+         * @return the corresponding non-negative [HugeInt].
+         */
+                fun from(dw: ULong) = when {
+            dw == 0uL -> ZERO
+            (dw shr 32) == 0uL -> HugeInt(false, intArrayOf(dw.toInt()))
+            else -> HugeInt(false, intArrayOf(dw.toInt(), (dw shr 32).toInt()))
+        }
+
+        /**
+         * Parses a [String] representation of an integer into a [HugeInt].
+         *
+         * Supported syntax:
+         * - Standard decimal notation, with an optional leading `'+'` or `'-'` sign.
+         * - Embedded underscores (e.g. `978_654_321`) are allowed as digit separators.
+         * - Hexadecimal form is supported when prefixed with `0x` or `0X`
+         *   after an optional sign, e.g. `-0xDEAD_BEEF`.
+         *
+         * Not supported:
+         * - Trailing decimal points (e.g. `123.`)
+         * - Scientific notation (e.g. `6.02E23`)
+         *
+         * @param str the string to parse.
+         * @return the parsed [HugeInt].
+         * @throws IllegalArgumentException if the string is empty or contains invalid characters.
+         */
+                fun from(str: String) =
+            from(StringLatin1Iterator(str, 0, str.length))
+
+        /**
+         * Parses a substring range of a [String] into a [HugeInt].
+         *
+         * Supports the same syntax rules as the full-string overload:
+         * - Optional sign (`'+'` or `'-'`)
+         * - Decimal or `0x`/`0X` hexadecimal digits
+         * - Optional underscores as digit separators
+         * - No fractional or scientific notation
+         *
+         * @param str the source string.
+         * @param offset the starting index of the substring.
+         * @param length the number of characters to parse.
+         * @return the parsed [HugeInt].
+         * @throws IllegalArgumentException if the range is empty, invalid, or contains invalid characters.
+         */
+                fun from(str: String, offset: Int, length: Int) =
+            from(StringLatin1Iterator(str, offset, length))
+
+        /**
+         * Parses a [CharSequence] representation of an integer into a [HugeInt].
+         *
+         * Supported syntax:
+         * - Standard decimal notation with optional `'+'` or `'-'`
+         * - Optional hexadecimal prefix `0x` or `0X`
+         * - Embedded underscores allowed as separators
+         * - No fractional or scientific notation
+         *
+         * @param csq the character sequence to parse.
+         * @return the parsed [HugeInt].
+         * @throws IllegalArgumentException if the input is empty or contains invalid characters.
+         */
+                fun from(csq: CharSequence) =
+            from(CharSequenceLatin1Iterator(csq, 0, csq.length))
+
+        /**
+         * Parses a range of a [CharSequence] into a [HugeInt].
+         *
+         * Accepts the same syntax as the full-sequence overload:
+         * - Optional leading `'+'` or `'-'`
+         * - Decimal or `0x`/`0X` hexadecimal digits
+         * - Optional underscores as separators
+         *
+         * @param csq the source character sequence.
+         * @param offset the index of the range to parse.
+         * @param length the number of characters in the range.
+         * @return the parsed [HugeInt].
+         * @throws IllegalArgumentException if the specified range is empty, invalid, or contains invalid characters.
+         */
+        fun from(csq: CharSequence, offset: Int, length: Int) =
+            from(CharSequenceLatin1Iterator(csq, offset, length))
+
+        /**
+         * Parses a [CharArray] representation of an integer into a [HugeInt].
+         *
+         * Supported syntax:
+         * - Decimal or `0x`/`0X` hexadecimal notation
+         * - Optional `'+'` or `'-'` sign at the start
+         * - Optional underscores as separators
+         * - No scientific or fractional forms
+         *
+         * @param chars the character array to parse.
+         * @return the parsed [HugeInt].
+         * @throws IllegalArgumentException if the array is empty or contains invalid characters.
+         */
+        fun from(chars: CharArray) =
+            from(CharArrayLatin1Iterator(chars, 0, chars.size))
+
+        /**
+         * Parses a range of a [CharArray] into a [HugeInt].
+         *
+         * Uses the same syntax rules as other text-based overloads:
+         * - Optional leading `'+'` or `'-'`
+         * - Decimal or hexadecimal digits
+         * - Underscores allowed between digits
+         *
+         * @param chars the source array.
+         * @param offset the index of the range to parse.
+         * @param length the number of characters in the range.
+         * @return the parsed [HugeInt].
+         * @throws IllegalArgumentException if the specified range is invalid or contains invalid characters.
+         */
+        fun from(chars: CharArray, offset: Int, length: Int) =
+            from(CharArrayLatin1Iterator(chars, offset, length))
+
+        /**
+         * Parses an ASCII/Latin-1/UTF-8 encoded [ByteArray] into a [HugeInt].
+         *
+         * Supported syntax:
+         * - Decimal or `0x`/`0X` hexadecimal digits
+         * - Optional `'+'` or `'-'` sign at the start
+         * - Optional underscores between digits
+         *
+         * The bytes must represent only ASCII digits, signs, or hexadecimal letters.
+         * Multi-byte UTF-8 sequences are not supported.
+         *
+         * @param bytes the byte array containing ASCII-encoded digits.
+         * @return the parsed [HugeInt].
+         * @throws IllegalArgumentException if the array is empty or contains non-ASCII bytes.
+         */
+                fun fromAscii(bytes: ByteArray) =
+            from(ByteArrayLatin1Iterator(bytes, 0, bytes.size))
+
+        /**
+         * Parses a range of an ASCII/Latin-1/UTF-8–encoded [ByteArray] into a [HugeInt].
+         *
+         * Uses the same syntax rules as the full-array overload:
+         * - Optional `'+'` or `'-'` sign
+         * - Decimal or hexadecimal digits (`0x`/`0X`)
+         * - Optional underscores as separators
+         *
+         * Only ASCII characters are supported.
+         *
+         * @param bytes the source byte array.
+         * @param offset the index of the range to parse.
+         * @param length the number of bytes in the rang.
+         * @return the parsed [HugeInt].
+         * @throws IllegalArgumentException if the specified range is invalid or contains non-ASCII bytes.
+         */
+                fun fromAscii(bytes: ByteArray, offset: Int, length: Int) =
+            from(ByteArrayLatin1Iterator(bytes, offset, length))
+
+        /**
+         * Parses a hexadecimal [String] into a [HugeInt].
+         *
+         * Supported syntax:
+         * - Optional leading `'+'` or `'-'`
+         * - Optional `0x` or `0X` prefix
+         * - Hex digits `[0-9A-Fa-f]`
+         * - Embedded underscores allowed (e.g., `DEAD_BEEF`)
+         *
+         * @param str the string to parse
+         * @return the parsed [HugeInt]
+         * @throws IllegalArgumentException if the string is empty or contains invalid characters
+         */
+                fun fromHex(str: String) = fromHex(str, 0, str.length)
+
+
+        /**
+         * Parses a range of a hexadecimal [String] into a [HugeInt].
+         *
+         * Supported syntax:
+         * - Optional leading `'+'` or `'-'`
+         * - Optional `0x` or `0X` prefix
+         * - Hex digits `[0-9A-Fa-f]`
+         * - Embedded underscores allowed
+         *
+         * @param str the source string
+         * @param offset the starting index of the range
+         * @param length the number of characters in the range
+         * @return the parsed [HugeInt]
+         * @throws IllegalArgumentException if the range is empty, invalid, or contains invalid characters
+         */
+                fun fromHex(str: String, offset: Int, length: Int) =
+            fromHex(StringLatin1Iterator(str, offset, length))
+
+
+        /**
+         * Parses a hexadecimal [CharSequence] into a [HugeInt].
+         *
+         * Syntax rules are identical to the string overloads.
+         *
+         * @param csq the character sequence to parse
+         * @return the parsed [HugeInt]
+         * @throws IllegalArgumentException if the sequence is empty or contains invalid characters
+         */
+                fun fromHex(csq: CharSequence) = fromHex(csq, 0, csq.length)
+
+
+        /**
+         * Parses a range of a hexadecimal [CharSequence] into a [HugeInt].
+         *
+         * @param csq the source character sequence
+         * @param offset the starting index of the range
+         * @param length the number of characters in the range
+         * @return the parsed [HugeInt]
+         * @throws IllegalArgumentException if the range is empty, invalid, or contains invalid characters
+         */
+                fun fromHex(csq: CharSequence, offset: Int, length: Int) =
+            fromHex(CharSequenceLatin1Iterator(csq, offset, length))
+
+
+        /**
+         * Parses a hexadecimal [CharArray] into a [HugeInt].
+         *
+         * Syntax rules are identical to the string overloads.
+         *
+         * @param chars the character array to parse
+         * @return the parsed [HugeInt]
+         * @throws IllegalArgumentException if the array is empty or contains invalid characters
+         */
+                fun fromHex(chars: CharArray) = fromHex(chars, 0, chars.size)
+
+
+        /**
+         * Parses a range of a hexadecimal [CharArray] into a [HugeInt].
+         *
+         * @param chars the source character array
+         * @param offset the starting index of the range
+         * @param length the number of characters in the range
+         * @return the parsed [HugeInt]
+         * @throws IllegalArgumentException if the range is empty, invalid, or contains invalid characters
+         */
+                fun fromHex(chars: CharArray, offset: Int, length: Int) =
+            fromHex(CharArrayLatin1Iterator(chars, offset, length))
+
+
+        /**
+         * Parses a UTF-8/ASCII [ByteArray] of hexadecimal characters into a [HugeInt].
+         *
+         * Only ASCII characters are supported. Syntax rules are identical to string overloads.
+         *
+         * @param bytes the byte array to parse
+         * @return the parsed [HugeInt]
+         * @throws IllegalArgumentException if the array is empty or contains non-ASCII or invalid characters
+         */
+                fun fromHexAscii(bytes: ByteArray) = fromHexAscii(bytes, 0, bytes.size)
+
+
+        /**
+         * Parses a range of a UTF-8/ASCII [ByteArray] of hexadecimal characters into a [HugeInt].
+         *
+         * Only ASCII characters are supported. Syntax rules are identical to string overloads.
+         *
+         * @param bytes the source byte array
+         * @param offset the starting index of the range
+         * @param length the number of bytes in the range
+         * @return the parsed [HugeInt]
+         * @throws IllegalArgumentException if the range is empty, invalid, or contains non-ASCII or invalid characters
+         */
+                fun fromHexAscii(bytes: ByteArray, offset: Int, length: Int) =
+            fromHex(ByteArrayLatin1Iterator(bytes, offset, length))
+
+        /**
+         * Parse a HugeInt thru a standard iterator for different text
+         * representations.
+         */
+        private fun from(src: Latin1Iterator): HugeInt {
+            val isNegative = src.peek() == '-'
+            val magia = Magia.from(src)
+            return if (magia.isNotEmpty()) HugeInt(isNegative, magia) else ZERO
+        }
+
+        /**
+         * Parse a HugeInt thru a standard iterator for different text
+         * representations.
+         */
+        private fun fromHex(src: Latin1Iterator): HugeInt {
+            val isNegative = src.peek() == '-'
+            val magia = Magia.fromHex(src)
+            return if (magia.isNotEmpty()) HugeInt(isNegative, magia) else ZERO
+        }
+
+        /**
+         * Constructs a randomly generated non-negative HugeInt, uniformly distributed
+         * over the range 0 through (2^bitLen - 1), inclusive.
+         *
+         * Each bit has a 50% chance of being set, so the actual returned bit length
+         * may be less than the requested bitLen.
+         */
+        fun fromRandom(bitLen: Int, random: Random = Random.Default): HugeInt {
+            if (bitLen >= 0) {
+                var zeroTest = 0
+                val magia = Magia.newWithBitLen(bitLen)
+                var mask = (if ((bitLen and 0x1F) == 0) 0 else 1 shl (bitLen and 0x1F)) - 1
+                for (i in magia.lastIndex downTo 0) {
+                    val rand = random.nextInt() and mask
+                    magia[i] = rand
+                    zeroTest = zeroTest or rand
+                    mask = -1
+                }
+                return if (zeroTest == 0) ZERO else HugeInt(false, magia)
+            }
+            throw IllegalArgumentException()
+        }
+
+        /**
+         * Constructs a [HugeInt] from a Big-Endian two’s-complement byte array.
+         *
+         * This behaves like the `java.math.BigInteger(byte[])` constructor and is the
+         * conventional external representation for signed binary integers.
+         *
+         * The sign is determined by the most significant bit of the first byte.
+         * An empty array returns [ZERO].
+         *
+         * For Little-Endian or unsigned data, use [fromBinaryBytes] directly.
+         *
+         * @param bytes  The source byte array.
+         * @return The corresponding [HugeInt] value.
+         */
+                fun fromTwosComplementBigEndianBytes(bytes: ByteArray): HugeInt =
+            fromTwosComplementBigEndianBytes(bytes, 0, bytes.size)
+
+        /**
+         * Constructs a [HugeInt] from a subrange of a Big-Endian two’s-complement byte array.
+         *
+         * This behaves like the `java.math.BigInteger(byte[], offset, length)` pattern.
+         * The sign is determined by the most significant bit of the first byte in the range.
+         * An empty range returns [ZERO].
+         *
+         * For Little-Endian or unsigned data, use [fromBinaryBytes] directly.
+         *
+         * @param bytes   The source byte array.
+         * @param offset  The starting index within [bytes].
+         * @param length  The number of bytes to read.
+         * @return The corresponding [HugeInt] value.
+         * @throws IllegalArgumentException if [offset] or [length] specify an invalid range.
+         */
+                fun fromTwosComplementBigEndianBytes(bytes: ByteArray, offset: Int, length: Int): HugeInt =
+            fromBinaryBytes(isTwosComplement = true, isBigEndian = true, bytes, offset, length)
+
+        /**
+         * Creates a [HugeInt] from an array of raw binary bytes.
+         *
+         * The input bytes represent either an unsigned integer or a two’s-complement
+         * signed integer, depending on [isTwosComplement]. If [isTwosComplement] is `true`,
+         * the most significant bit of the first byte determines the sign, and the bytes are
+         * interpreted according to two’s-complement encoding. If [isTwosComplement] is `false`,
+         * the bytes are treated as a non-negative unsigned value.
+         *
+         * The byte order is determined by [isBigEndian].
+         *
+         * @param isTwosComplement `true` if bytes use two’s-complement encoding, `false` if unsigned.
+         * @param isBigEndian `true` if bytes are in big-endian order, `false` for little-endian.
+         * @param bytes Source byte array containing the integer representation.
+         * @return A [HugeInt] representing the value of the specified byte range.
+         * @throws IllegalArgumentException if the range `[offset, offset + length)` is invalid.
+         */
+        fun fromBinaryBytes(isTwosComplement: Boolean, isBigEndian: Boolean,
+                            bytes: ByteArray): HugeInt  =
+            fromBinaryBytes(isTwosComplement, isBigEndian, bytes, 0, bytes.size)
+
+            /**
+         * Creates a [HugeInt] from a sequence of raw binary bytes.
+         *
+         * The input bytes represent either an unsigned integer or a two’s-complement
+         * signed integer, depending on [isTwosComplement]. If [isTwosComplement] is `true`,
+         * the most significant bit of the first byte determines the sign, and the bytes are
+         * interpreted according to two’s-complement encoding. If [isTwosComplement] is `false`,
+         * the bytes are treated as a non-negative unsigned value.
+         *
+         * The byte order is determined by [isBigEndian].
+         *
+         * @param isTwosComplement `true` if bytes use two’s-complement encoding, `false` if unsigned.
+         * @param isBigEndian `true` if bytes are in big-endian order, `false` for little-endian.
+         * @param bytes Source byte array containing the integer representation.
+         * @param offset Starting offset within [bytes].
+         * @param length Number of bytes to read.
+         * @return A [HugeInt] representing the value of the specified byte range.
+         * @throws IllegalArgumentException if the range `[offset, offset + length)` is invalid.
+         */
+        fun fromBinaryBytes(isTwosComplement: Boolean, isBigEndian: Boolean,
+                            bytes: ByteArray, offset: Int, length: Int): HugeInt {
+            if (offset < 0 || length < 0 || length > bytes.size - offset)
+                throw IllegalArgumentException()
+            if (length > 0) {
+                val ibSign = offset - 1 + (if (isBigEndian) 1 else length)
+                val isNegative = isTwosComplement && bytes[ibSign] < 0
+                val magia = Magia.fromBinaryBytes(
+                    isNegative, isBigEndian, bytes, offset,
+                    length
+                )
+                if (magia !== Magia.ZERO)
+                    return HugeInt(isNegative, magia)
+            }
+            return ZERO
+        }
+
+        /**
+         * Converts a Little-Endian IntArray to a HugeInt with the specified sign.
+         */
+                fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray): HugeInt =
+            fromLittleEndianIntArray(sign, littleEndianIntArray, littleEndianIntArray.size)
+
+        /**
+         * Converts a Little-Endian IntArray to a HugeInt with the specified sign.
+         */
+                fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray, len: Int): HugeInt {
+            val magia = Magia.newCopyTrimmed(littleEndianIntArray, len)
+            return if (magia.isNotEmpty()) HugeInt(sign, magia) else ZERO
+        }
+
+        /**
+         * Constructs a positive HugeInt with a single bit turned on at the zero-based bitIndex.
+         *
+         * The returned HugeInt value will be 2**bitIndex
+         *
+         * @throws kotlin.IllegalArgumentException for a negative bitIndex
+         */
+                fun withSetBit(bitIndex: Int): HugeInt {
+            if (bitIndex < 0)
+                throw IllegalArgumentException("negative bitIndex:$bitIndex")
+            if (bitIndex == 0)
+                return ONE
+            val magia = Magia.newWithBitLen(bitIndex + 1)
+            magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
+            return HugeInt(false, magia)
+        }
+
+        /**
+         * Constructs a non-negative HugeInt with `bitWidth` bits set to 1.
+         *
+         * The returned value is `2^bitWidth - 1`.
+         *
+         * @throws IllegalArgumentException if `bitWidth` is negative.
+         */
+                fun withBitMask(bitWidth: Int): HugeInt {
+            return when {
+                bitWidth > 1 -> {
+                    val magia = Magia.newWithBitLen(bitWidth)
+                    magia.fill(-1)
+                    val leadingZeroCount = (magia.size * 32) - bitWidth
+                    magia[magia.lastIndex] = -1 ushr leadingZeroCount
+                    HugeInt(false, magia)
+                }
+                bitWidth == 1 -> ONE
+                bitWidth == 0 -> ZERO
+                else -> throw IllegalArgumentException("negative bitWidth:$bitWidth")
+            }
+        }
+
+        /**
+         * Constructs a non-negative HugeInt with `bitWidth` bits set to 1, starting at
+         * the specified `bitIndex`.
+         *
+         * The returned value is `(2^bitWidth - 1) << bitIndex`, which is equivalent
+         * to `(2^bitWidth - 1) * 2^bitIndex`.
+         *
+         * @param bitIndex 0-based index of the least significant bit to start from.
+         * @param bitWidth number of consecutive bits to set.
+         *
+         * @throws IllegalArgumentException if `bitIndex` or `bitWidth` is negative.
+         */
+                fun withIndexedBitMask(bitIndex: Int, bitWidth: Int): HugeInt = when {
+            bitIndex > 0 && bitWidth > 1 -> {
+                val bitLen = bitIndex + bitWidth
+                val magia = Magia.newWithBitLen(bitLen)
+                var wordIndex = bitIndex ushr 5
+                val initialInnerIndex = bitIndex and 0x1F
+                val initialBitCount = min(bitWidth, 32 - initialInnerIndex)
+                val initialMask = (((1L shl initialBitCount) - 1) shl initialInnerIndex).toInt()
+                magia[wordIndex++] = initialMask
+                var remainingBitCount = bitWidth - initialBitCount
+                if (remainingBitCount > 0) {
+                    while (remainingBitCount > 32) {
+                        magia[wordIndex++] = -1
+                        remainingBitCount -= 32
+                    }
+                    if (remainingBitCount > 0)
+                        magia[wordIndex] = (1 shl remainingBitCount) - 1
+                }
+                HugeInt(false, magia)
+            }
+            bitIndex < 0 || bitWidth < 0 ->
+                throw IllegalArgumentException(
+                    "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
+            bitIndex == 0 -> withBitMask(bitWidth)
+            bitWidth == 1 -> withSetBit(bitIndex)
+            else -> ZERO
+        }
+    }
+
+    /**
+     * Returns `true` if this HugeInt is zero.
+     *
+     * All zero values point to the singleton `HugeInt.ZERO`.
+     */
+    fun isZero() = this === ZERO
+
+    /**
+     * Returns `true` if this HugeInt is not zero.
+     */
+    fun isNotZero() = this !== ZERO
+
+    /**
+     * Returns `true` if this HugeInt is negative.
+     */
+    fun isNegative() = sign
+
+    /**
+     * Standard signum function.
+     *
+     * @return -1 if negative, 0 if zero, 1 if positive
+     */
+    fun signum() = if (sign) -1 else if (isZero()) 0 else 1
+
+    /**
+     * Returns `true` if the magnitude of this HugeInt is a power of two
+     * (exactly one bit set).
+     */
+    fun isMagnitudePowerOfTwo(): Boolean = Magia.isPowerOfTwo(this.magia, this.magia.size)
+
+    /**
+     * Returns `true` if this HugeInt fits in a signed 32-bit integer
+     * (`Int.MIN_VALUE..Int.MAX_VALUE`).
+     */
+    fun fitsInt(): Boolean {
+        val limbLen = Magia.nonZeroLimbLen(magia)
+        if (limbLen != 1)
+            return limbLen == 0
+        val limb = magia[0]
+        if (limb >= 0)
+            return true
+        return sign && limb == Int.MIN_VALUE
+    }
+
+    /**
+     * Returns `true` if this HugeInt fits in an unsigned 32-bit integer
+     * (`0..UInt.MAX_VALUE`).
+     */
+    fun fitsUInt() = !sign && Magia.nonZeroLimbLen(magia) <= 1
+
+    /**
+     * Returns `true` if this HugeInt fits in a signed 64-bit integer
+     * (`Long.MIN_VALUE..Long.MAX_VALUE`).
+     */
+    fun fitsLong(): Boolean {
+        val limbLen = Magia.nonZeroLimbLen(magia)
+        if (limbLen > 2)
+            return false
+        if (limbLen < 2)
+            return true
+        if (magia[1] >= 0)
+            return true
+        return sign && magia[1] == Int.MIN_VALUE && magia[0] == 0
+    }
+
+    /**
+     * Returns `true` if this HugeInt fits in an unsigned 64-bit integer
+     * (`0..ULong.MAX_VALUE`).
+     */
+    fun fitsULong() = !sign && Magia.nonZeroLimbLen(magia) <= 2
+
+    /**
+     * Returns the lowest 32 bits of the magnitude as a signed Int.
+     */
+    fun magnitudeRawInt() = if (magia.isNotEmpty()) magia[0] else 0
+
+    /**
+     * Returns the lowest 32 bits of the magnitude as an unsigned UInt.
+     */
+    fun magnitudeRawUInt() = magnitudeRawInt().toUInt()
+
+    /**
+     * Returns the lowest 64 bits of the magnitude as a signed Long.
+     */
+    fun magnitudeRawLong() = when {
+        magia.isEmpty() -> 0L
+        magia.size == 1 -> U32(magia[0])
+        else -> (U32(magia[1]) shl 32) or U32(magia[0])
+    }
+
+    /**
+     * Returns the lowest 64 bits of the magnitude as an unsigned ULong.
+     */
+    fun magnitudeRawULong() = magnitudeRawLong().toULong()
+
+    /**
+     * Returns this HugeInt as a signed Int, clamped to `Int.MIN_VALUE..Int.MAX_VALUE`.
+     *
+     * Values greater than `Int.MAX_VALUE` return `Int.MAX_VALUE`.
+     * Values less than `Int.MIN_VALUE` return `Int.MIN_VALUE`.
+     */
+    fun toClampedInt(): Int {
+        val bitLen = Magia.bitLen(magia)
+        val magnitude = magia[0]
+        return if (!sign) {
+            if (bitLen <= 31) magnitude else Int.MAX_VALUE
+        } else {
+            if (bitLen <= 31) -magnitude else Int.MIN_VALUE
+        }
+    }
+
+    /**
+     * Returns this HugeInt as an unsigned UInt, clamped to `0..UInt.MAX_VALUE`.
+     *
+     * Values greater than `UInt.MAX_VALUE` return `UInt.MAX_VALUE`.
+     * Negative values return 0.
+     */
+    fun toClampedUInt(): UInt {
+        val bitLen = Magia.bitLen(magia)
+        val magnitude = magia[0]
+        return if (!sign) {
+            if (bitLen <= 32) magnitude.toUInt() else UInt.MAX_VALUE
+        } else {
+            0u
+        }
+    }
+
+    /**
+     * Returns this HugeInt as a signed Long, clamped to `Long.MIN_VALUE..Long.MAX_VALUE`.
+     *
+     * Values greater than `Long.MAX_VALUE` return `Long.MAX_VALUE`.
+     * Values less than `Long.MIN_VALUE` return `Long.MIN_VALUE`.
+     */
+    fun toClampedLong(): Long {
+        val bitLen = Magia.bitLen(magia)
+        val magnitude = when (magia.size) {
+            0 -> 0L
+            1 -> magia[0].toLong() and 0xFFFF_FFFFL
+            else -> (magia[1].toLong() shl 32) or (magia[0].toLong() and 0xFFFF_FFFFL)
+        }
+        return if (!sign) {
+            if (bitLen <= 63) magnitude else Long.MAX_VALUE
+        } else {
+            if (bitLen <= 63) -magnitude else Long.MIN_VALUE
+        }
+    }
+
+    /**
+     * Returns this HugeInt as an unsigned ULong, clamped to `0..ULong.MAX_VALUE`.
+     *
+     * Values greater than `ULong.MAX_VALUE` return `ULong.MAX_VALUE`.
+     * Negative values return 0.
+     */
+    fun toClampedULong(): ULong {
+        val bitLen = Magia.bitLen(magia)
+        val magnitude = when (magia.size) {
+            0 -> 0L
+            1 -> magia[0].toLong() and 0xFFFF_FFFFL
+            else -> (magia[1].toLong() shl 32) or (magia[0].toLong() and 0xFFFF_FFFFL)
+        }
+        return if (!sign) {
+            if (bitLen <= 64) magnitude.toULong() else ULong.MAX_VALUE
+        } else {
+            0uL
+        }
+    }
+
+// Note: `magia` is shared with `negate` and `abs`.
+// No mutation of `magia` is allowed.
+
+    /**
+     * Java/C-style function for the absolute value of this HugeInt.
+     *
+     * If already non-negative, returns `this`.
+     *
+     *@see absoluteValue
+     */
+    fun abs() = if (sign) HugeInt(false, magia) else this
+
+    /**
+     * Kotlin-style property for the absolute value of this HugeInt.
+     *
+     * If already non-negative, returns `this`.
+     */
+    public val absoluteValue: HugeInt = abs()
+
+    /**
+     * Returns a HugeInt with the opposite sign and the same magnitude.
+     *
+     * Zero always returns the singleton `HugeInt.ZERO`.
+     */
+    fun negate() = if (isNotZero()) HugeInt(!sign, magia) else ZERO
+
+    /**
+     * Standard plus/minus/times/div/rem operators for HugeInt.
+     *
+     * These overloads support HugeInt, Int, UInt, Long, and ULong operands.
+     *
+     * @return a new HugeInt representing the sum or difference.
+     */
+
+    operator fun unaryMinus() = negate()
+    operator fun unaryPlus() = this
+
+    operator fun plus(other: HugeInt): HugeInt = this.addSubImpl(false, other)
+    operator fun plus(n: Int): HugeInt = this.addSubImpl(false, false, n)
+    operator fun plus(w: UInt): HugeInt = this.addSubImpl(false, false, w)
+    operator fun plus(l: Long): HugeInt = this.addSubImpl(false, false, l)
+    operator fun plus(dw: ULong): HugeInt = this.addSubImpl(false, false, dw)
+
+    operator fun minus(other: HugeInt): HugeInt = this.addSubImpl(true, other)
+    operator fun minus(n: Int): HugeInt = this.addSubImpl(false, true, n)
+    operator fun minus(w: UInt): HugeInt = this.addSubImpl(false, true, w)
+    operator fun minus(l: Long): HugeInt = this.addSubImpl(false, true, l)
+    operator fun minus(dw: ULong): HugeInt = this.addSubImpl(false, true, dw)
+
+    operator fun times(other: HugeInt): HugeInt {
+        return if (isNotZero() && other.isNotZero())
+            HugeInt(this.sign xor other.sign, Magia.newMul(this.magia, other.magia))
+        else
+            ZERO
+    }
+    operator fun times(n: Int): HugeInt {
+        return if (isNotZero() && n != 0)
+            HugeInt(this.sign xor (n < 0), Magia.newMul(this.magia, n.absoluteValue.toUInt()))
+        else
+            ZERO
+    }
+    operator fun times(w: UInt): HugeInt {
+        return if (isNotZero() && w != 0u)
+            HugeInt(this.sign, Magia.newMul(this.magia, w))
+        else
+            ZERO
+    }
+    operator fun times(l: Long): HugeInt {
+        return if (isNotZero() && l != 0L)
+            HugeInt(this.sign xor (l < 0), Magia.newMul(this.magia, l.absoluteValue.toULong()))
+        else
+            ZERO
+    }
+    operator fun times(dw: ULong): HugeInt {
+        return if (isNotZero() && dw != 0uL)
+            HugeInt(this.sign, Magia.newMul(this.magia, dw))
+        else
+            ZERO
+    }
+
+    operator fun div(other: HugeInt): HugeInt {
+        if (other.isZero())
+            throw ArithmeticException("div by zero")
+        if (isNotZero()) {
+            val quot = Magia.newDiv(this.magia, other.magia)
+            if (quot.isNotEmpty())
+                return HugeInt(this.sign xor other.sign, quot)
+        }
+        return ZERO
+    }
+
+    operator fun div(n: Int): HugeInt {
+        if (n == 0)
+            throw ArithmeticException("div by zero")
+        if (isNotZero()) {
+            val quot = Magia.newDiv(this.magia, n.absoluteValue.toUInt())
+            if (quot.isNotEmpty())
+                return HugeInt(this.sign xor (n < 0), quot)
+        }
+        return ZERO
+    }
+
+    operator fun div(w: UInt): HugeInt {
+        if (w == 0u)
+            throw ArithmeticException("div by zero")
+        if (isNotZero()) {
+            val quot = Magia.newDiv(this.magia, w)
+            if (quot.isNotEmpty())
+                return HugeInt(this.sign, quot)
+        }
+        return ZERO
+    }
+
+    operator fun div(l: Long): HugeInt {
+        if (l == 0L)
+            throw ArithmeticException("div by zero")
+        if (isNotZero()) {
+            val quot = Magia.newDiv(this.magia, l.absoluteValue.toULong())
+            if (quot.isNotEmpty())
+                return HugeInt(this.sign xor (l < 0), quot)
+        }
+        return ZERO
+    }
+
+    operator fun div(dw: ULong): HugeInt {
+        if (dw == 0uL)
+            throw ArithmeticException("div by zero")
+        if (isNotZero()) {
+            val quot = Magia.newDiv(this.magia, dw)
+            if (quot.isNotEmpty())
+                return HugeInt(this.sign, quot)
+        }
+        return ZERO
+    }
+
+    operator fun rem(other: HugeInt): HugeInt {
+        if (other.isZero())
+            throw ArithmeticException("div by zero")
+        if (isNotZero()) {
+            val rem = Magia.newMod(this.magia, other.magia)
+            if (rem.isNotEmpty())
+                return HugeInt(this.sign, rem)
+        }
+        return ZERO
+    }
+
+    // note that in java/kotlin, the sign of remainder only depends upon
+    // the dividend, so we just take the abs value of the divisor
+    operator fun rem(n: Int): HugeInt = rem(n.absoluteValue.toUInt())
+
+    operator fun rem(w: UInt): HugeInt {
+        if (w == 0u)
+            throw ArithmeticException("div by zero")
+        if (isNotZero()) {
+            val rem = Magia.newMod(this.magia, w)
+            if (rem.isNotEmpty())
+                return HugeInt(this.sign, rem)
+        }
+        return ZERO
+    }
+
+    operator fun rem(l: Long): HugeInt = rem(l.absoluteValue.toULong())
+
+    operator fun rem(dw: ULong): HugeInt {
+        if (dw == 0uL)
+            throw ArithmeticException("div by zero")
+        if (isNotZero()) {
+            val rem = Magia.newMod(this.magia, dw)
+            if (rem.isNotEmpty())
+                return HugeInt(this.sign, rem)
+        }
+        return ZERO
+    }
+
+    /**
+     * Perform an integer division, returning quotient and remainder.
+     *
+     * @return Pair<quotient: HugeInt, remainder: HugeInt>
+     */
+    fun divMod(other: HugeInt): Pair<HugeInt, HugeInt> {
+        return when {
+            other.isZero() -> throw ArithmeticException("div by zero")
+            this.isNotZero() -> divModHelper(other.sign, other.magia)
+            else -> ZERO to other
+        }
+    }
+
+    /** @see divMod(HugeInt) */
+    fun divMod(n: Int): Pair<HugeInt, HugeInt> = divModUIntHelper(n < 0, n.absoluteValue.toUInt())
+    fun divMod(w: UInt): Pair<HugeInt, HugeInt> = divModUIntHelper(false, w)
+    fun divMod(l: Long): Pair<HugeInt, HugeInt> = divModULongHelper(l < 0, l.absoluteValue.toULong())
+    fun divMod(dw: ULong): Pair<HugeInt, HugeInt> = divModULongHelper(false, dw)
+
+    /**
+     * Divides the given [numerator] (primitive type) by this HugeInt and returns the quotient.
+     *
+     * This is used for expressions like `5 / hugeInt`, where the primitive is the numerator
+     * and the HugeInt is the divisor.
+     *
+     * @param numerator the value to divide (absolute value used; see `signNumerator`)
+     * @param signNumerator the sign of the numerator (ignored in primitive overloads)
+     * @throws ArithmeticException if this HugeInt is zero
+     * @return the quotient as a HugeInt, zero if |numerator| < |this|
+     */
+    fun divInverse(numerator: Int) = divInverse(numerator.toLong())
+    fun divInverse(numerator: UInt) = divInverse(false, numerator.toULong())
+    fun divInverse(numerator: Long) = divInverse(numerator < 0, numerator.absoluteValue.toULong())
+    fun divInverse(signNumerator: Boolean, numerator: ULong): HugeInt {
+        if (this.isZero())
+            throw ArithmeticException("div by zero")
+        if (this.magnitudeCompareTo(numerator) > 0)
+            return ZERO
+        val quotient = numerator / this.magnitudeRawULong()
+        if (quotient == 0uL)
+            return ZERO
+        else
+            return HugeInt(this.sign xor signNumerator,
+                           Magia.newFromULong(quotient))
+    }
+
+    /**
+     * Computes the remainder of dividing the given [numerator] (primitive type) by this HugeInt.
+     *
+     * This is used for expressions like `5 % hugeInt`, where the primitive is the numerator
+     * and the HugeInt is the divisor.
+     *
+     * @param numerator the value to divide (absolute value used; see `signNumerator`)
+     * @param signNumerator the sign of the numerator (ignored in primitive overloads)
+     * @throws ArithmeticException if this HugeInt is zero
+     * @return the remainder as a HugeInt, zero if numerator is a multiple of this HugeInt
+     */
+    fun modInverse(numerator: Int) = modInverse(numerator.toLong())
+    fun modInverse(numerator: UInt) = modInverse(false, numerator.toULong())
+    fun modInverse(numerator: Long) = modInverse(numerator < 0, numerator.absoluteValue.toULong())
+    fun modInverse(signNumerator: Boolean, numerator: ULong): HugeInt {
+        if (this.isZero())
+            throw ArithmeticException("div by zero")
+        if (this.magnitudeCompareTo(numerator) > 0)
+            return HugeInt(signNumerator, Magia.newFromULong(numerator))
+        val remainder = numerator % this.magnitudeRawULong()
+        if (remainder == 0uL)
+            return ZERO
+        else
+            return HugeInt(signNumerator, Magia.newFromULong(remainder))
+    }
+
+    /**
+     * Computes the square of this HugeInt (i.e., this * this).
+     *
+     * @return a non-negative HugeInt representing the square, or `ZERO` if this is zero.
+     */
+    fun sqr(): HugeInt {
+        if (this.isNotZero()) {
+            check(Magia.nonZeroLimbLen(this.magia) > 0)
+            val magiaSqr = Magia.newSqr(this.magia)
+            return HugeInt(false, magiaSqr)
+        }
+        return ZERO
+    }
+
+    /**
+     * Raises this HugeInt to the power of [n].
+     *
+     * Special cases are handled for efficiency:
+     * - `n == 0` → returns `ONE`
+     * - `n == 1` → returns `this`
+     * - `n == 2` → uses `sqr()` for efficiency
+     * - Magnitude of `1` or `2` → uses precomputed results
+     *
+     * @param n exponent, must be >= 0
+     * @throws IllegalArgumentException if `n < 0`
+     * @return HugeInt representing this^n with correct sign
+     */
+    fun pow(n: Int): HugeInt {
+        val resultSign = this.sign && ((n and 1) != 0)
+        return when {
+            n < 0 -> throw IllegalArgumentException("cannot raise HugeInt to negative power:$n")
+            n == 0 -> ONE
+            n == 1 -> this
+            this.isZero() -> ZERO
+            Magia.EQ(this.magia, 1) -> if (resultSign) NEG_ONE else ONE
+            Magia.EQ(this.magia, 2) -> HugeInt(resultSign, Magia.newWithSetBit(n))
+            n == 2 -> sqr()
+            else -> {
+                val maxBitLen = Magia.bitLen(this.magia) * n
+                val maxBitLimbLen = (maxBitLen + 0x1F) ushr 5
+                var baseMag = Magia.newCopyWithExactLen(this.magia, maxBitLimbLen)
+                var baseLen = Magia.nonZeroLimbLen(this.magia)
+                var resultMag = IntArray(maxBitLimbLen)
+                resultMag[0] = 1
+                var resultLen = 1
+                var tmpMag = IntArray(maxBitLimbLen)
+
+                var exp = n
+                while (true) {
+                    if ((exp and 1) != 0) {
+                        tmpMag.fill(0, 0, baseLen)
+                        resultLen = Magia.mul(tmpMag, resultMag, resultLen, baseMag, baseLen)
+                        val t = tmpMag
+                        tmpMag = resultMag
+                        resultMag = t
+                    }
+                    exp = exp ushr 1
+                    if (exp == 0)
+                        break
+                    tmpMag.fill(0, 0, min(tmpMag.size, 2 * baseLen))
+                    baseLen = Magia.sqr(tmpMag, baseMag, baseLen)
+                    val t = tmpMag
+                    tmpMag = baseMag
+                    baseMag = t
+                }
+                HugeInt(resultSign, resultMag)
+            }
+        }
+    }
+
+    /**
+     * Returns the bit-length of the magnitude of this HugeInt.
+     *
+     * Equivalent to the number of bits required to represent the absolute value.
+     */
+    fun magnitudeBitLen() = Magia.bitLen(magia)
+
+    /**
+     * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
+     *
+     * BigInteger.bitLength() attempts a pseudo-twos-complement answer
+     * It is the number of bits required, minus the sign bit.
+     * - For non-negative values, it is simply the number of bits in the magnitude.
+     * - For negative values, it becomes a little wonky.
+     *
+     * Example: `BigInteger("-1").bitLength() == 0` ... think about ie :)
+     */
+    fun bitLengthBigIntegerStyle(): Int = Magia.bitLengthBigIntegerStyle(sign, magia)
+
+    /**
+     * Returns the number of 32-bit integers required to store the binary magnitude.
+     */
+    fun magnitudeIntArrayLen() = (Magia.bitLen(magia) + 31) ushr 5
+
+    /**
+     * Returns the number of 64-bit longs required to store the binary magnitude.
+     */
+    fun magnitudeLongArrayLen() = (Magia.bitLen(magia) + 63) ushr 6
+
+    /**
+     * Computes the number of bytes needed to represent this HugeInt
+     * in two's-complement format.
+     *
+     * Always returns at least 1 for zero.
+     */
+    fun calcTwosComplementByteLength(): Int {
+        if (isZero())
+            return 1
+        // add one for the sign bit
+        val bitLen2sComplement = bitLengthBigIntegerStyle() + 1
+        val byteLength = (bitLen2sComplement + 7) ushr 3
+        return byteLength
+    }
+
+    /**
+     * Tests whether the bit at [bitIndex] is set.
+     *
+     * @param bitIndex 0-based, starting from the least-significant bit
+     * @return true if the bit is set, false otherwise
+     */
+    fun testBit(bitIndex: Int): Boolean = Magia.testBit(this.magia, bitIndex)
+
+    /**
+     * Returns the index of the rightmost set bit (number of trailing zeros).
+     *
+     * If this HugeInt is ZERO (no bits set), returns -1.
+     *
+     * Equivalent to `java.math.BigInteger.getLowestSetBit()`.
+     *
+     * @return bit index of the lowest set bit, or -1 if ZERO
+     */
+    fun trailingZeroCount(): Int = Magia.ntz(this.magia)
+
+    /**
+     * Returns the number of bits set in the magnitude, ignoring the sign.
+     */
+    fun magnitudeBitCount(): Int = Magia.bitPopulationCount(this.magia)
+
+    /**
+     * Returns a new HugeInt representing the bitwise AND of the magnitudes,
+     * ignoring signs.
+     *
+     * The result is always non-negative.
+     */
+    infix fun and(other: HugeInt): HugeInt {
+        val magiaAnd = Magia.newAnd(this.magia, other.magia)
+        return if (magiaAnd.isNotEmpty()) HugeInt(false, magiaAnd) else ZERO
+    }
+
+    /**
+     * Returns a new HugeInt representing the bitwise OR of the magnitudes,
+     * ignoring signs.
+     *
+     * The result is always non-negative.
+     */
+    infix fun or(other: HugeInt): HugeInt {
+        val magiaOr = Magia.newOr(this.magia, other.magia)
+        return if (magiaOr.isNotEmpty()) HugeInt(false, magiaOr) else ZERO
+    }
+
+    /**
+     * Returns a new HugeInt representing the bitwise XOR of the magnitudes,
+     * ignoring signs.
+     *
+     * The result is always non-negative.
+     */
+    infix fun xor(other: HugeInt): HugeInt {
+        val magiaXor = Magia.newXor(this.magia, other.magia)
+        return if (magiaXor.isNotEmpty()) HugeInt(false, magiaXor) else ZERO
+    }
+
+    /**
+     * Performs an unsigned right shift (logical shift) of the magnitude.
+     *
+     * Sign is ignored and the result is always non-negative.
+     *
+     * @param bitCount number of bits to shift, must be >= 0
+     * @throws IllegalArgumentException if bitCount < 0
+     */
+    infix fun ushr(bitCount: Int): HugeInt {
+        return when {
+            bitCount > 0 -> {
+                val magia = Magia.newShiftRight(this.magia, bitCount)
+                if (magia !== Magia.ZERO) HugeInt(false, magia) else ZERO
+            }
+            bitCount == 0 -> this
+            else -> throw IllegalArgumentException("bitCount < 0")
+        }
+    }
+
+    /**
+     * Performs a signed right shift (arithmetic shift) of the magnitude.
+     *
+     * Mimics twos-complement behavior for negative values.
+     *
+     * @param bitCount number of bits to shift, must be >= 0
+     * @throws IllegalArgumentException if bitCount < 0
+     */
+    infix fun shr(bitCount: Int): HugeInt {
+        return when {
+            bitCount > 0 -> {
+                var magia = Magia.newShiftRight(this.magia, bitCount)
+                when {
+                    magia !== Magia.ZERO -> {
+                        // Mimic twos-complement rounding down for negative numbers
+                        if (sign && Magia.testAnyBitInLowerN(this.magia, bitCount))
+                            magia = Magia.newOrMutateAdd(magia, 1u)
+                        HugeInt(this.sign, magia)
+                    }
+                    sign -> NEG_ONE
+                    else -> ZERO
+                }
+            }
+            bitCount == 0 -> this
+            else -> throw IllegalArgumentException("bitCount < 0")
+        }
+    }
+
+    /**
+     * Performs a left shift of the magnitude, retaining the sign.
+     *
+     * @param bitCount number of bits to shift, must be >= 0
+     * @throws IllegalArgumentException if bitCount < 0
+     */
+    infix fun shl(bitCount: Int): HugeInt {
+        return when {
+            isZero() || bitCount == 0 -> this
+            bitCount > 0 -> HugeInt(this.sign,
+                                    Magia.newShiftLeft(this.magia, bitCount))
+            else -> throw IllegalArgumentException("bitCount < 0")
+        }
+    }
+
+    /**
+     * Compares this [HugeInt] with another [HugeInt] for order.
+     *
+     * The comparison is performed according to mathematical value:
+     * - A negative number is always less than a positive number.
+     * - If both numbers have the same sign, their magnitudes are compared.
+     *
+     * @param other the [HugeInt] to compare this value against.
+     * @return
+     *  * `-1` if this value is less than [other],
+     *  * `0` if this value is equal to [other],
+     *  * `1` if this value is greater than [other].
+     */
+    override operator fun compareTo(other: HugeInt): Int {
+        if (this.sign != other.sign)
+            return if (this.sign) -1 else 1
+        val cmp = Magia.compare(this.magia, other.magia)
+        return if (this.sign) -cmp else cmp
+    }
+
+    /**
+     * Compares this [HugeInt] with a 32-bit signed integer value.
+     *
+     * The comparison is based on the mathematical value of both numbers:
+     * - Negative values of [n] are treated with a negative sign and compared by magnitude.
+     * - Positive values are compared directly by magnitude.
+     *
+     * @param n the integer value to compare with this [HugeInt].
+     * @return
+     *  * `-1` if this value is less than [n],
+     *  * `0` if this value is equal to [n],
+     *  * `1` if this value is greater than [n].
+     */
+    operator fun compareTo(n: Int) = compareToHelper(n < 0, n.absoluteValue.toUInt().toULong())
+
+    /**
+     * Compares this [HugeInt] with an unsigned 32-bit integer value.
+     *
+     * The comparison is performed by treating [w] as a non-negative value
+     * and comparing magnitudes directly.
+     *
+     * @param w the unsigned integer to compare with this [HugeInt].
+     * @return
+     *  * `-1` if this value is less than [w],
+     *  * `0` if this value is equal to [w],
+     *  * `1` if this value is greater than [w].
+     */
+    operator fun compareTo(w: UInt) = compareToHelper(false, w.toULong())
+
+    /**
+     * Compares this [HugeInt] with a 64-bit signed integer value.
+     *
+     * The comparison is based on mathematical value:
+     * - If [l] is negative, the comparison accounts for its sign.
+     * - Otherwise, magnitudes are compared directly.
+     *
+     * @param l the signed long value to compare with this [HugeInt].
+     * @return
+     *  * `-1` if this value is less than [l],
+     *  * `0` if this value is equal to [l],
+     *  * `1` if this value is greater than [l].
+     */
+    operator fun compareTo(l: Long) = compareToHelper(l < 0, l.absoluteValue.toULong())
+
+    /**
+     * Compares this [HugeInt] with an unsigned 64-bit integer value.
+     *
+     * The comparison is performed by treating [dw] as a non-negative value
+     * and comparing magnitudes directly.
+     *
+     * @param dw the unsigned long value to compare with this [HugeInt].
+     * @return
+     *  * `-1` if this value is less than [dw],
+     *  * `0` if this value is equal to [dw],
+     *  * `1` if this value is greater than [dw].
+     */
+    operator fun compareTo(dw: ULong) = compareToHelper(false, dw)
+
+    /**
+     * Compares magnitudes, disregarding sign flags.
+     *
+     * @return -1,0,1
+     */
+    fun magnitudeCompareTo(other: HugeInt) = Magia.compare(this.magia, other.magia)
+    fun magnitudeCompareTo(n: Int) = Magia.compare(this.magia, n.toUInt())
+    fun magnitudeCompareTo(un: UInt) = Magia.compare(this.magia, un)
+    fun magnitudeCompareTo(l: Long) = Magia.compare(this.magia, l.toULong())
+    fun magnitudeCompareTo(ul: ULong) = Magia.compare(this.magia, ul)
+    fun magnitudeCompareTo(littleEndianIntArray: IntArray) =
+        Magia.compare(this.magia, littleEndianIntArray)
+
+    /**
+     * Comparison predicate for numerical equality with another [HugeInt].
+     *
+     * @param other the [HugeInt] to compare with
+     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
+     */
+    infix fun EQ(other: HugeInt): Boolean =
+        (this.sign == other.sign) && Magia.EQ(this.magia, other.magia)
+
+    /**
+     * Comparison predicate for numerical equality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value equals [n], `false` otherwise
+     */
+    infix fun EQ(n: Int): Boolean = compareTo(n) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value equals [w], `false` otherwise
+     */
+    infix fun EQ(w: UInt): Boolean = compareTo(w) == 0
+
+    /**
+     * Comparison predicate for numerical equality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value equals [l], `false` otherwise
+     */
+    infix fun EQ(l: Long): Boolean = compareTo(l) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value equals [dw], `false` otherwise
+     */
+    infix fun EQ(dw: ULong): Boolean = compareTo(dw) == 0
+
+    /**
+     * Comparison predicate for numerical inequality with another [HugeInt].
+     *
+     * @param other the [HugeInt] to compare with
+     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
+     */
+    infix fun NE(other: HugeInt): Boolean =
+        (this.sign != other.sign) || !Magia.EQ(this.magia, other.magia)
+
+    /**
+     * Comparison predicate for numerical inequality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value does not equal [n], `false` otherwise
+     */
+    infix fun NE(n: Int): Boolean = compareTo(n) != 0
+
+    /**
+     * Comparison predicate for numerical inequality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value does not equal [w], `false` otherwise
+     */
+    infix fun NE(w: UInt): Boolean = compareTo(w) != 0
+
+    /**
+     * Comparison predicate for numerical inequality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value does not equal [l], `false` otherwise
+     */
+    infix fun NE(l: Long): Boolean = compareTo(l) != 0
+
+    /**
+     * Comparison predicate for numerical inequality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value does not equal [dw], `false` otherwise
+     */
+    infix fun NE(dw: ULong): Boolean = compareTo(dw) != 0
+
+    /**
+     * Compares this [HugeInt] with another object for numerical equality.
+     *
+     * Two [HugeInt] instances are considered equal if they have the same sign
+     * and identical magnitude arrays.
+     *
+     * Prefer using the infix predicates [EQ] and [NE] instead of `==` and `!=`,
+     * since the `equals(Any?)` signature permits unintended comparisons with
+     * unrelated types that will compile quietly but will always evaluate to
+     * `false` at runtime.
+     *
+     * @param other the object to compare against
+     * @return `true` if [other] is a [HugeInt] with the same value; `false` otherwise
+     */
+    override fun equals(other: Any?): Boolean {
+        return (other is HugeInt) &&
+                (this.sign == other.sign) &&
+                Magia.EQ(this.magia, other.magia)
+    }
+
+    /**
+     * Returns a hash code for this HugeInt.
+     *
+     * Combines the sign and the magnitude array to ensure consistency
+     * with [equals], so that equal HugeInts have the same hash code.
+     *
+     * @return hash code of this HugeInt
+     */
+    override fun hashCode(): Int {
+        var result = sign.hashCode()
+        result = 31 * result + magia.contentHashCode()
+        return result
+    }
+
+    /**
+     * Returns the decimal string representation of this HugeInt.
+     *
+     * - Negative values are prefixed with a `-` sign.
+     * - Equivalent to calling `java.math.BigInteger.toString()`.
+     *
+     * @return a decimal string representing the value of this HugeInt
+     */
+    override fun toString() = Magia.toString(this.sign, this.magia)
+
+    /**
+     * Returns the hexadecimal string representation of this HugeInt.
+     *
+     * - The string is prefixed with `0x`.
+     * - Uses uppercase hexadecimal characters.
+     * - Negative values are prefixed with a `-` sign before `0x`.
+     *
+     * @return a hexadecimal string representing the value of this HugeInt
+     */
+    fun toHexString() = Magia.toHexString(this.sign, this.magia)
+
+    /**
+     * Converts this [HugeInt] to a **big-endian two's-complement** byte array.
+     *
+     * - Negative values use standard two's-complement representation.
+     * - The returned array has the minimal length needed to represent the value,
+     *   **but always at least 1 byte**.
+     * - For other binary formats, see [toBinaryByteArray] or [toBinaryBytes].
+     *
+     * @return a new [ByteArray] containing the two's-complement representation
+     */
+    fun toTwosComplementBigEndianByteArray(): ByteArray =
+        toBinaryByteArray(isTwosComplement = true, isBigEndian = true)
+
+    /**
+     * Converts this [HugeInt] to a [ByteArray] in the requested binary format.
+     *
+     * - The format is determined by [isTwosComplement] and [isBigEndian].
+     * - Negative values are represented in two's-complement form if [isTwosComplement] is true.
+     * - The returned array has the minimal length needed, **but always at least 1 byte**.
+     *
+     * @param isTwosComplement whether to use two's-complement representation for negative numbers
+     * @param isBigEndian whether the bytes are written in big-endian or little-endian order
+     * @return a new [ByteArray] containing the binary representation
+     */
+    fun toBinaryByteArray(isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray =
+        Magia.toBinaryByteArray(sign, magia, Magia.nonZeroLimbLen(magia), isTwosComplement, isBigEndian)
+
+    /**
+     * Writes this [HugeInt] into the provided [bytes] array in the requested binary format.
+     *
+     * - No heap allocation takes place.
+     * - If [isTwosComplement] is true, values use two's-complement representation
+     *   with the most significant bit indicating the sign.
+     * - If [isTwosComplement] is false, the unsigned magnitude is written,
+     *   possibly with the most significant bit set.
+     * - Bytes are written in big-endian order if [isBigEndian] is true,
+     *   otherwise little-endian order.
+     * - If [requestedLength] is 0, the minimal number of bytes needed is calculated
+     *   and written, **but always at least 1 byte**.
+     * - If [requestedLength] > 0, exactly that many bytes will be written:
+     *   - If the requested length is greater than the minimum required, the sign will
+     *     be extended into the extra bytes.
+     *   - If the requested length is insufficient… you will have a bad day.
+     * - In all cases, the actual number of bytes written is returned.
+     * - May throw [IndexOutOfBoundsException] if the supplied [bytes] array is too small.
+     *
+     * For a standard **two's-complement big-endian** version, see [toTwosComplementBigEndianByteArray].
+     * For a version that allocates a new array automatically, see [toBinaryByteArray].
+     *
+     * @param isTwosComplement whether to use two's-complement representation for negative numbers
+     * @param isBigEndian whether bytes are written in big-endian (true) or little-endian (false) order
+     * @param bytes the target array to write into
+     * @param offset the start index in [bytes] to begin writing
+     * @param requestedLength number of bytes to write (<= 0 means minimal required, but always at least 1)
+     * @return the number of bytes actually written
+     * @throws IndexOutOfBoundsException if [bytes] is too small
+     */
+    fun toBinaryBytes(isTwosComplement: Boolean, isBigEndian: Boolean,
+                      bytes: ByteArray, offset: Int = 0, requestedLength: Int = -1): Int =
+            Magia.toBinaryBytes(this.magia, isTwosComplement && this.sign, isBigEndian,
+                                               bytes, offset, requestedLength)
+
+    /**
+     * Returns a copy of the magnitude as a little-endian IntArray.
+     *
+     * - Least significant limb is at index 0.
+     * - Sign is ignored; only the magnitude is returned.
+     *
+     * @return a new IntArray containing the magnitude in little-endian order
+     */
+    fun magnitudeToLittleEndianIntArray(): IntArray = Magia.newCopyTrimmed(magia)
+
+    /**
+     * Returns a copy of the magnitude as a little-endian LongArray.
+     *
+     * - Combines every two 32-bit limbs into a 64-bit long.
+     * - Least significant bits are in index 0.
+     * - Sign is ignored; only the magnitude is returned.
+     *
+     * @return a new LongArray containing the magnitude in little-endian order
+     */
+    fun magnitudeToLittleEndianLongArray(): LongArray {
+        val intLen = Magia.nonZeroLimbLen(magia)
+        val longLen = (intLen + 1) ushr 1
+        val z = LongArray(longLen)
+        var iw = 0
+        var il = 0
+        while (intLen - iw >= 2) {
+            val lo = U32(magia[iw])
+            val hi = magia[iw + 1].toLong() shl 32
+            z[il] = hi or lo
+            ++il
+            iw += 2
+        }
+        if (iw < intLen)
+            z[il] = U32(magia[iw])
+        return z
+    }
+
+    /**
+     * Internal helper for addition or subtraction between two HugeInts.
+     *
+     * @param isSub true to subtract [other] from this, false to add
+     * @param other the HugeInt operand
+     * @return a new HugeInt representing the result
+     */
+    fun addSubImpl(isSub: Boolean, other: HugeInt): HugeInt {
+        if (other === ZERO)
+            return this
+        if (this === ZERO)
+            return if (isSub) other.negate() else other
+        val otherSign = isSub xor other.sign
+        if (this.sign == otherSign)
+            return HugeInt(this.sign, Magia.newAdd(this.magia, other.magia))
+        val cmp = this.magnitudeCompareTo(other)
+        val ret = when {
+            cmp > 0 -> HugeInt(sign, Magia.newSub(this.magia, other.magia))
+            cmp < 0 -> HugeInt(otherSign, Magia.newSub(other.magia, this.magia))
+            else -> ZERO
+        }
+        return ret
+    }
+
+    /**
+     * Internal helper for addition or subtraction with an Int operand.
+     *
+     * @param signFlipThis true to flip the sign of this HugeInt before operation
+     * @param signFlipOther true to flip the sign of the Int operand before operation
+     * @param n the Int operand
+     * @return a new HugeInt representing the result
+     */
+    fun addSubImpl(signFlipThis: Boolean, signFlipOther: Boolean, n: Int): HugeInt {
+        val otherSign = n < 0
+        val otherMag = n.absoluteValue
+        return addSubImpl(signFlipThis, otherSign xor signFlipOther, otherMag.toUInt())
+    }
+
+    /**
+     * Internal helper for addition or subtraction with a UInt operand.
+     *
+     * @param signFlipThis true to flip the sign of this HugeInt before operation
+     * @param otherSign the sign of the UInt operand
+     * @param w the UInt operand
+     * @return a new HugeInt representing the result
+     */
+    fun addSubImpl(signFlipThis: Boolean, otherSign: Boolean, w: UInt): HugeInt {
+        if (w == 0u)
+            return if (signFlipThis) this.negate() else this
+        if (isZero()) {
+            val magia = intArrayOf(w.toInt())
+            return HugeInt(otherSign, magia)
+        }
+        val thisSign = this.sign xor signFlipThis
+        if (thisSign == otherSign)
+            return HugeInt(thisSign, Magia.newAdd(this.magia, w))
+        val cmp = this.magnitudeCompareTo(w)
+        val ret = when {
+            cmp > 0 -> HugeInt(thisSign, Magia.newSub(this.magia, w.toInt()))
+            cmp < 0 -> HugeInt(otherSign, intArrayOf(w.toInt() - this.magia[0]))
+            else -> ZERO
+        }
+        return ret
+    }
+
+    /**
+     * Internal helper for addition or subtraction with a Long operand.
+     *
+     * @param signFlipThis true to flip the sign of this HugeInt before operation
+     * @param signFlipOther true to flip the sign of the Long operand before operation
+     * @param l the Long operand
+     * @return a new HugeInt representing the result
+     */
+    fun addSubImpl(signFlipThis: Boolean, signFlipOther: Boolean, l: Long): HugeInt {
+        val otherSign = l < 0L
+        val otherMag = l.absoluteValue
+        return addSubImpl(signFlipThis, otherSign xor signFlipOther, otherMag.toULong())
+    }
+
+    /**
+     * Internal helper for addition or subtraction with a ULong operand.
+     *
+     * @param signFlipThis true to flip the sign of this HugeInt before operation
+     * @param otherSign the sign of the ULong operand
+     * @param dw the ULong operand
+     * @return a new HugeInt representing the result
+     */
+    fun addSubImpl(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): HugeInt {
+        if ((dw shr 32) == 0uL)
+            return addSubImpl(signFlipThis, otherSign, dw.toUInt())
+        if (isZero()) {
+            val magia = intArrayOf(dw.toInt(), (dw shr 32).toInt())
+            return HugeInt(otherSign, magia)
+        }
+        val thisSign = this.sign xor signFlipThis
+        if (thisSign == otherSign)
+            return HugeInt(thisSign, Magia.newAdd(this.magia, dw.toLong()))
+        val cmp = this.magnitudeCompareTo(dw)
+        val ret = when {
+            cmp > 0 -> HugeInt(thisSign, Magia.newSub(this.magia, dw.toLong()))
+            cmp < 0 -> {
+                val thisMag = this.magnitudeRawULong()
+                val diff = dw - thisMag
+                HugeInt(otherSign, Magia.newFromULong(diff))
+            }
+
+            else -> ZERO
+        }
+        return ret
+    }
+
+    /**
+     * Performs division and modulo with another HugeInt.
+     *
+     * @param otherSign sign of the divisor
+     * @param otherMagia magnitude of the divisor
+     * @return a Pair of HugeInts: quotient first, remainder second
+     * @throws ArithmeticException if divisor is zero (handled at caller level)
+     */
+    private fun divModHelper(otherSign: Boolean, otherMagia: IntArray): Pair<HugeInt, HugeInt> {
+        val (magiaQuot, magiaRem) = Magia.newDivMod(this.magia, otherMagia)
+        val hiQuot = if (magiaQuot.isNotEmpty()) HugeInt(this.sign xor otherSign, magiaQuot) else ZERO
+        val hiRem = if (magiaRem.isNotEmpty()) HugeInt(this.sign, magiaRem) else ZERO
+        return hiQuot to hiRem
+    }
+
+    /**
+     * Performs division and modulo with a 32-bit unsigned integer.
+     *
+     * @param wSign sign of the divisor
+     * @param wMag absolute value of the divisor
+     * @return a Pair of HugeInts: quotient first, remainder second
+     * @throws ArithmeticException if divisor is zero
+     */
+    private fun divModUIntHelper(wSign: Boolean, wMag: UInt): Pair<HugeInt, HugeInt> {
+        return when {
+            wMag == 0u -> throw ArithmeticException("div by zero")
+            this.isNotZero() -> {
+                val quot = Magia.newCopyTrimmed(this.magia)
+                val remN = Magia.mutateDivMod(quot, wMag)
+                val hiQuot =
+                    if (Magia.nonZeroLimbLen(quot) > 0) HugeInt(this.sign xor wSign, quot) else ZERO
+                val hiRem = if (remN != 0u) HugeInt(this.sign, intArrayOf(remN.toInt())) else ZERO
+                hiQuot to hiRem
+            }
+            else -> ZERO to HugeInt(wSign, intArrayOf(wMag.toInt()))
+        }
+    }
+
+    /**
+     * Performs division and modulo with a 64-bit unsigned long integer.
+     *
+     * Delegates to [divModUIntHelper] if the high 32 bits are zero; otherwise
+     * constructs a temporary IntArray to perform the operation via [divModHelper].
+     *
+     * @param dwSign sign of the divisor
+     * @param dwMag absolute value of the divisor
+     * @return a Pair of HugeInts: quotient first, remainder second
+     * @throws ArithmeticException if divisor is zero
+     */
+    private fun divModULongHelper(dwSign: Boolean, dwMag: ULong): Pair<HugeInt, HugeInt> {
+        val lo = dwMag.toUInt()
+        val hi = (dwMag shr 32).toUInt()
+        return when {
+            dwMag == 0uL -> throw ArithmeticException("div by zero")
+            hi == 0u -> divModUIntHelper(dwSign, lo)
+            else -> divModHelper(dwSign, intArrayOf(lo.toInt(), hi.toInt()))
+        }
+    }
+
+    /**
+     * Helper for comparing this HugeInt to an unsigned 64-bit integer.
+     *
+     * @param ulSign sign of the ULong operand
+     * @param ulMag the ULong magnitude
+     * @return -1 if this < ulMag, 0 if equal, 1 if this > ulMag
+     */
+    fun compareToHelper(ulSign: Boolean, ulMag: ULong): Int {
+        if (this.sign != ulSign)
+            return if (this.sign) -1 else 1
+        val cmp = Magia.compare(this.magia, ulMag)
+        return if (!ulSign) cmp else -cmp
+    }
+
+    /**
+     * Writes the magnitude of this HugeInt into the specified [bytes] array
+     * in **big-endian two's-complement** format.
+     *
+     * This is an internal helper used by [toTwosComplementBigEndianByteArray].
+     *
+     * @param bytes target byte array
+     * @param offset starting index in [bytes] to write
+     * @param magByteLen number of bytes of the magnitude to write
+     *
+     * Notes:
+     * - Handles both positive and negative values.
+     * - For negative numbers, computes two's complement in-place.
+     * - Assumes [bytes] has enough space to hold the output.
+     * - Does not return a value; writes directly into [bytes].
+     */
+    private fun writeBigEndianTwosComplementBytesZ(bytes: ByteArray, offset: Int, magByteLen: Int) =
+        Magia.toBinaryBytes(this.magia, this.sign, isBigEndian = true, bytes, offset, magByteLen)
+
+    private fun writeBigEndianTwosComplementBytes(bytes: ByteArray, offset: Int, magByteLen: Int) {
+        val last = offset + magByteLen - 1
+        var dest = last
+        var remaining = magByteLen
+        var i = 0
+        val complementMask = if (sign) -1 else 0
+        bytes[0] = complementMask.toByte()
+        while (remaining > 0 && i < magia.size) {
+            var w = magia[i] xor complementMask
+            var j = 4
+            do {
+                bytes[dest--] = w.toByte()
+                w = w ushr 8
+                --remaining
+                --j
+            } while (remaining > 0 && j > 0)
+            ++i
+        }
+        if (sign) {
+            var carry = 1
+            var k = last
+            while (carry > 0 && k >= 0) {
+                val t = (bytes[k].toInt() and 0xFF) + carry
+                bytes[k] = t.toByte()
+                carry = t ushr 8
+                --k
+            }
+        }
+    }
+
+}
+
+/**
+ * Extension operators to enable arithmetic and comparison between primitive integer types
+ * (`Int`, `UInt`, `Long`, `ULong`) and `HugeInt`.
+ *
+ * These make expressions like `5 + hugeInt`, `10L * hugeInt`, or `7u % hugeInt` work naturally.
+ *
+ * Notes:
+ * - For division and remainder, the primitive value acts as the numerator and the `HugeInt`
+ *   as the divisor.
+ * - All operations delegate to the internal `HugeInt` implementations (e.g. `addSubImpl`, `times`,
+ *   `divInverse`, `modInverse`, `compareToHelper`).
+ * - Division by zero throws `ArithmeticException`.
+ * - Comparisons reverse the order (`a < b` calls `b.compareToHelper(...)` and negates the result)
+ *   so that they produce correct signed results when a primitive appears on the left-hand side.
+ */
+operator fun Int.plus(other: HugeInt) = other.addSubImpl(false, false, this)
+operator fun UInt.plus(other: HugeInt) = other.addSubImpl(false, false, this)
+operator fun Long.plus(other: HugeInt) = other.addSubImpl(false, false, this)
+operator fun ULong.plus(other: HugeInt) = other.addSubImpl(false, false, this)
+
+operator fun Int.minus(other: HugeInt) = other.addSubImpl(true, false, this)
+operator fun UInt.minus(other: HugeInt) = other.addSubImpl(true, false, this)
+operator fun Long.minus(other: HugeInt) = other.addSubImpl(true, false, this)
+operator fun ULong.minus(other: HugeInt) = other.addSubImpl(true, false, this)
+
+operator fun Int.times(other: HugeInt) = other.times(this)
+operator fun UInt.times(other: HugeInt) = other.times(this)
+operator fun Long.times(other: HugeInt) = other.times(this)
+operator fun ULong.times(other: HugeInt) = other.times(this)
+
+operator fun Int.div(other: HugeInt) = other.divInverse(this)
+operator fun UInt.div(other: HugeInt) = other.divInverse(this)
+operator fun Long.div(other: HugeInt) = other.divInverse(this)
+operator fun ULong.div(other: HugeInt) = other.divInverse(false, this)
+
+operator fun Int.rem(other: HugeInt) = other.modInverse(this)
+operator fun UInt.rem(other: HugeInt) = other.modInverse(this)
+operator fun Long.rem(other: HugeInt) = other.modInverse(this)
+operator fun ULong.rem(other: HugeInt) = other.modInverse(false, this)
+
+operator fun Int.compareTo(hi: HugeInt) =
+    -hi.compareToHelper(this < 0, this.absoluteValue.toUInt().toULong())
+operator fun UInt.compareTo(hi: HugeInt) =
+    -hi.compareToHelper(false, this.toULong())
+operator fun Long.compareTo(hi: HugeInt) =
+    -hi.compareToHelper(this < 0, this.absoluteValue.toULong())
+operator fun ULong.compareTo(hi: HugeInt) =
+    -hi.compareToHelper(false, this)
+
+/**
+ * Compares this [Int] value with a [HugeInt] for numerical equality
+ * with compile-time type safety.
+ *
+ * `EQ` represents *EQuals*, descended from a proud lineage of Fortran
+ * and assembly condition mnemonics.
+ *
+ * @return `true` if both values are numerically equal; `false` otherwise.
+ */
+infix fun Int.EQ(other: HugeInt): Boolean = other.compareTo(this) == 0
+
+/**
+ * Compares this [UInt] value with a [HugeInt] for numerical equality
+ * with compile-time type safety.
+ *
+ * `EQ` represents *EQuals*, descended from a proud lineage of Fortran
+ * and assembly condition mnemonics.
+ *
+ * @return `true` if both values are numerically equal; `false` otherwise.
+ */
+infix fun UInt.EQ(other: HugeInt): Boolean = other.compareTo(this) == 0
+
+/**
+ * Compares this [Long] value with a [HugeInt] for numerical equality
+ * with compile-time type safety.
+ *
+ * `EQ` represents *EQuals*, descended from a proud lineage of Fortran
+ * and assembly condition mnemonics.
+ *
+ * @return `true` if both values are numerically equal; `false` otherwise.
+ */
+infix fun Long.EQ(other: HugeInt): Boolean = other.compareTo(this) == 0
+
+/**
+ * Compares this [ULong] value with a [HugeInt] for numerical equality
+ * with compile-time type safety.
+ *
+ * `EQ` represents *EQuals*, descended from a proud lineage of Fortran
+ * and assembly condition mnemonics.
+ *
+ * @return `true` if both values are numerically equal; `false` otherwise.
+ */
+infix fun ULong.EQ(other: HugeInt): Boolean = other.compareTo(this) == 0
+
+
+/**
+ * Compares this [Int] value with a [HugeInt] for numerical inequality
+ * with compile-time type safety.
+ *
+ * `NE` represents *Not Equals*, descended from a proud lineage of Fortran
+ * and assembly condition mnemonics.
+ *
+ * @return `true` if the values are not numerically equal; `false` otherwise.
+ */
+infix fun Int.NE(other: HugeInt): Boolean = other.compareTo(this) != 0
+
+/**
+ * Compares this [UInt] value with a [HugeInt] for numerical inequality
+ * with compile-time type safety.
+ *
+ * `NE` represents *Not Equals*, descended from a proud lineage of Fortran
+ * and assembly condition mnemonics.
+ *
+ * @return `true` if the values are not numerically equal; `false` otherwise.
+ */
+infix fun UInt.NE(other: HugeInt): Boolean = other.compareTo(this) != 0
+
+/**
+ * Compares this [Long] value with a [HugeInt] for numerical inequality
+ * with compile-time type safety.
+ *
+ * `NE` represents *Not Equals*, descended from a proud lineage of Fortran
+ * and assembly condition mnemonics.
+ *
+ * @return `true` if the values are not numerically equal; `false` otherwise.
+ */
+infix fun Long.NE(other: HugeInt): Boolean = other.compareTo(this) != 0
+
+/**
+ * Compares this [ULong] value with a [HugeInt] for numerical inequality
+ * with compile-time type safety.
+ *
+ * `NE` represents *Not Equals*, descended from a proud lineage of Fortran
+ * and assembly condition mnemonics.
+ *
+ * @return `true` if the values are not numerically equal; `false` otherwise.
+ */
+infix fun ULong.NE(other: HugeInt): Boolean = other.compareTo(this) != 0
+

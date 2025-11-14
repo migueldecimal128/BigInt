@@ -1,0 +1,63 @@
+package com.decimal128.hugeint
+
+import java.math.BigDecimal
+import java.math.BigInteger
+import kotlin.math.max
+
+
+// CAR == Cardinal ARray
+// cardinal has fallen out of use, but is an unsigned integer
+// the "cardinality" of a set
+object MagiaTransducer {
+
+    @Suppress("NOTHING_TO_INLINE")
+    private inline fun U32(n: Int) = n.toLong() and 0xFFFF_FFFFL
+
+    fun magiaToBi(x: IntArray): BigInteger {
+        var bi = BigInteger.valueOf(U32(x[0]))
+        for (i in x.size-1 downTo 1) {
+            val t = BigInteger.valueOf(U32(x[i])).shiftLeft(i * 32)
+            bi = bi.or(t)
+        }
+        return bi
+    }
+
+    fun magiaFromBi(bi: BigInteger): IntArray {
+        val bitLen = bi.bitLength()
+        val wordLen = (bitLen + 0x1F) ushr 5
+        val car = IntArray(max(1, wordLen))
+        for (i in 0..<wordLen)
+            car[i] = bi.shiftRight(i * 32).toInt()
+        return car
+    }
+
+    fun magiaToString(magia: IntArray): String {
+        return magiaToBi(magia).toString()
+    }
+
+    fun magiaFromString(str: String): IntArray {
+        return magiaFromBi(BigInteger(str))
+    }
+
+    fun compare(magia: IntArray, bi: BigInteger): Int {
+        val carBitLen = Magia.bitLen(magia)
+        val cmpBitLen = carBitLen.compareTo(bi.bitLength())
+        if (cmpBitLen != 0)
+            return cmpBitLen
+        for (i in magia.size - 1 downTo 0) {
+            val cmp = unsignedCmp(magia[i], bi.shiftRight(i * 32).toInt())
+            if (cmp != 0)
+                return cmp
+        }
+        return 0
+    }
+
+    fun EQ(magia: IntArray, bi:BigInteger) = compare(magia, bi) == 0
+
+    fun calcDigitCount(magia: IntArray): Int {
+        val bi = magiaToBi(magia)
+        val bd = BigDecimal(bi)
+        val precision = bd.precision()
+        return precision
+    }
+}

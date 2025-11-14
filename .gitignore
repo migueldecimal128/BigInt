@@ -1,0 +1,43 @@
+##############################################
+# Kotlin Multiplatform / JVM library .gitignore
+##############################################
+
+# IntelliJ / IDEA
+.idea/
+*.iml
+
+# Gradle
+.gradle/
+build/
+
+# Kotlin / KMP metadata
+.kotlin/
+
+# macOS files
+.DS_Store
+
+# JS / Node (if you enable JS)
+kotlin-js-store/
+node_modules/
+
+# Test reports / temp files
+build/reports/
+build/test-results/
+build/tmp/
+
+# Gradle config cache
+.gradle/configuration-cache/
+
+# Ignore all lock files
+**/*.lock
+
+##############################################
+# EXCEPTIONS — keep Gradle wrapper files
+##############################################
+
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Keep these scripts
+!gradlew
+!gradlew.bat
