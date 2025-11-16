@@ -686,16 +686,20 @@ class HugeIntAccumulator private constructor (
     private fun mutateAddMagImpl(y: IntArray, yLen: Int) {
         if (yLen > magia.size)
             magia = Magia.newCopyWithFloorLen(magia, yLen + 1)
-        val carry: UInt = Magia.mutateAdd(magia, limbLen, y, yLen)
-        val maxOperandLen = max(limbLen, yLen)
+        var xLen = limbLen
+        while (xLen < yLen) {
+            magia[xLen] = 0
+            ++xLen
+        }
+        val carry: UInt = Magia.mutateAdd(magia, xLen, y, yLen)
         if (carry == 0u) {
-            limbLen = maxOperandLen
+            limbLen = xLen
             return
         }
-        if (maxOperandLen + 1 > magia.size)
-            magia = Magia.newCopyWithFloorLen(magia, maxOperandLen + 1)
-        magia[maxOperandLen] = 1
-        limbLen = maxOperandLen + 1
+        if (xLen == magia.size)
+            magia = Magia.newCopyWithFloorLen(magia, xLen + 1)
+        magia[xLen] = 1
+        limbLen = xLen + 1
     }
 
     /**

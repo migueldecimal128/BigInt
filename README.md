@@ -20,6 +20,7 @@ the complexity of `java.math.BigInteger`.
 - **Arbitrary-precision signed integers**
 - Arithmetic infix operators: `+ - * / %`
 - Comparator operators: `< <= == != >= >`
+- Integer math functions: `sqr() isqrt() pow(n) abs()`
 - Accepts primitive operands (`Int`, `UInt`, `Long`, `ULong`) without boxing
 - Schoolbook multiplication (O(n²))
 - Knuth’s Algorithm D for division
@@ -31,7 +32,7 @@ the complexity of `java.math.BigInteger`.
 
 ## 🔧 Installation
 
-### Gradle (example if published)
+### Gradle
 
 ```kotlin
 dependencies {

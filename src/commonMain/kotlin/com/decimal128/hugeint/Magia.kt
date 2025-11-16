@@ -377,39 +377,58 @@ object Magia {
     }
 
     /**
-     * Adds the first [yLen] limbs of [y] to the first [xLen] limbs of [x], mutating [x] in place.
+     * Adds the magnitude in [y] to [x] **in place**.
      *
-     * Handles carry propagation across the limbs of [x] and [y].
-     * It is the caller's responsibility to check the returned carry and store it in [x],
-     * extending the length of [x] if needed.
+     * This is a convenience overload that determines effective limb lengths:
      *
-     * @return the final carry as an unsigned 32-bit value.
-     * @throws IllegalArgumentException if [xLen] or [yLen] are out of range for [x] or [y].
+     * - `xLen` is taken as `x.size`
+     * - `yLen` is computed via [nonZeroLimbLen], ignoring any leading zero limbs
+     *
+     * The semantic effect is identical to:
+     *
+     *     mutateAdd(x, x.size, y, nonZeroLimbLen(y))
+     *
+     * The caller must ensure that `x.size >= nonZeroLimbLen(y)`.
+     *
+     * @return the final carry as an unsigned 32-bit value (`0u` or `1u`).
+     */
+    fun mutateAdd(x: IntArray, y: IntArray) =
+        mutateAdd(x, x.size, y, nonZeroLimbLen(y))
+
+    /**
+     * Adds the first [yLen] limbs of [y] to the first [xLen] limbs of [x],
+     * writing the result **in place** into [x].
+     *
+     * Carries propagate across limbs. Only the lower [yLen] limbs of [x]
+     * are added to; if the addition produces a carry beyond [yLen], it
+     * continues through the remaining `[xLen - yLen]` limbs of [x].
+     *
+     * The returned carry represents the carry-out beyond limb [xLen − 1].
+     * The caller is responsible for handling this (e.g., by extending [x]
+     * when needed).
+     *
+     * **Requirements**
+     * - `0 ≤ yLen ≤ y.size`
+     * - `0 ≤ xLen ≤ x.size`
+     * - `xLen ≥ yLen`
+     *
+     * @return the final carry as a 32-bit unsigned value (`0u` or `1u`).
+     * @throws IllegalArgumentException if any bounds requirement is violated.
      */
     fun mutateAdd(x: IntArray, xLen: Int, y: IntArray, yLen: Int): UInt {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            check(xLen == 0 || x[xLen - 1] != 0)
-            val minLen = min(xLen, yLen)
+        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size && xLen >= yLen) {
             var carry = 0uL
-            for (i in 0..<minLen) {
+            for (i in 0..<yLen) {
                 carry = dw32(x[i]) + dw32(y[i]) + carry
                 x[i] = carry.toInt()
                 carry = carry shr 32
             }
-            if (xLen >= yLen) {
-                var i = yLen
-                while (carry != 0uL && i < xLen) {
-                    carry = dw32(x[i]) + carry
-                    x[i] = carry.toInt()
-                    carry = carry shr 32
-                    ++i
-                }
-            } else {
-                for (i in minLen..<yLen) {
-                    carry = dw32(y[i]) + carry
-                    x[i] = carry.toInt()
-                    carry = carry shr 32
-                }
+            var i = yLen
+            while (carry != 0uL && i < xLen) {
+                carry = dw32(x[i]) + carry
+                x[i] = carry.toInt()
+                carry = carry shr 32
+                ++i
             }
             return carry.toUInt()
         } else {
@@ -1345,6 +1364,74 @@ object Magia {
         } else {
             throw IllegalArgumentException()
         }
+    }
+
+    /**
+     * Returns the 64-bit unsigned value formed by taking the magnitude,
+     * shifting it right by [bitIndex] bits, and truncating to the low 64 bits.
+     * In other words:
+     *
+     *     result = (x >> bitIndex) mod 2^64
+     *
+     * Bits above the available limbs are treated as zero, so the returned
+     * 64-bit value is always well-defined.
+     *
+     * This reads up to three 32-bit little-endian limbs from [x] to assemble
+     * the 64-bit result.
+     *
+     * @param x the little-endian 32-bit limb array.
+     * @param bitIndex the starting bit position (0 = least-significant bit).
+     * @return the low 64 bits of (magnitude >> bitIndex).
+     */
+    fun extractULongAtBitIndex(x: IntArray, bitIndex: Int): ULong {
+        val loLimb = bitIndex ushr 5
+        val innerShift = bitIndex and 0x1F
+        if (bitIndex == 0)
+            return toRawULong(x)
+        if (loLimb >= x.size)
+            return 0uL
+        val lo = x[loLimb].toUInt().toULong()
+        if ((loLimb + 1) == x.size)
+            return lo shr innerShift
+        val mid = x[loLimb + 1].toUInt().toULong()
+        if ((loLimb + 2) == x.size || innerShift == 0)
+            return ((mid shl 32) or lo) shr innerShift
+        val hi = x[loLimb + 2].toUInt().toULong()
+        return (hi shl (64 - innerShift)) or (mid shl (32 - innerShift)) or (lo shr innerShift)
+    }
+
+    /**
+     * Creates a new limb array containing the 32-bit unsigned value [w] placed at the
+     * bit position [bitIndex], with all other bits zero. This is equivalent to
+     *
+     *     result = w << bitIndex
+     *
+     * represented as a little-endian array of 32-bit limbs.
+     *
+     * The array is sized to hold all non-zero bits of `(w << bitIndex)`. If [w] is
+     * zero, the canonical zero array [ZERO] is returned.
+     *
+     * Shift operations rely on JVM semantics, where 32-bit shifts use the shift
+     * count modulo 32.
+     *
+     * @param w the 32-bit unsigned value to place.
+     * @param bitIndex the bit position (0 = least-significant bit).
+     * @return a new limb array with `w` inserted beginning at [bitIndex].
+     */
+    fun newWithUIntAtBitIndex(w: UInt, bitIndex: Int): IntArray {
+        if (w == 0u)
+            return ZERO
+        val wBitLen = 32 - w.countLeadingZeroBits()
+        val z = newWithBitLen(wBitLen + bitIndex)
+        val limbIndex = bitIndex ushr 5
+        val innerShift = bitIndex and 0x1F
+        z[limbIndex] = (w shl innerShift).toInt()
+        if (limbIndex + 1 < z.size) {
+            check (innerShift != 0)
+            z[limbIndex + 1] = (w shr (32 - innerShift)).toInt()
+        }
+        check (extractULongAtBitIndex(z, bitIndex) == w.toULong())
+        return z
     }
 
     /**
