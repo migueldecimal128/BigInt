@@ -1268,6 +1268,25 @@ class HugeInt private constructor(val sign: Boolean, val magia: IntArray): Compa
     }
 
     /**
+     * Returns the greatest common divisor (GCD) of this value and [other].
+     *
+     * Implements Stein's binary GCD algorithm, which avoids full
+     * multiprecision division and relies only on subtraction,
+     * comparisons, and shifts—operations that are fast for HugeInt.
+     *
+     * The result is always non-negative.
+     */
+    fun gcd(other: HugeInt): HugeInt {
+        if (this.isZero())
+            return other.abs()
+        if (other.isZero())
+            return this.abs()
+        val magia = Magia.gcd(this.magia, other.magia)
+        check (magia !== Magia.ZERO)
+        return HugeInt(false, magia)
+    }
+
+    /**
      * Returns the bit-length of the magnitude of this HugeInt.
      *
      * Equivalent to the number of bits required to represent the absolute value.

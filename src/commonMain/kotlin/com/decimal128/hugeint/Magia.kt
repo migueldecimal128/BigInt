@@ -969,7 +969,7 @@ object Magia {
         if (innerShift > 0) {
             val last = newLen - 1
             for (i in 0..<last)
-                x[i] = (x[i + 1] shl (-innerShift)) or (x[i] ushr innerShift)
+                x[i] = (x[i + 1] shl (32-innerShift)) or (x[i] ushr innerShift)
             x[last] = x[last] ushr innerShift
         }
         return x
@@ -2081,11 +2081,11 @@ object Magia {
      * included if [isNegative] is `true`. For example, a positive value might render
      * as `"0x1AF3"`, while a negative value would render as `"-0x1AF3"`.
      *
-     * Each element of [magia] represents a 32-bit limb of the unsigned magnitude,
+     * Each element of [x] represents a 32-bit limb of the unsigned magnitude,
      * with the least significant limb first (little-endian order).
      *
      * @param isNegative whether the number is negative.
-     * @param magia the magnitude of the number, stored as an `IntArray` of 32-bit limbs.
+     * @param x the magnitude of the number, stored as an `IntArray` of 32-bit limbs.
      * @return the hexadecimal string representation, prefixed with `"0x"`.
      *
      * Example:
@@ -2094,8 +2094,29 @@ object Magia {
      * toHexString(true,  intArrayOf(0x00000001)) == "-0x1"
      * ```
      */
-    fun toHexString(isNegative: Boolean, magia: IntArray): String {
-        val bitLen = bitLen(magia)
+    fun toHexString(isNegative: Boolean, x: IntArray): String =
+        toHexString(isNegative, x, x.size)
+
+    /**
+     * Converts the magnitude [x] to a hexadecimal string.
+     *
+     * The limbs in [x] are stored in little-endian order (least-significant limb at index 0).
+     * Only the first [xLen] limbs are used.
+     *
+     * The result is formatted in big-endian hex, prefixed with `"0x"`, and with a leading
+     * `'-'` if [isNegative] is `true`.
+     *
+     * Examples:
+     * ```
+     * toHexString(false, intArrayOf(0x89ABCDEFu.toInt(), 0x01234567), 2)
+     *     == "0x123456789ABCDEF"
+     *
+     * toHexString(true, intArrayOf(0x1), 1)
+     *     == "-0x1"
+     * ```
+     */
+    fun toHexString(isNegative: Boolean, x: IntArray, xLen: Int): String {
+        val bitLen = bitLen(x, xLen)
         var nybbleCount = (bitLen + 3) ushr 2
         val strLen = (if (isNegative) 1 else 0) + 2 + max(nybbleCount, 1)
         val bytes = ByteArray(strLen)
@@ -2107,7 +2128,7 @@ object Magia {
         var i = 0
         var j = bytes.size
         while (nybbleCount > 0) {
-            var w = magia[i++]
+            var w = x[i++]
             val stepCount = min(8, nybbleCount)
             repeat(stepCount) {
                 val nybble = w and 0x0F
@@ -2119,7 +2140,6 @@ object Magia {
         }
         return bytes.decodeToString()
     }
-
 
     /**
      * Factory methods for constructing a numeric value from Latin-1 (ASCII) encoded input.
@@ -2585,15 +2605,50 @@ object Magia {
     }
 
     /**
-     * number of trailing zeros ... or -1
+     * Returns the number of trailing zero *bits* in the magnitude [magia],
+     * or `-1` if the value is zero so the number of trailing zeros is infinite.
+     *
+     * This is equivalent to calling [ntz] with `xLen = magia.size`.
+     *
+     * Trailing zero bits are counted starting at the least significant bit
+     * of limb `magia[0]`, continuing upward through all limbs until a
+     * non-zero 32-bit limb is found.
      */
-    internal fun ntz(magia: IntArray): Int {
-        for (i in magia.indices) {
-            if (magia[i] != 0)
-                return (i shl 6) + magia[i].countTrailingZeroBits()
+    internal fun ntz(magia: IntArray): Int = ntz(magia, magia.size)
+
+    /**
+     * Returns the number of trailing zero *bits* in the lower [xLen] limbs
+     * of [x], or `-1` if all those limbs are zero.
+     *
+     * Limbs are interpreted in little-endian order:
+     * `x[0]` contains the least-significant 32 bits.
+     *
+     * The result is computed by scanning limbs `0 ..< xLen` until a non-zero
+     * limb is encountered. If a non-zero limb `x[i]` is found, the return
+     * value is:
+     *
+     *     (i * 32) + countTrailingZeroBits(x[i])
+     *
+     * If all examined limbs are zero, this method returns `-1`.
+     *
+     * @param x the magnitude array in little-endian limb order
+     * @param xLen the number of low limbs to inspect; must satisfy
+     *             `0 <= xLen <= x.size`
+     * @return the number of trailing zero bits, or `-1` if the inspected
+     *         region is entirely zero
+     * @throws IllegalArgumentException if [xLen] is out of bounds
+     */
+    internal fun ntz(x: IntArray, xLen: Int): Int {
+        if (xLen >= 0 && xLen <= x.size) {
+            for (i in 0..<xLen) {
+                if (x[i] != 0)
+                    return (i shl 5) + x[i].countTrailingZeroBits()
+            }
+            return -1
         }
-        return -1
+        throw IllegalArgumentException()
     }
+
 
     /**
      * Returns the number of trailing zero bits in the given arbitrary-precision integer,
@@ -2614,6 +2669,30 @@ object Magia {
         return popCount
     }
 
+    /**
+     * Computes a hash code for the magnitude [x], ignoring any leading
+     * zero limbs. The effective length is determined by [nonZeroLimbLen],
+     * ensuring that numerically equal magnitudes with different limb
+     * capacities produce the same hash.
+     *
+     * The hash is a standard polynomial hash using multiplier 31,
+     * identical to applying:
+     *
+     *     h = 31 * h + limb
+     *
+     * for each non-zero limb in order.
+     *
+     * The loop over limbs is manually unrolled in groups of four solely
+     * for performance. The result is **bit-for-bit identical** to the
+     * non-unrolled version.
+     *
+     * This function is used by [HugeInt.hashCode] so that the hash depends
+     * only on the numeric value, not on redundant leading zero limbs or
+     * array capacity.
+     *
+     * @param x the magnitude array in little-endian limb order
+     * @return a hash code consistent with numeric equality of magnitudes
+     */
     fun normalizedHashCode(x: IntArray): Int {
         val xLen = nonZeroLimbLen(x)
         var h = 0
@@ -2631,6 +2710,58 @@ object Magia {
             ++i
         }
         return h
+    }
+
+    fun gcd(x: IntArray, y: IntArray): IntArray {
+        var u = newCopyTrimmed(x)
+        var v = newCopyTrimmed(y)
+
+        var uLen = u.size
+        var vLen = v.size
+        if (uLen <= 0 || vLen <= 0)
+            throw IllegalArgumentException()
+
+        val ntzU = ntz(u, uLen)
+        val ntzV = ntz(v, vLen)
+        val initialShift = min(ntzU, ntzV)
+        if (ntzU > 0) {
+            mutateShiftRight(u, uLen, ntzU)
+            uLen = nonZeroLimbLen(u, uLen)
+        }
+        if (ntzV > 0) {
+            mutateShiftRight(v, vLen, ntzV)
+            vLen = nonZeroLimbLen(v, vLen)
+        }
+
+        // Now both u and v are odd
+        while (vLen != 0) {
+            // Remove factors of 2 from v
+            val tz = ntz(v, vLen)
+            if (tz > 0) {
+                mutateShiftRight(v, vLen, tz)
+                vLen = nonZeroLimbLen(v)
+            }
+            // Ensure u <= v
+            val cmp = compare(u, uLen, v, vLen)
+            if (cmp > 0) {
+                // swap pointers and lengths
+                val tmpA = u; u = v; v = tmpA
+                val tmpL = uLen; uLen = vLen; vLen = tmpL
+            }
+            // v = v - u
+            mutateSub(v, vLen, u, uLen)
+            vLen = nonZeroLimbLen(v, vLen)
+        }
+        // Final result = u * 2^shift
+        if (initialShift > 0) {
+            val shiftedBitLen = bitLen(u, uLen) + initialShift
+            val shiftedLimbLen = limbLenFromBitLen(shiftedBitLen)
+            for (i in uLen..<shiftedLimbLen)
+                u[i] = 0
+            uLen = shiftedLimbLen
+            mutateShiftLeft(u, uLen, initialShift)
+        }
+        return newCopyWithExactLen(u, uLen)
     }
 
 }
