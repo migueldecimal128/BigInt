@@ -66,30 +66,45 @@ tasks.register<Test>("testHsdis") {
  *    caused unresolved-reference errors in your environment). The Kotlin plugin will
  *    emit suggestions but this configuration is stable and will build.
  */
+@OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
 kotlin {
-    // Configure JVM toolchain at kotlin extension scope (supported)
-    jvmToolchain(21)
 
-    // JVM target
+    // ---------------------------
+    // 1. Target configurations
+    // ---------------------------
+
     jvm {
-        // keep this block minimal; avoid deprecated withJava() here
+        // your existing JVM test setup (keep it)
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
     }
 
-    // JS target (IR)
-//    js(IR) {
-//        browser()
-//        nodejs()
-//    }
+    js(IR) {
+        browser()
+        nodejs()
+    }
 
-    // Example native targets — include only if you will build native
-    // comment out any you don't need to reduce native toolchain requirements
+    wasmJs {
+        browser()
+        nodejs()
+    }
+
+    wasmWasi {
+        nodejs()
+    }
+
     macosX64()
-//    macosArm64()
+    macosArm64()
+    // (Add linuxX64() or mingwX64() if needed)
+
+
+    // ---------------------------
+    // 2. Source-set hierarchy
+    // ---------------------------
 
     sourceSets {
+
         val commonMain by getting
         val commonTest by getting {
             dependencies {
@@ -101,25 +116,60 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                // optional if you need native libs via JNA in JVM tests
-                implementation("net.java.dev.jna:jna:5.17.0")
             }
         }
 
-        /*
         val jsMain by getting
         val jsTest by getting {
             dependencies {
-                implementation(kotlin("test-js"))
+                implementation(kotlin("test"))
             }
         }
 
-         */
+        val wasmJsMain by getting
+        val wasmJsTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
 
-        // If you want shared native sources you can create/attach nativeMain/nativeTest
-        // val nativeMain by creating
-        // val nativeTest by creating
+        val wasmWasiMain by getting
+        val wasmWasiTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+
+        val macosX64Main by getting
+        val macosArm64Main by getting
+
+        // ---------------------------------------------
+        // Shared fallback source set for JS + WASM
+        // ---------------------------------------------
+        val jsWasmMain by creating {
+            dependsOn(commonMain)
+        }
+        jsMain.dependsOn(jsWasmMain)
+        wasmJsMain.dependsOn(jsWasmMain)
+        wasmWasiMain.dependsOn(jsWasmMain)
+
+        val jsWasmTest by creating {
+            dependsOn(commonTest)
+        }
+        jsTest.dependsOn(jsWasmTest)
+        wasmJsTest.dependsOn(jsWasmTest)
+        wasmWasiTest.dependsOn(jsWasmTest)
+
+        // ---------------------------------------------
+        // Shared implementation for all Native targets
+        // ---------------------------------------------
+        val nativeMain by creating {
+            dependsOn(commonMain)
+        }
+        macosX64Main.dependsOn(nativeMain)
+        macosArm64Main.dependsOn(nativeMain)
     }
+
 }
 
 /*

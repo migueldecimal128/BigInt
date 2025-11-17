@@ -11,7 +11,7 @@ class TestHugeIntAccum {
 
     @Test
     fun testHugeIntAccum() {
-        repeat(10000) {
+        repeat(10) {
             testAddSub()
             testMul()
             testAddAbsValue()

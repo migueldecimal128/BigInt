@@ -6,11 +6,16 @@ import kotlin.test.assertEquals
 
 class TestHashCode {
 
+    val verbose = false
+
     @Test
     fun testSignHashCode() {
         val trueHashCode = true.hashCode()
         val falseHashCode = false.hashCode()
-        println("trueHashCode:$trueHashCode falseHashCode:$falseHashCode")
+        if (verbose)
+            println("trueHashCode:$trueHashCode falseHashCode:$falseHashCode")
+        assertEquals(1231, trueHashCode)
+        assertEquals(1237, falseHashCode)
     }
 
     val rng = Random.Default
