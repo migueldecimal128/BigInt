@@ -37,7 +37,7 @@ the complexity of `java.math.BigInteger`.
 
 ```kotlin
 dependencies {
-    implementation("com.decimal128:hugeint:<version>")
+    implementation("com.decimal128:hugeint:<version-coming-soon>")
 }
 ```
 
