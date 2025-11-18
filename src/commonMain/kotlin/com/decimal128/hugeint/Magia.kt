@@ -646,13 +646,13 @@ object Magia {
      *
      * Requirements:
      * - [w] must not be zero.
-     * - [p.size] must be at least [xLen] + 1.
+     * - [p.size] should be at least [xLen] + 1 ... unless you counted your bits carefully
      * - [p] does not need to be zero-initialized.
      *
      * The final carry will always be written to [p][xLen] if present, even if zero.
      * The result is non-normalized; any additional limbs in [p] beyond [xLen] + 1 are not zeroed.
      *
-     * This function can mutate [p] in-place.
+     * This function can mutate [x] === [p] in-place.
      *
      * @throws IllegalArgumentException if [p.size] is too small to hold the result and carry.
      */

@@ -1,4 +1,7 @@
 # 📘 **HugeInt – Arbitrary-Precision Integer Arithmetic for Kotlin Multiplatform**
+## 🚧⚠️ **Warning! Construction Zone** ⚠️🚧
+`HugeInt` is currently **EXPERIMENTAL**. 
+Aspects of the API are still subject to change. 
 
 `HugeInt` is a lightweight, high-performance arbitrary-precision
 signed integer type for **Kotlin Multiplatform**, designed to
@@ -20,7 +23,7 @@ the complexity of `java.math.BigInteger`.
 - **Arbitrary-precision signed integers**
 - Arithmetic infix operators: `+ - * / %`
 - Comparator operators: `< <= == != >= >`
-- Integer math functions: `sqr() isqrt() pow(n) abs() gcd()`
+- Integer math functions: `sqr() isqrt() pow(n) abs() gcd() factorial(n)`
 - Binary bit-manipulation and boolean operations
 - Accepts primitive operands (`Int`, `UInt`, `Long`, `ULong`) without boxing
 - Schoolbook multiplication (O(n²))

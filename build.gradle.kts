@@ -1,13 +1,16 @@
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.gradle.api.tasks.testing.Test
+import org.gradle.api.publish.maven.MavenPublication
 
 plugins {
+    id("maven-publish")
+    id("signing")
     kotlin("multiplatform") version "2.2.0"
     id("org.jetbrains.dokka") version "2.0.0"
 }
 
-group = "com.decimal128.hugeint"
-version = "1.0-SNAPSHOT"
+group = "com.decimal128"
+version = "0.9.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -181,5 +184,21 @@ tasks.withType<Test> {
             TestLogEvent.STANDARD_ERROR
         )
         showStandardStreams = true
+    }
+}
+
+afterEvaluate {
+    publishing {
+        publications.withType<MavenPublication>().configureEach {
+            when (name) {
+                "kotlinMultiplatform" -> artifactId = "hugeint"
+                "jvm" -> artifactId = "hugeint-jvm"
+                "js" -> artifactId = "hugeint-js"
+                "wasmJs" -> artifactId = "hugeint-wasm-js"
+                "wasmWasi" -> artifactId = "hugeint-wasm-wasi"
+                "macosX64" -> artifactId = "hugeint-macosx64"
+                // add more if you add more targets
+            }
+        }
     }
 }

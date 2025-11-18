@@ -625,7 +625,7 @@ class HugeInt private constructor(val sign: Boolean, val magia: IntArray): Compa
          *
          * @throws IllegalArgumentException if `bitIndex` or `bitWidth` is negative.
          */
-                fun withIndexedBitMask(bitIndex: Int, bitWidth: Int): HugeInt = when {
+        fun withIndexedBitMask(bitIndex: Int, bitWidth: Int): HugeInt = when {
             bitIndex > 0 && bitWidth > 1 -> {
                 val bitLen = bitIndex + bitWidth
                 val magia = Magia.newWithBitLen(bitLen)
@@ -652,6 +652,64 @@ class HugeInt private constructor(val sign: Boolean, val magia: IntArray): Compa
             bitWidth == 1 -> withSetBit(bitIndex)
             else -> ZERO
         }
+
+        fun factorial(n: Int): HugeInt {
+            if (n >= 0)
+                return factorial(n.toUInt())
+            throw IllegalArgumentException("factorial of a negative number")
+        }
+
+        fun factorial(w: UInt): HugeInt {
+            if (w <= 20u) {
+                if (w <= 1u)
+                    return ONE
+                var f = 1uL
+                for (i in 2uL..w.toULong())
+                    f *= i
+                return from(f)
+            }
+            val limbLen = estimateFactorialLimbLen(w)
+            val f = IntArray(limbLen)
+            val twentyBang = 2_432_902_008_176_640_000
+            f[0] = twentyBang.toInt()
+            f[1] = (twentyBang ushr 32).toInt()
+            var fLen = 2
+            for (i in 21u..w) {
+                Magia.mul(f, f, fLen, i)
+                fLen += if (fLen < f.size && f[fLen] != 0) 1 else 0
+            }
+            return HugeInt(false, f)
+        }
+
+        private fun estimateFactorialLimbLen(w: UInt): Int {
+            val bits = estimateFactorialBits(w)
+            val limbs = ((bits + 0x1FuL) shr 5)
+            if (limbs == limbs.toInt().toULong())
+                return limbs.toInt()
+            throw IllegalArgumentException("factorial will overflow memory constraints")
+        }
+
+        private fun estimateFactorialBits(w: UInt): ULong {
+            if (w < 2u) return 1uL
+
+            val nn = w.toDouble()
+            val log2e = 1.4426950408889634
+            val pi = 3.141592653589793
+
+            // n log2 n - n log2 e + 0.5 log2(2πn)
+            val term1 = nn * kotlin.math.log2(nn)
+            val term2 = -log2e * nn
+            val term3 = 0.5 * kotlin.math.log2(2 * pi * nn)
+
+            val estimate = term1 + term2 + term3
+
+            // Add correction term 1/(12n ln 2)
+            val correction = 0.12022644346 / nn
+
+            return kotlin.math.floor(estimate + correction).toULong() + 1u
+        }
+
+
     }
 
     /**
