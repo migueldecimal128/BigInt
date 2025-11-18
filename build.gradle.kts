@@ -199,6 +199,15 @@ afterEvaluate {
                 "macosX64" -> artifactId = "hugeint-macosx64"
                 // add more if you add more targets
             }
+            pom {
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+            }
+
         }
     }
 }

@@ -144,7 +144,7 @@ Run tests:
 
 ## 📄 License
 
-MIT License ... go for it
+This project is licensed under the MIT License — see the `LICENSE` file for details.
 
 ---
 

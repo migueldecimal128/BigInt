@@ -1,13 +1,11 @@
+// SPDX-License-Identifier: MIT
+
 package com.decimal128.hugeint
 
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.math.max
 
-
-// CAR == Cardinal ARray
-// cardinal has fallen out of use, but is an unsigned integer
-// the "cardinality" of a set
 object MagiaTransducer {
 
     @Suppress("NOTHING_TO_INLINE")
@@ -25,10 +23,10 @@ object MagiaTransducer {
     fun magiaFromBi(bi: BigInteger): IntArray {
         val bitLen = bi.bitLength()
         val wordLen = (bitLen + 0x1F) ushr 5
-        val car = IntArray(max(1, wordLen))
+        val magia = IntArray(max(1, wordLen))
         for (i in 0..<wordLen)
-            car[i] = bi.shiftRight(i * 32).toInt()
-        return car
+            magia[i] = bi.shiftRight(i * 32).toInt()
+        return magia
     }
 
     fun magiaToString(magia: IntArray): String {
@@ -40,8 +38,8 @@ object MagiaTransducer {
     }
 
     fun compare(magia: IntArray, bi: BigInteger): Int {
-        val carBitLen = Magia.bitLen(magia)
-        val cmpBitLen = carBitLen.compareTo(bi.bitLength())
+        val magiaBitLen = Magia.bitLen(magia)
+        val cmpBitLen = magiaBitLen.compareTo(bi.bitLength())
         if (cmpBitLen != 0)
             return cmpBitLen
         for (i in magia.size - 1 downTo 0) {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package com.decimal128.hugeint
 
 import kotlin.random.Random

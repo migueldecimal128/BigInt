@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #ifndef UNSIGNED_MUL_HI_H
 #define UNSIGNED_MUL_HI_H
 
