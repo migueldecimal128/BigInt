@@ -1996,7 +1996,7 @@ object Magia {
     fun renderTailDigitsBeforeIndex(w: UInt, utf8: ByteArray, offMaxx: Int): Int {
         var t = w.toULong()
         var ib = offMaxx
-        if (w >= 10000uL) {
+        while (t >= 1000uL) {
             val t0 = unsignedMulHi(t, M_U64_DIV_1E4) shr S_U64_DIV_1E4
             val abcd = t - (t0 * 10000uL)
             t = t0
@@ -2016,12 +2016,14 @@ object Magia {
                 IllegalArgumentException()
             }
         }
-        do {
-            val divTen = (t * 0xCCCCCCCDuL) shr 35
-            val digit = (t - (divTen * 10uL)).toInt()
-            utf8[--ib] = ('0'.code + digit).toByte()
-            t = divTen
-        } while (t != 0uL)
+        if (t != 0uL || w == 0u) {
+            do {
+                val divTen = (t * 0xCCCCCCCDuL) shr 35
+                val digit = (t - (divTen * 10uL)).toInt()
+                utf8[--ib] = ('0'.code + digit).toByte()
+                t = divTen
+            } while (t != 0uL)
+        }
 
         return offMaxx - ib
     }
