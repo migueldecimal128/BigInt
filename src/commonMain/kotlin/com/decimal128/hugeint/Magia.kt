@@ -1895,24 +1895,83 @@ object Magia {
                     return "0"
                 return if (isNegative) "-1" else "1"
             }
-            val maxDigitLen = ((bitLen * 1234) shr 12) + 1
-            val maxSignedLen = maxDigitLen + if (isNegative) 1 else 0
-            var wordLen = nonZeroLimbLen(x, xLen)
-            var t = newCopyWithExactLen(x, wordLen)
+            val maxSignedLen = maxDigitLenFromBitLen(bitLen) + if (isNegative) 1 else 0
             val utf8 = ByteArray(maxSignedLen)
-            var ib = utf8.size
-            while (wordLen > 1) {
-                val newLenAndRemainder = mutateBarrettDivBy1e9(t, wordLen)
+            val limbLen = nonZeroLimbLen(x, xLen)
+            val t = newCopyWithExactLen(x, limbLen)
+            val len = toUtf8(utf8, utf8.size, isNegative, t, limbLen)
+            return utf8.decodeToString(utf8.size - len, utf8.size)
+        } else {
+            throw IllegalArgumentException()
+        }
+    }
+
+    /**
+     * Returns an upper bound on the number of decimal digits required to represent
+     * a non-negative integer of the given bit length.
+     *
+     * The exact digit count for a value with `bitLen` bits is:
+     *
+     *     digits = floor(bitLen * log10(2)) + 1
+     *
+     * This function uses a fixed-point approximation for `log10(2)`:
+     *
+     *     log10(2) ≈ 1234 / 4096
+     *
+     * so the expression
+     *
+     *     ((bitLen * 1234) >> 12) + 1
+     *
+     * produces a fast, conservative estimate: it never underestimates the number
+     * of decimal digits needed, and the `+1` accounts for the standard
+     * `floor(x) + 1` form of the digit-count formula.
+     *
+     * @param bitLen the bit length of the positive integer (must be ≥ 1)
+     * @return an upper bound on the number of base-10 digits required
+     */
+    fun maxDigitLenFromBitLen(bitLen: Int) = ((bitLen * 1234) shr 12) + 1
+
+    /**
+     * Converts the big-integer value in `t` (length `tLen`) into decimal UTF-8 digits.
+     *
+     * Converts the big-integer value in `t` (length `tLen`) to decimal digits and
+     * writes them into `utf8` **right-to-left**. ibMaxx is Max eXclusive, so
+     * writing begins at index `ibMaxx - 1` and proceeds to the left.
+     *
+     * The array `t` is treated as a temporary work area and is **mutated in-place**
+     * by repeated Barrett divisions by 1e9. Full 9-digit chunks are written with
+     * `renderChunk9`, and the final limb is written with `renderChunkTail`.
+     *
+     * If `isNegative` is true, a leading '-' is inserted.
+     *
+     * @param utf8 the destination byte buffer where UTF-8 digits are written.
+     * @param ibMaxx the exclusive upper index in `utf8`; writing starts at
+     *               `ibMaxx - 1` and proceeds leftward.
+     * @param isNegative whether a leading '-' should be inserted.
+     * @param tmp a temporary big-integer buffer holding the magnitude; it is
+     *            mutated in-place by repeated Barrett reduction divisions.
+     * @param tmpLen the number of active limbs in `tmp`; must be ≥ 1, within bounds
+     *               and normalized.
+     *
+     * @return the number of bytes written into `utf8`.
+     */
+    fun toUtf8(utf8: ByteArray, ibMaxx: Int, isNegative: Boolean, tmp: IntArray, tmpLen: Int): Int {
+        if (tmpLen > 0 && tmpLen <= tmp.size && tmp[tmpLen - 1] != 0 &&
+            ibMaxx > 0 && ibMaxx <= utf8.size) {
+            var ib = ibMaxx
+            var limbsRemaining = tmpLen
+            while (limbsRemaining > 1) {
+                val newLenAndRemainder = mutateBarrettDivBy1e9(tmp, limbsRemaining)
                 val chunk = newLenAndRemainder and 0xFFFF_FFFFuL
                 renderChunk9(chunk, utf8, ib)
-                wordLen = (newLenAndRemainder shr 32).toInt()
+                limbsRemaining = (newLenAndRemainder shr 32).toInt()
                 ib -= 9
             }
-            ib -= renderChunkTail(t[0].toUInt(), utf8, ib)
+            ib -= renderChunkTail(tmp[0].toUInt(), utf8, ib)
             if (isNegative)
                 utf8[--ib] = '-'.code.toByte()
             val len = utf8.size - ib
-            return utf8.decodeToString(ib, ib + len)
+            return len
         } else {
             throw IllegalArgumentException()
         }
