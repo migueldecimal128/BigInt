@@ -24,42 +24,45 @@ private const val M_U64_DIV_1E4 = 0x346DC5D63886594BuL
 private const val S_U64_DIV_1E4 = 11 // + 64 high
 
 /**
- * Provides low-level support for arbitrary-precision unsigned integer arithmetic.
+ * Provides low-level support for arbitrary-precision **unsigned** integer arithmetic.
  *
- * Unsigned magnitudes are represented in **little-endian** format, using 32-bit unsigned
- * limbs stored within an [IntArray].
+ * Unsigned magnitudes are represented in **little-endian** form, using 32-bit limbs
+ * stored in a raw [IntArray]. Although the limbs represent unsigned values, an
+ * [IntArray] is used instead of [UIntArray] because the latter is merely a wrapper
+ * around [IntArray] and is inappropriate for high-performance internal arithmetic.
+ * Kotlin unsigned primitives ([UInt], [ULong]) are used for temporary scalar values.
  *
- * Multi-limb values are stored in [IntArray] even though the individual limbs are
- * unsigned. This stems from the lack of unsigned types in the JVM spec. Kotlin
- * [UIntArray] is actually a wrapper around [IntArray] and is inappropriate for this
- * application. Kotlin unsigned types [UInt] and [ULong] are used when primitive
- * integer types are passed around.
-  *
  * ### Design Overview
- * - `new` functions return **immutable** [IntArray]s and are typically used by [HugeInt].
- * - `mutate` functions modify the supplied destination [IntArray] in place and are used
- *   by [HugeIntAccumulator].
+ * - The bit-length (`bitLen`) is restricted to the non-negative range of an `Int`
+ *   (i.e., **< 2³¹**). Consequently, an [IntArray] may contain up to `2^(31–5)` limbs
+ *   (exclusive). For example, an [IntArray] of size `2²⁶–1` would consume ~256 MiB and
+ *   represent an integer with approximately **6.46×10⁸ decimal digits**. In practice,
+ *   performance and memory constraints will be reached long before this theoretical
+ *   upper bound.
+ * - `new*` functions construct **immutable** limb arrays and are used by [HugeInt].
+ * - `mutate*` functions operate **in place** on an existing destination array and are
+ *   used by [HugeIntAccumulator].
  *
  * ### Available Functionality
- * - Magia is effectively a complete arbitrary-length integer ALU Arithmetic Logic Unit
- * - **Arithmetic operations:** `add`, `sub`, `mul`, `div`, `rem`, `sqr`
- * - **Standard bitwise operations:** `and`, `or`, `xor`, `shl`, `shr`
- * - **Advanced bit manipulation:** `bitLen`, `nlz`, `bitPopulation`, `testBit`, `setBit`,
- *   and bit-mask creation routines
- * - **Parsing:** Supports text input from `String`, `CharSequence`, `CharArray`, and
- *   UTF-8/ASCII encoded `ByteArray` representations
- * - **Conversion:** To `String` and UTF-8/ASCII encoded `ByteArray`
- * - **Serialization:** To and from little- or big-endian, two’s complement or unsigned
- *   formats
+ * - Magia acts as a complete arbitrary-length integer **ALU** (Arithmetic Logic Unit).
+ * - **Arithmetic:** `add`, `sub`, `mul`, `div`, `rem`, `sqr`
+ * - **Bitwise:** `and`, `or`, `xor`, `shl`, `shr`
+ * - **Bit-operations:** `bitLen`, `nlz`, `bitPopulation`, `testBit`, `setBit`,
+ *   and utility bit-mask construction routines.
+ * - **Parsing:** From `String`, `CharSequence`, `CharArray`, and ASCII/UTF-8 `ByteArray`.
+ * - **Conversion:** To decimal `String` or ASCII/UTF-8 `ByteArray`.
+ * - **Serialization:** To and from little- or big-endian unsigned / two’s-complement
+ *   formats.
  *
- * Be advised that these functions are intended for a high-performance library. The caller
- * generally needs a deep understanding of low-level bit manipulation techniques. The goal
- * of high performance often leads to bit-twiddling in an effort to have blocks of branchless
- * code with a high level of instruction-level-parallelism. This adds significantly to the
- * complexity.
+ * ### Notes on Intended Use
+ * These routines are intentionally **low-level** and assume familiarity with
+ * bit-manipulation techniques. High performance is achieved through
+ * branch-elimination and instruction-level parallelism, which can make certain
+ * routines appear intricate or non-obvious to readers unfamiliar with this style
+ * of implementation.
  *
- * This object forms the computational core for higher-level numeric abstractions such as [HugeInt]
- * and [HugeIntAccumulator].
+ * Magia forms the computational core used by higher-level abstractions such as
+ * [HugeInt] and [HugeIntAccumulator].
  */
 object Magia {
 
@@ -162,6 +165,8 @@ object Magia {
     inline fun newWithBitLen(bitLen: Int) =
         if (bitLen > 0) IntArray(limbLenFromBitLen(bitLen)) else ZERO
 
+    const val MAX_ALLOC_SIZE_MASK = (1 shl 26) - 1
+
     /**
      * Creates a new limb array with at least [floorLen] elements.
      *
@@ -172,7 +177,7 @@ object Magia {
     inline fun newWithFloorLen(floorLen: Int) : IntArray {
         val t = if (floorLen <= 0) 1 else floorLen
         val allocSize = (t + 3) and 3.inv()
-        return IntArray(allocSize)
+        return IntArray(allocSize and MAX_ALLOC_SIZE_MASK)
     }
 
     /**
@@ -227,7 +232,7 @@ object Magia {
 
     fun newCopyWithExactLen(src: IntArray, exactLimbLen: Int): IntArray {
         if (exactLimbLen > 0) {
-            val dst = IntArray(exactLimbLen)
+            val dst = IntArray(exactLimbLen and MAX_ALLOC_SIZE_MASK)
             //System.arraycopy(src, 0, dst, 0, min(src.size, dst.size))
             src.copyInto(dst, 0, 0, min(src.size, dst.size))
             return dst
@@ -816,7 +821,7 @@ object Magia {
             return ZERO
         val bitLen = bitLengthFromNormalized(x, xLen)
         val sqrLimbLen = (2 * bitLen + 0x1F) shr 5
-        val p = IntArray(sqrLimbLen)
+        val p = IntArray(sqrLimbLen and MAX_ALLOC_SIZE_MASK)
         sqr(p, x, xLen)
         return p
     }
@@ -926,7 +931,7 @@ object Magia {
         val newWordLen = (newBitLen + 0x1F) ushr 5
         val wordShift = bitCount ushr 5
         val innerShift = bitCount and ((1 shl 5) - 1)
-        val z = IntArray(max(newWordLen, 0))
+        val z = IntArray(max(newWordLen, 0) and MAX_ALLOC_SIZE_MASK)
         if (innerShift != 0) {
             val iLast = z.size - 1
             for (i in 0..<iLast)
@@ -1196,7 +1201,7 @@ object Magia {
             if (iLast < 0)
                 return ZERO
         } while ((x[iLast] and y[iLast]) == 0)
-        val z = IntArray(iLast + 1)
+        val z = IntArray((iLast + 1) and MAX_ALLOC_SIZE_MASK)
         while (iLast >= 0) {
             z[iLast] = x[iLast] and y[iLast]
             --iLast
@@ -1900,36 +1905,35 @@ object Magia {
             val limbLen = nonZeroLimbLen(x, xLen)
             val t = newCopyWithExactLen(x, limbLen)
             val len = destructiveToUtf8BeforeIndex(utf8, utf8.size, isNegative, t, limbLen)
-            return utf8.decodeToString(utf8.size - len, utf8.size)
+            val startingIndex = utf8.size - len
+            check (startingIndex <= 1)
+            return utf8.decodeToString(startingIndex, utf8.size)
         } else {
             throw IllegalArgumentException()
         }
     }
 
     /**
-     * Returns an upper bound on the number of decimal digits required to represent
-     * a non-negative integer of the given bit length.
+     * Returns an upper bound on the number of decimal digits required to
+     * represent a non-negative integer with the given bit length.
      *
-     * The exact digit count for a value with `bitLen` bits is:
+     * For any positive integer `x`, the exact digit count is:
      *
      *     digits = floor(bitLen * log10(2)) + 1
      *
-     * This function uses a fixed-point approximation for `log10(2)`:
+     * This function computes a tight conservative approximation using a
+     * fixed-point 2**32 scaled constant that slightly exceeds `log10(2)`.
+     * This function always produces a close safe upper bound on the number
+     * of base-10 digits, never overestimating by more than 1 for values
+     * with tens of thousands of digits
      *
-     *     log10(2) ≈ 1234 / 4096
-     *
-     * so the expression
-     *
-     *     ((bitLen * 1234) >> 12) + 1
-     *
-     * produces a fast, conservative estimate: it never underestimates the number
-     * of decimal digits needed, and the `+1` accounts for the standard
-     * `floor(x) + 1` form of the digit-count formula.
-     *
-     * @param bitLen the bit length of the positive integer (must be ≥ 1)
-     * @return an upper bound on the number of base-10 digits required
+     * @param bitLen the bit length of the integer (must be ≥ 0)
+     * @return an upper bound on the required decimal digit count
      */
-    fun maxDigitLenFromBitLen(bitLen: Int) = ((bitLen * 1234) shr 12) + 1
+    inline fun maxDigitLenFromBitLen(bitLen: Int): Int {
+        // LOG10_2_CEIL_SCALE_2_32  = 1292913987uL
+        return (bitLen.toULong() * 1292913987uL shr 32).toInt() + 1
+    }
 
     /**
      * Converts the big-integer value in `t` (length `tLen`) into decimal UTF-8 digits.
@@ -2379,7 +2383,7 @@ object Magia {
                 return if (isNegative) ONE else ZERO
         }
 
-        val magia = IntArray((remaining + 3) shr 2)
+        val magia = IntArray((remaining + 3) ushr 2)
 
         var ib = ibLsb
         var iw = 0
