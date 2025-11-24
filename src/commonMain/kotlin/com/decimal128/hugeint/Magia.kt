@@ -2178,6 +2178,9 @@ object Magia {
      * After all limbs are processed, the function computes the new effective length
      * of [magia] (trimming the most significant zero limb, if present) without looping.
      *
+     * The new len will usually be one less, but sometimes will be the same. The most
+     * significant limb is always written ... meaning that it will be zero-ed out.
+     *
      * @param magia the multi-limb integer to divide. Must have `magia[len - 1] != 0`.
      *              Each element represents 32 bits of the number.
      * @param len the number of limbs in [magia] to process.
