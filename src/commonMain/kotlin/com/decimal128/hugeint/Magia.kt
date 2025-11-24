@@ -23,6 +23,11 @@ private const val S_U32_DIV_1E2 = 37
 private const val M_U64_DIV_1E4 = 0x346DC5D63886594BuL
 private const val S_U64_DIV_1E4 = 11 // + 64 high
 
+// these magic reciprocal constants only work for values up to
+// 10**9 / 10**4
+private const val M_1E9_DIV_1E4 = 879_609_303uL
+private const val S_1E9_DIV_1E4 = 43
+
 private const val LOG2_10_CEIL_32 = 14_267_572_565uL
 
 /**
@@ -858,7 +863,7 @@ object Magia {
      * @param pow10 the decimal power (0..9) selecting the precomputed multiplier.
      * @param a the 32-bit addend fused into the result.
      */
-    private fun mutateFmaPow10(x: IntArray, pow10: Int, a: Int) {
+    fun mutateFmaPow10(x: IntArray, pow10: Int, a: Int) {
         if (pow10 in 0..9) {
             val m64 = POW10[pow10].toULong()
             var carry = dw32(a)
@@ -2105,13 +2110,15 @@ object Magia {
      * utf8[offMaxx - 9] .. utf8[offMaxx - 1] = '0'..'9'
      * ```
      *
-     * @param dw the 9-digit unsigned long value to render.
+     * @param dw the 9-digit unsigned long value to render ... `0..999999999`
      * @param utf8 the output byte buffer for ASCII digits.
      * @param offMaxx the maximum exclusive offset within [utf8];
      * digits occupy the range `offMaxx - 9 .. offMaxx - 1`.
      */
     fun render9DigitsBeforeIndex(dw: ULong, utf8: ByteArray, offMaxx: Int) {
-        val abcde = unsignedMulHi(dw, M_U64_DIV_1E4) shr S_U64_DIV_1E4
+        check (dw < 1_000_000_000uL)
+        //val abcde = unsignedMulHi(dw, M_U64_DIV_1E4) shr S_U64_DIV_1E4
+        val abcde = (dw * M_1E9_DIV_1E4) shr S_1E9_DIV_1E4
         val fghi  = dw - (abcde * 10000uL)
 
         val abc = (abcde * M_U32_DIV_1E2) shr S_U32_DIV_1E2
@@ -2181,7 +2188,7 @@ object Magia {
      * **Note:** The correction is a 0-or-1 adjustment; `qHat` never decreases.
      * **Correctness:** Guarantees that after each limb, `0 ≤ rHat < 1e9`.
      */
-    internal fun mutateBarrettDivBy1e9(magia: IntArray, len: Int): ULong {
+    fun mutateBarrettDivBy1e9(magia: IntArray, len: Int): ULong {
         var rem = 0uL
         check(magia[len - 1] != 0)
         for (i in len - 1 downTo 0) {
