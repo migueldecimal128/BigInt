@@ -23,6 +23,8 @@ private const val S_U32_DIV_1E2 = 37
 private const val M_U64_DIV_1E4 = 0x346DC5D63886594BuL
 private const val S_U64_DIV_1E4 = 11 // + 64 high
 
+private const val LOG2_10_CEIL_32 = 14_267_572_565uL
+
 /**
  * Provides low-level support for arbitrary-precision **unsigned** integer arithmetic.
  *
@@ -77,10 +79,16 @@ object Magia {
      *
      * **WARNING** do NOT mutate this.
      */
-    val ONE = intArrayOf(1)
+    internal val ONE = intArrayOf(1)
 
     private inline fun U32(n: Int) = n.toLong() and 0xFFFF_FFFFL
     private inline fun dw32(n: Int) = n.toUInt().toULong()
+
+    /**
+     * Largest allowed limb-array length.  (2²⁶−1 elements)
+     * Chosen so that bitLength = limbLen * 32 always remains < Int.MAX_VALUE.
+     */
+    private const val MAX_ALLOC_SIZE = (1 shl 26) - 1
 
     /**
      * Converts the first limb of [x] into a single [UInt] value.
@@ -158,26 +166,51 @@ object Magia {
     }
 
     /**
-     * Creates a new limb array large enough to hold a value of [bitLen] bits.
+     * Allocates a new limb array large enough to represent a value whose
+     * magnitude requires **[bitLen]** bits.
      *
-     * Returns [ZERO] if [bitLen] ≤ 0.
+     * • If `bitLen <= 0`, returns the canonical zero-array **[ZERO]**.
+     * • If `1 ≤ bitLen ≤ MAX_ALLOC_SIZE * 32`, allocates an array sized by
+     *   `limbLenFromBitLen(bitLen)`.
+     * • Otherwise throws `IllegalArgumentException`.
+     *
+     * @param bitLen required bit length of the value.
+     * @return an `IntArray` sized to hold a value of the given bit length,
+     *         or **ZERO** when `bitLen <= 0`.
      */
-    inline fun newWithBitLen(bitLen: Int) =
-        if (bitLen > 0) IntArray(limbLenFromBitLen(bitLen)) else ZERO
-
-    const val MAX_ALLOC_SIZE_MASK = (1 shl 26) - 1
+    fun newWithBitLen(bitLen: Int): IntArray {
+        return when {
+            bitLen in 1..(MAX_ALLOC_SIZE*32) ->
+                IntArray(limbLenFromBitLen(bitLen))
+            bitLen == 0 -> ZERO
+            else ->
+                throw IllegalArgumentException("invalid allocation bitLen:$bitLen")
+        }
+    }
 
     /**
-     * Creates a new limb array with at least [floorLen] elements.
+     * Creates a new limb array with at least **floorLen** elements.
      *
-     * This will never allocate less than 4 elements
-     * Mutable routines use this to utilize all allocated storage,
-     * rounding up to a 4 Int 16 byte boundary.
+     * Used by mutating accumulators that expect values to grow. The
+     * allocated size is rounded up to the next multiple of 4 to reduce
+     * external fragmentation and ensure all allocated storage is usable.
+     *
+     * The maximum allowed size is **MAX_ALLOC_SIZE = 2²⁶ − 1**, chosen so
+     * any array allocated here can represent a HugeInt whose `bitLen`
+     * will remain `< Int.MAX_VALUE`.
+     *
+     * @param floorLen minimum required limb count (0 ≤ floorLen ≤ MAX_ALLOC_SIZE)
+     * @return an `IntArray` of size ≥ floorLen, rounded up to a multiple of 4
      */
-    inline fun newWithFloorLen(floorLen: Int) : IntArray {
-        val t = if (floorLen <= 0) 1 else floorLen
-        val allocSize = (t + 3) and 3.inv()
-        return IntArray(allocSize and MAX_ALLOC_SIZE_MASK)
+    fun newWithFloorLen(floorLen: Int) : IntArray {
+        if (floorLen in 0..MAX_ALLOC_SIZE) {
+            // if floorLen == 0 then add 1
+            val t = floorLen + 1 - (-floorLen ushr 31)
+            val allocSize = (t + 3) and 3.inv()
+            if (allocSize <= MAX_ALLOC_SIZE)
+                return IntArray(allocSize)
+        }
+        throw IllegalArgumentException("invalid allocation length:$floorLen")
     }
 
     /**
@@ -231,16 +264,19 @@ object Magia {
     }
 
     fun newCopyWithExactLen(src: IntArray, exactLimbLen: Int): IntArray {
-        if (exactLimbLen > 0) {
-            val dst = IntArray(exactLimbLen and MAX_ALLOC_SIZE_MASK)
+        if (exactLimbLen in 1..MAX_ALLOC_SIZE) {
+            val dst = IntArray(exactLimbLen)
             //System.arraycopy(src, 0, dst, 0, min(src.size, dst.size))
             src.copyInto(dst, 0, 0, min(src.size, dst.size))
             return dst
         }
-        return ZERO
+        if (exactLimbLen == 0)
+            return ZERO
+        throw IllegalArgumentException("invalid allocation length:$exactLimbLen")
     }
 
     private fun newCopyWithBitLen(src: IntArray, newBitLen: Int): IntArray {
+
         val dst = newWithBitLen(newBitLen)
         //copy(dst, src)
         src.copyInto(dst, 0, 0, min(src.size, dst.size))
@@ -268,7 +304,7 @@ object Magia {
     }
 
     /**
-     * Returns a new limb array representing [x] plus the signed 64-bit value [dw].
+     * Returns a new limb array representing [x] plus the unsigned 64-bit value [dw].
      *
      * The result is extended as needed to hold any carry or sign extension from the addition.
      */
@@ -792,21 +828,50 @@ object Magia {
     }
 
     /**
-     * Performs an in-place fused multiply-add on [x]: x[i] = x[i] * [m] + [a], propagating carry.
+     * Powers of 10 from 10⁰ through 10⁹.
      *
-     * Used internally when parsing base-10 text strings.
-     *
-     * @param x the limb array to be mutated.
-     * @param m the multiplier.
-     * @param a the addend.
+     * Used for fast small-power decimal scaling.
      */
-    private fun mutateFma(x: IntArray, m: Int, a: Int) {
-        val m64 = U32(m)
-        var carry = U32(a)
-        for (i in x.indices) {
-            val t = U32(x[i]) * m64 + carry
-            x[i] = t.toInt()
-            carry = t ushr 32
+    private val POW10 = IntArray(10)
+    init {
+        POW10[0] = 1
+        for (i in 1 until POW10.size)
+            POW10[i] = POW10[i - 1] * 10
+    }
+
+
+    /**
+     * Performs an in-place fused multiply-add on the limb array [x]:
+     *
+     *     x = x * 10^pow10 + a
+     *
+     * where the multiplication is carried out using a precomputed 64-bit
+     * multiplier for powers of ten in the fixed range **0‥9**.
+     *
+     * This is used internally during text parsing of decimal inputs to
+     * accumulate digits efficiently in base-2³² limbs.
+     *
+     * Requirements:
+     *  • `pow10` must be in **0..9**
+     *  • `a` is an unsigned 32-bit addend (lower 32 bits of the next digit chunk)
+     *
+     * If `pow10` lies outside 0..9, an `IllegalArgumentException` is thrown.
+     *
+     * @param x the limb array to mutate (little-endian base-2³²).
+     * @param pow10 the decimal power (0..9) selecting the precomputed multiplier.
+     * @param a the 32-bit addend fused into the result.
+     */
+    private fun mutateFmaPow10(x: IntArray, pow10: Int, a: Int) {
+        if (pow10 in 0..9) {
+            val m64 = POW10[pow10].toULong()
+            var carry = dw32(a)
+            for (i in x.indices) {
+                val t = dw32(x[i]) * m64 + carry
+                x[i] = t.toInt()
+                carry = t shr 32
+            }
+        } else {
+            throw IllegalArgumentException()
         }
     }
 
@@ -820,8 +885,8 @@ object Magia {
         if (xLen == 0)
             return ZERO
         val bitLen = bitLengthFromNormalized(x, xLen)
-        val sqrLimbLen = (2 * bitLen + 0x1F) shr 5
-        val p = IntArray(sqrLimbLen and MAX_ALLOC_SIZE_MASK)
+        val sqrBitLen = 2 * bitLen
+        val p = newWithBitLen(sqrBitLen)
         sqr(p, x, xLen)
         return p
     }
@@ -928,10 +993,9 @@ object Magia {
         val newBitLen = bitLen(x) - bitCount
         if (newBitLen <= 0)
             return ZERO
-        val newWordLen = (newBitLen + 0x1F) ushr 5
         val wordShift = bitCount ushr 5
         val innerShift = bitCount and ((1 shl 5) - 1)
-        val z = IntArray(max(newWordLen, 0) and MAX_ALLOC_SIZE_MASK)
+        val z = newWithBitLen(newBitLen)
         if (innerShift != 0) {
             val iLast = z.size - 1
             for (i in 0..<iLast)
@@ -1201,7 +1265,7 @@ object Magia {
             if (iLast < 0)
                 return ZERO
         } while ((x[iLast] and y[iLast]) == 0)
-        val z = IntArray((iLast + 1) and MAX_ALLOC_SIZE_MASK)
+        val z = IntArray((iLast + 1))
         while (iLast >= 0) {
             z[iLast] = x[iLast] and y[iLast]
             --iLast
@@ -2564,7 +2628,7 @@ object Magia {
      * - Hexadecimal input prefixed with "0x" or "0X" is delegated to [fromHex].
      *
      * The function accumulates decimal digits in blocks of 9 for efficiency, using
-     * [mutateFma] to multiply and add into the resulting array.
+     * [mutateFmaPow10] to multiply and add into the resulting array.
      *
      * @param src the input iterator providing characters in Latin-1 encoding.
      * @return a new [IntArray] representing the magnitude of the parsed integer.
@@ -2592,7 +2656,10 @@ object Magia {
             var accumulator = 0
             var accumulatorDigitCount = 0
             val remainingLen = src.remainingLen() + if (ch == '\u0000') 0 else 1
-            val bitLen = (remainingLen * 13607 + 4095) ushr 12
+            // val bitLen = (remainingLen * 13607 + 4095) ushr 12
+            val roundUp32 = (1uL shl 32) - 1uL
+            val bitLen =
+                ((remainingLen.toULong() * LOG2_10_CEIL_32 + roundUp32) shr 32).toInt()
             if (bitLen == 0) {
                 if (leadingZeroSeen)
                     return ZERO
@@ -2614,17 +2681,13 @@ object Magia {
                 ++accumulatorDigitCount
                 if (accumulatorDigitCount < 9)
                     continue
-                mutateFma(z, 1000000000, accumulator)
+                mutateFmaPow10(z, 9, accumulator)
                 accumulator = 0
                 accumulatorDigitCount = 0
             }
             if (ch == '\u0000' && chLast != '_') {
-                if (accumulatorDigitCount > 0) {
-                    var pow10 = 1
-                    for (j in 0..<accumulatorDigitCount)
-                        pow10 *= 10
-                    mutateFma(z, pow10, accumulator)
-                }
+                if (accumulatorDigitCount > 0)
+                    mutateFmaPow10(z, accumulatorDigitCount, accumulator)
                 return z
             }
         } while (false)
