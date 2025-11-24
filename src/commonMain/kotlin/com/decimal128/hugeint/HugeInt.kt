@@ -1907,7 +1907,7 @@ class HugeInt private constructor(val sign: Boolean, val magia: IntArray): Compa
             return HugeInt(thisSign, Magia.newAdd(this.magia, w))
         val cmp = this.magnitudeCompareTo(w)
         val ret = when {
-            cmp > 0 -> HugeInt(thisSign, Magia.newSub(this.magia, w.toInt()))
+            cmp > 0 -> HugeInt(thisSign, Magia.newSub(this.magia, w))
             cmp < 0 -> HugeInt(otherSign, intArrayOf(w.toInt() - this.magia[0]))
             else -> ZERO
         }
@@ -1945,10 +1945,10 @@ class HugeInt private constructor(val sign: Boolean, val magia: IntArray): Compa
         }
         val thisSign = this.sign xor signFlipThis
         if (thisSign == otherSign)
-            return HugeInt(thisSign, Magia.newAdd(this.magia, dw.toLong()))
+            return HugeInt(thisSign, Magia.newAdd(this.magia, dw))
         val cmp = this.magnitudeCompareTo(dw)
         val ret = when {
-            cmp > 0 -> HugeInt(thisSign, Magia.newSub(this.magia, dw.toLong()))
+            cmp > 0 -> HugeInt(thisSign, Magia.newSub(this.magia, dw))
             cmp < 0 -> {
                 val thisMag = this.magnitudeRawULong()
                 val diff = dw - thisMag

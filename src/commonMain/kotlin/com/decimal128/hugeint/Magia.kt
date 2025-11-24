@@ -81,7 +81,6 @@ object Magia {
      */
     internal val ONE = intArrayOf(1)
 
-    private inline fun U32(n: Int) = n.toLong() and 0xFFFF_FFFFL
     private inline fun dw32(n: Int) = n.toUInt().toULong()
 
     /**
@@ -308,20 +307,20 @@ object Magia {
      *
      * The result is extended as needed to hold any carry or sign extension from the addition.
      */
-    fun newAdd(x: IntArray, dw: Long): IntArray {
+    fun newAdd(x: IntArray, dw: ULong): IntArray {
         val newBitLen = max(bitLen(x), (64 - dw.countLeadingZeroBits())) + 1
         val z = newWithBitLen(newBitLen)
         var carry = dw
         val indexLimit = min(x.size, z.size)
         for (i in 0..<indexLimit) {
-            val t = U32(x[i]) + (carry and 0xFFFF_FFFFL)
+            val t = dw32(x[i]) + (carry and 0xFFFF_FFFFuL)
             z[i] = t.toInt()
-            carry = (t ushr 32) + (carry ushr 32)
+            carry = (t shr 32) + (carry shr 32)
         }
-        if (carry != 0L)
+        if (carry != 0uL)
             z[indexLimit] = carry.toInt()
-        if (carry ushr 32 != 0L)
-            z[indexLimit + 1] = (carry ushr 32).toInt()
+        if (carry shr 32 != 0uL)
+            z[indexLimit + 1] = (carry shr 32).toInt()
         return z
     }
 
@@ -335,24 +334,26 @@ object Magia {
         val z = newWithBitLen(newBitLen)
 
         val min = min(z.size, min(x.size, y.size))
-        var carry = 0L
+        var carry = 0uL
         var i = 0
         while (i < min) {
-            val t = U32(x[i]) + U32(y[i]) + carry
+            val t = dw32(x[i]) + dw32(y[i]) + carry
             z[i] = t.toInt()
-            carry = t ushr 32
-            check(carry in 0L..1L)
+            carry = t shr 32
+            check((carry shr 1) == 0uL)
             ++i
         }
         val longer = if (x.size > y.size) x else y
         while (i < longer.size && i < z.size) {
-            val t = U32(longer[i]) + carry
+            val t = dw32(longer[i]) + carry
             z[i] = t.toInt()
-            carry = t ushr 32
+            carry = t shr 32
             ++i
         }
-        if (carry != 0L && i < z.size)
+        if (carry != 0uL) {
+            check (carry == 1uL)
             z[i] = 1
+        }
         return z
     }
 
@@ -485,54 +486,54 @@ object Magia {
      *
      * If the result is zero or the subtraction underflows, returns [ZERO].
      */
-    fun newSub(x: IntArray, w: Int): IntArray {
+    fun newSub(x: IntArray, w: UInt): IntArray {
         val z = IntArray(nonZeroLimbLen(x))
         var orAccumulator = 0
-        var borrow = U32(w)
+        var borrow = w.toULong()
         for (i in z.indices) {
-            val t = U32(x[i]) - borrow
+            val t = dw32(x[i]) - borrow
             val zi = t.toInt()
             z[i] = zi
             orAccumulator = orAccumulator or zi
-            borrow = t ushr 63
+            borrow = t shr 63
         }
-        return if (orAccumulator == 0 || borrow != 0L) ZERO else z
+        return if (orAccumulator == 0 || borrow != 0uL) ZERO else z
     }
 
     /**
-     * Returns a new limb array representing [x] minus the signed 64-bit value [dw].
+     * Returns a new limb array representing [x] minus the unsigned 64-bit value [dw].
      * The caller must ensure that x >= y.
      *
      * If the result is zero or the subtraction underflows, returns [ZERO].
      */
-    fun newSub(x: IntArray, dw: Long): IntArray {
+    fun newSub(x: IntArray, dw: ULong): IntArray {
         val z = IntArray(nonZeroLimbLen(x))
         var orAccumulator = 0
-        var borrow = 0L
+        var borrow = 0uL
         if (z.isNotEmpty()) {
-            val t0 = U32(x[0]) - (dw and 0xFFFF_FFFFL)
+            val t0 = dw32(x[0]) - (dw and 0xFFFF_FFFFuL)
             val z0 = t0.toInt()
             z[0] = z0
             orAccumulator = z0
             if (z.size > 1) {
-                borrow = t0 ushr 63
-                val t1 = U32(x[1]) - (dw ushr 32) - borrow
+                borrow = t0 shr 63
+                val t1 = dw32(x[1]) - (dw shr 32) - borrow
                 val z1 = t1.toInt()
                 z[1] = z1
                 orAccumulator = orAccumulator or z1
-                borrow = t1 ushr 63
+                borrow = t1 shr 63
                 var i = 2
                 while (i < z.size) {
-                    val t = U32(x[i]) - borrow
+                    val t = dw32(x[i]) - borrow
                     val zi = t.toInt()
                     z[i] = zi
                     orAccumulator = orAccumulator or zi
-                    borrow = t ushr 63
+                    borrow = t shr 63
                     ++i
                 }
             }
         }
-        return if (orAccumulator == 0 || borrow != 0L) ZERO else z
+        return if (orAccumulator == 0 || borrow != 0uL) ZERO else z
     }
 
     /**
@@ -545,31 +546,27 @@ object Magia {
         check (compare(x, y) >= 0)
         val z = IntArray(nonZeroLimbLen(x))
         var orAccumulator = 0
-        var borrow = 0L
+        var borrow = 0uL
         val min = min(z.size, min(x.size, y.size))
         var i = 0
         while (i < min) {
-            val t = U32(x[i]) - U32(y[i]) - borrow
+            val t = dw32(x[i]) - dw32(y[i]) - borrow
             val zi = t.toInt()
             z[i] = zi
             orAccumulator = orAccumulator or zi
-            borrow = t ushr 63
-            check(borrow in 0L..1L)
+            borrow = t shr 63
             ++i
         }
         while (i < x.size && i < z.size) {
-            val t = U32(x[i]) - borrow
+            val t = dw32(x[i]) - borrow
             val zi = t.toInt()
             z[i] = zi
             orAccumulator = orAccumulator or zi
-            borrow = t ushr 63
+            borrow = t shr 63
             ++i
         }
-        check (borrow == 0L)
-        return if (orAccumulator != 0)
-            z
-        else
-            ZERO
+        check (borrow == 0uL)
+        return if (orAccumulator != 0) z else ZERO
     }
 
     /**
@@ -806,17 +803,17 @@ object Magia {
             check (x[xLen - 1] != 0)
             check (y[yLen - 1] != 0)
             for (i in 0..<xLen) {
-                val xLimb = U32(x[i])
-                var carry = 0L
+                val xLimb = dw32(x[i])
+                var carry = 0uL
                 for (j in 0..<yLen) {
-                    val yLimb = U32(y[j])
-                    val t = xLimb * yLimb + U32(p[i + j]) + carry
+                    val yLimb = dw32(y[j])
+                    val t = xLimb * yLimb + dw32(p[i + j]) + carry
                     p[i + j] = t.toInt()
-                    carry = t ushr 32
+                    carry = t shr 32
                 }
                 if (i + yLen < p.size)
                     p[i + yLen] = carry.toInt()
-                else if (carry != 0L)
+                else if (carry != 0uL)
                     throw IllegalArgumentException()
             }
             val lastIndex = min(xLen + yLen, p.size) - 1
@@ -1547,7 +1544,7 @@ object Magia {
                 return -1
         for (i in minLen - 1 downTo 0) {
             if (x[i] != y[i])
-                return ((((U32(x[i]) - U32(y[i])) shr 63) shl 1) + 1).toInt()
+                return (((dw32(x[i]) - dw32(y[i])).toLong() shr 63) shl 1).toInt() + 1
         }
         return 0
     }
@@ -1576,7 +1573,7 @@ object Magia {
                 return if (xLen > yLen) 1 else -1
             for (i in xLen - 1 downTo 0) {
                 if (x[i] != y[i])
-                    return ((((U32(x[i]) - U32(y[i])) shr 63) shl 1) + 1).toInt()
+                    return (((dw32(x[i]) - dw32(y[i])).toLong() shr 63) shl 1).toInt() + 1
             }
             return 0
         } else {
