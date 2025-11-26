@@ -53,15 +53,16 @@ HugeInt is written in Kotlin and has no dependencies.
 
 ### Creating values
 
-HugeInt exposes **no public constructors**.  
-All instances must be created through `HugeInt.from()` factory methods:
+HugeInt exposes **no public constructors**.
+Instances created from Kotlin primitive integer and String types
+are encouraged to use the supplied extension functions.  
 
 ```kotlin
-val zero  = HugeInt.ZERO
-val small = HugeInt.from(123456789L)
-val dec   = HugeInt.from("123456789012345678901234567890")
-val nines = HugeInt.from("-999_999_999_999_999")
-val hex   = HugeInt.from("0xCAFE_BABE_FACE_DEAD_BEEF_CEDE_FEED_BEAD_FADE")
+val zero  = 0.toHugeInt()
+val small = 123456789L.toHugeInt()
+val dec   = "123456789012345678901234567890".toHugeInt()
+val nines = "-999_999_999_999_999".toHugeInt()
+val hex   = "0xCAFE_BABE_FACE_DEAD_BEEF_CEDE_FEED_BEAD_FADE".toHugeInt()
 ```
 
 ### Basic arithmetic

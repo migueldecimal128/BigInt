@@ -7,6 +7,7 @@ package com.decimal128.hugeint
 import com.decimal128.hugeint.intrinsic.unsignedMulHi
 import kotlin.math.min
 import kotlin.math.max
+import kotlin.text.HexFormat
 
 
 // magia == MAGnitude IntArray ... it's magic!
@@ -2302,7 +2303,7 @@ object Magia {
     }
 
     /**
-     * Factory methods for constructing a numeric value from Latin-1 (ASCII) encoded input.
+     * Factory methods for constructing a numeric value from ASCII/Latin-1/UTF-8 encoded input.
      *
      * Each overload accepts a different input source — `String`, `CharSequence`, `CharArray`,
      * or `ByteArray` — and creates a new instance by parsing its contents as an unsigned
