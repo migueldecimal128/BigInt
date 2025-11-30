@@ -1,9 +1,9 @@
-# 📘 **HugeInt – Arbitrary-Precision Integer Arithmetic for Kotlin Multiplatform**
+# 📘 **BigInt – Arbitrary-Precision Integer Arithmetic for Kotlin Multiplatform**
 ## 🚧⚠️ **Warning! Construction Zone** ⚠️🚧
-`HugeInt` is currently **EXPERIMENTAL**. 
+`BigInt` is currently **EXPERIMENTAL**. 
 Aspects of the API are still subject to change. 
 
-`HugeInt` is a lightweight, high-performance arbitrary-precision
+`BigInt` is a lightweight, high-performance arbitrary-precision
 signed integer type for **Kotlin Multiplatform**, designed to
 bring efficient big-integer arithmetic to 
 **JVM, Native, and JavaScript** with **no external dependencies**.
@@ -31,7 +31,7 @@ the complexity of `java.math.BigInteger`.
 - Sign–magnitude representation with canonical zero
 - Little-endian 32-bit limbs stored in an `IntArray`
 - ByteArray serialization: big/little endian of twos-complement/magnitude
-- Heap-friendly mutable accumulator: `HugeIntAccumulator`
+- Heap-friendly mutable accumulator: `BigIntAccumulator`
 
 ---
 
@@ -41,11 +41,11 @@ the complexity of `java.math.BigInteger`.
 
 ```kotlin
 dependencies {
-    implementation("com.decimal128:hugeint:<version-coming-soon>")
+    implementation("com.decimal128:bigint:<version-coming-soon>")
 }
 ```
 
-HugeInt is written in Kotlin and has no dependencies. 
+BigInt is written in Kotlin and has no dependencies. 
 
 ---
 
@@ -53,26 +53,26 @@ HugeInt is written in Kotlin and has no dependencies.
 
 ### Creating values
 
-HugeInt exposes **no public constructors**.
+BigInt exposes **no public constructors**.
 Instances created from Kotlin primitive integer and String types
 are encouraged to use the supplied extension functions.  
 
 ```kotlin
-val zero  = 0.toHugeInt()
-val small = 123456789L.toHugeInt()
-val dec   = "123456789012345678901234567890".toHugeInt()
-val nines = "-999_999_999_999_999".toHugeInt()
-val hex   = "0xCAFE_BABE_FACE_DEAD_BEEF_CEDE_FEED_BEAD_FADE".toHugeInt()
+val zero  = 0.toBigInt()
+val small = 123456789L.toBigInt()
+val dec   = "123456789012345678901234567890".toBigInt()
+val nines = "-999_999_999_999_999".toBigInt()
+val hex   = "0xCAFE_BABE_FACE_DEAD_BEEF_CEDE_FEED_BEAD_FADE".toBigInt()
 ```
 
 ### Basic arithmetic
 
 ```kotlin
-val a = HugeInt.from("123456789012345678901234567890")
-val b = HugeInt.from(987654321)
+val a = "123456789012345678901234567890".toBigInt()
+val b = 987654321.toBigInt()
 
 val sum  = a + b
-val diff = a - 42
+val diff = a - b
 val prod = a * b
 val quot = a / b
 val rem  = a % b
@@ -97,32 +97,32 @@ All without boxing.
 
 ---
 
-## 🧮 HugeIntAccumulator
+## 🧮 BigIntAccumulator
 
-`HugeIntAccumulator` is a mutable companion type for
+`BigIntAccumulator` is a mutable companion type for
 **efficient in-place accumulation**, dramatically reducing 
-temporary allocations during summation-heavy workloads.
+temporary heap allocations during summation-heavy workloads.
 
 ### Basic usage
 
 ```kotlin
-val s = HugeIntAccumulator()
-val s2 = HugeIntAccumulator()
+val s = BigIntAccumulator()
+val s2 = BigIntAccumulator()
 for (x in myBigData) {
     s += x 
     s2.addSquareOf(x)
 }
-val sum = HugeInt.from(s)
-val sumOfSquares = HugeInt.from(s2)
+val sum = BigInt.from(s)
+val sumOfSquares = BigInt.from(s2)
 
 ```
 
 ```factorial
 
-val f = HugeIntAccumulator().set(1) // start at 1
+val f = BigIntAccumulator().set(1) // start at 1
 for (i in 2..n)
     f *= i
-val factorial = HugeInt.from(f)
+val factorial = BigInt.from(f)
 
 ```
 
