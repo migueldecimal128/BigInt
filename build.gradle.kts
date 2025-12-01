@@ -76,8 +76,6 @@ kotlin {
 
     applyDefaultHierarchyTemplate()
 
-    compilerOptions.optIn.add("kotlinx.cinterop.ExperimentalForeignApi")
-
     // ---------------------------
     // 1. Target configurations
     // ---------------------------
@@ -103,7 +101,7 @@ kotlin {
         nodejs()
     }
 
-    macosX64 {
+    macosX64{
         compilations["main"].cinterops {
             val unsigned_mul_hi by creating {
                 defFile(project.file("src/nativeInterop/cinterop/unsigned_mul_hi.def"))
@@ -138,7 +136,12 @@ kotlin {
 
          */
 
-        val commonMain by getting
+        val commonMain by getting {
+            dependencies {
+                // Use the artifact name as a string, passed to a specific dependency helper
+                implementation(kotlin("stdlib-common"))
+            }
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
@@ -191,12 +194,12 @@ afterEvaluate {
     publishing {
         publications.withType<MavenPublication>().configureEach {
             when (name) {
-                "kotlinMultiplatform" -> artifactId = "hugeint"
-                "jvm" -> artifactId = "hugeint-jvm"
-                "js" -> artifactId = "hugeint-js"
-                "wasmJs" -> artifactId = "hugeint-wasm-js"
-                "wasmWasi" -> artifactId = "hugeint-wasm-wasi"
-                "macosX64" -> artifactId = "hugeint-macosx64"
+                "kotlinMultiplatform" -> artifactId = "bigint"
+                "jvm" -> artifactId = "bigint-jvm"
+                "js" -> artifactId = "bigint-js"
+                "wasmJs" -> artifactId = "bigint-wasm-js"
+                "wasmWasi" -> artifactId = "bigint-wasm-wasi"
+                "macosX64" -> artifactId = "bigint-macosx64"
                 // add more if you add more targets
             }
             pom {

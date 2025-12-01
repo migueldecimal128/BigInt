@@ -9,7 +9,7 @@ import kotlin.time.measureTime
 
 class TestFactorialMacosX64 {
 
-    val verbose = true
+    val verbose = false
 
     @Test
     fun testSmall() {

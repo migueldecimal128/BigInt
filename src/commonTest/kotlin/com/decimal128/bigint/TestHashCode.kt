@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class TestHashCode {
 
-    val verbose = true
+    val verbose = false
 
     @Test
     fun testSignHashCode() {

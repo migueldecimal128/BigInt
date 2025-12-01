@@ -1,5 +1,7 @@
 package com.decimal128.bigint
 
+import kotlin.jvm.JvmInline
+
 /**
  * Represents a sign value encoded canonically as **0** (non-negative)
  * or **-1** (negative).
