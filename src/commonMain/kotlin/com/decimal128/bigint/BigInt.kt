@@ -443,7 +443,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
          * zero occurs with **twice** the probability of any particular non-zero
          * value.
          *
-         * @param bitLen the number of bits to sample; must be positive.
+         * @param bitLen the number of bits to sample; must be >= 0.
          * @param rng the random number generator used for the magnitude and,
          *            when `withRandomSign` is true, for the sign.
          * @param withRandomSign if `true`, assigns a random sign to non-zero
@@ -455,7 +455,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
             rng: Random = Random.Default,
             withRandomSign: Boolean = false
         ): BigInt {
-            if (bitLen >= 0) {
+            if (bitLen > 0) {
                 var zeroTest = 0
                 val magia = Magia.newWithBitLen(bitLen)
                 var mask = (if ((bitLen and 0x1F) == 0) 0 else 1 shl (bitLen and 0x1F)) - 1
@@ -471,7 +471,51 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
                     else -> BigInt(Sign(rng.nextInt() shr 31), magia)
                 }
             }
-            throw IllegalArgumentException()
+            if (bitLen == 0)
+                return ZERO
+            throw IllegalArgumentException("bitLen must be > 0")
+        }
+
+        /**
+         * Generates a random `BigInt` whose bit length is chosen uniformly from the
+         * closed interval `[bitLenMin .. bitLenMax]`, and whose magnitude is uniformly
+         * sampled from `0 .. (2^bitLen - 1)` once that bit length is selected.
+         *
+         * The magnitude is produced exactly as in the single-argument
+         * `fromRandom(bitLen, ...)`: each bit is chosen independently with
+         * probability 0.5, so the true bit length of the value may be smaller than
+         * the selected `bitLen` if the leading sampled bits are zero.
+         *
+         * Zero is always returned as the unique `BigInt.ZERO` object, so—when
+         * `withRandomSign == true`—zero occurs with **twice** the probability of any
+         * specific non-zero magnitude (because zero never receives a sign).
+         *
+         * The sign behavior is identical to the fixed-bit-length overload:
+         *  - When `withRandomSign == false`, the result is always non-negative.
+         *  - When `withRandomSign == true`, non-zero magnitudes receive a random
+         *    sign with equal probability.
+         *
+         * @param bitLenMin the minimum bit length (inclusive); must be ≥ 0.
+         * @param bitLenMax the maximum bit length (inclusive); must be ≥ `bitLenMin`.
+         * @param rng the random number generator used for selecting the bit length,
+         *            magnitude, and (optionally) sign.
+         * @param withRandomSign if `true`, assigns a random sign to non-zero values;
+         *                       otherwise the result is always non-negative.
+         * @return a random `BigInt` with a bit length selected from
+         *         `[bitLenMin .. bitLenMax]`.
+         * @throws IllegalArgumentException if `bitLenMin <= 0` or `bitLenMax < bitLenMin`.
+         */
+        fun fromRandom(
+            bitLenMin: Int,
+            bitLenMax: Int,
+            rng: Random = Random.Default,
+            withRandomSign: Boolean = false
+        ): BigInt {
+            val range = bitLenMax - bitLenMin
+            if (bitLenMin < 0 || range < 0)
+                throw IllegalArgumentException("invalid bitLen range: 0 <= bitLenMin <= bitLenMax")
+            val bitLen = bitLenMin + rng.nextInt(range + 1)
+            return fromRandom(bitLen, rng, withRandomSign)
         }
 
         /**
@@ -723,6 +767,47 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
             return kotlin.math.floor(estimate + correction).toULong() + 1u
         }
 
+        /**
+         * Returns the greatest common divisor (GCD) of the two values [a] and [b].
+         *
+         * The GCD is always non-negative, and `gcd(a, b) == gcd(b, a)`.
+         * If either argument is zero, the result is the absolute value of the other.
+         *
+         * This implementation uses Stein’s binary GCD algorithm, which avoids
+         * multiprecision division and relies only on subtraction, comparison,
+         * and bit-shifts — operations that are efficient on `BigInt`.
+         *
+         * @return the non-negative greatest common divisor of [a] and [b]
+         */
+        fun gcd(a: BigInt, b: BigInt): BigInt {
+            if (a.isZero())
+                return b.abs()
+            if (b.isZero())
+                return a.abs()
+            val magia = Magia.gcd(a.magia, b.magia)
+            check(magia !== Magia.ZERO)
+            return BigInt(POSITIVE, magia)
+        }
+
+        /**
+         * Returns the least common multiple (LCM) of [a] and [b].
+         *
+         * If either argument is zero, the result is `BigInt.ZERO`. Otherwise the LCM is
+         * defined as `|a / gcd(a, b)| * |b|` and is always non-negative.
+         *
+         * This implementation divides the smaller magnitude by the GCD to minimize the
+         * cost of multiprecision division, then multiplies by the larger magnitude.
+         */
+        fun lcm(a: BigInt, b: BigInt): BigInt {
+            if (a.isZero() || b.isZero())
+                return ZERO
+            val gcd = Magia.gcd(a.magia, b.magia)
+            val lcm = if (Magia.bitLen(a.magia) < Magia.bitLen(b.magia))
+                Magia.newMul(Magia.newDiv(a.magia, gcd), b.magia)
+            else
+                Magia.newMul(Magia.newDiv(b.magia, gcd), a.magia)
+            return BigInt(POSITIVE, lcm)
+        }
 
     }
 
@@ -797,7 +882,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
 
     /**
      * Returns `true` if this value is non-negative and fits in an unsigned
-     * 64-bit integer (`0 .. ULong.MAX.MAX_VALUE`).
+     * 64-bit integer (`0 .. ULong.MAX_VALUE`).
      */
     fun fitsULong() = sign.isPositive && Magia.nonZeroLimbLen(magia) <= 2
 
@@ -816,10 +901,67 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
     fun toInt() = if (magia.isEmpty()) 0 else (magia[0] xor sign.mask) - sign.mask
 
     /**
+     * Returns this value as a signed `Int`, throwing an [ArithmeticException]
+     * if it cannot be represented exactly. Unlike [toInt], this performs a
+     * strict range check instead of truncating the upper bits.
+     */
+    fun toIntExact(): Int =
+        if (fitsInt())
+            toInt()
+        else
+            throw ArithmeticException("BigInt out of Int range")
+
+    /**
+     * Returns this BigInt as a signed Int, clamped to `Int.MIN_VALUE..Int.MAX_VALUE`.
+     *
+     * Values greater than `Int.MAX_VALUE` return `Int.MAX_VALUE`.
+     * Values less than `Int.MIN_VALUE` return `Int.MIN_VALUE`.
+     */
+    fun toIntClamped(): Int {
+        val bitLen = Magia.bitLen(magia)
+        if (bitLen == 0)
+            return 0
+        val mag = magia[0]
+        return if (sign.isPositive) {
+            if (bitLen <= 31) mag else Int.MAX_VALUE
+        } else {
+            if (bitLen <= 31) -mag else Int.MIN_VALUE
+        }
+    }
+
+    /**
      * Returns the low 32 bits of this value interpreted as an unsigned
      * two’s-complement `UInt` (i.e., wraps modulo 2³², like `Long.toUInt()`).
      */
     fun toUInt() = toInt().toUInt()
+
+    /**
+     * Returns this value as a `UInt`, throwing an [ArithmeticException]
+     * if it cannot be represented exactly. Unlike [toUInt], this checks
+     * that the value is within the unsigned 32-bit range.
+     */
+    fun toUIntExact(): UInt =
+        if (fitsUInt())
+            toUInt()
+        else
+            throw ArithmeticException("BigInt out of UInt range")
+
+    /**
+     * Returns this BigInt as an unsigned UInt, clamped to `0..UInt.MAX_VALUE`.
+     *
+     * Values greater than `UInt.MAX_VALUE` return `UInt.MAX_VALUE`.
+     * Negative values return 0.
+     */
+    fun toUIntClamped(): UInt {
+        if (sign.isPositive) {
+            val bitLen = Magia.bitLen(magia)
+            if (bitLen > 0) {
+                val magnitude = magia[0]
+                return if (bitLen <= 32) magnitude.toUInt() else UInt.MAX_VALUE
+            }
+        }
+        return 0u
+    }
 
     /**
      * Returns the low 64 bits of this value as a signed two’s-complement `Long`.
@@ -839,10 +981,71 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
     }
 
     /**
+     * Returns this value as a `Long`, throwing an [ArithmeticException]
+     * if it cannot be represented exactly. Unlike [toLong], this checks
+     * that the value lies within the signed 64-bit range.
+     */
+    fun toLongExact(): Long =
+        if (fitsLong())
+            toLong()
+        else
+            throw ArithmeticException("BigInt out of Long range")
+
+    /**
+     * Returns this BigInt as a signed Long, clamped to `Long.MIN_VALUE..Long.MAX_VALUE`.
+     *
+     * Values greater than `Long.MAX_VALUE` return `Long.MAX_VALUE`.
+     * Values less than `Long.MIN_VALUE` return `Long.MIN_VALUE`.
+     */
+    fun toLongClamped(): Long {
+        val bitLen = Magia.bitLen(magia)
+        val magnitude = when (magia.size) {
+            0 -> 0L
+            1 -> magia[0].toLong() and 0xFFFF_FFFFL
+            else -> (magia[1].toLong() shl 32) or (magia[0].toLong() and 0xFFFF_FFFFL)
+        }
+        return if (sign.isPositive) {
+            if (bitLen <= 63) magnitude else Long.MAX_VALUE
+        } else {
+            if (bitLen <= 63) -magnitude else Long.MIN_VALUE
+        }
+    }
+
+    /**
      * Returns the low 64 bits of this value interpreted as an unsigned
      * two’s-complement `ULong` (wraps modulo 2⁶⁴, like `Long.toULong()`).
      */
     fun toULong(): ULong = toLong().toULong()
+
+    /**
+     * Returns this value as a `ULong`, throwing an [ArithmeticException]
+     * if it cannot be represented exactly. Unlike [toULong], this checks
+     * that the value is within the unsigned 64-bit range.
+     */
+    fun toULongExact(): ULong =
+        if (fitsULong())
+            toULong()
+        else
+            throw ArithmeticException("BigInt out of ULong range")
+
+    /**
+     * Returns this BigInt as an unsigned ULong, clamped to `0..ULong.MAX_VALUE`.
+     *
+     * Values greater than `ULong.MAX_VALUE` return `ULong.MAX_VALUE`.
+     * Negative values return 0.
+     */
+    fun toULongClamped(): ULong {
+        if (sign.isPositive) {
+            val bitLen = Magia.bitLen(magia)
+            val magnitude = when (magia.size) {
+                0 -> 0L
+                1 -> magia[0].toLong() and 0xFFFF_FFFFL
+                else -> (magia[1].toLong() shl 32) or (magia[0].toLong() and 0xFFFF_FFFFL)
+            }
+            return if (bitLen <= 64) magnitude.toULong() else ULong.MAX_VALUE
+        }
+        return 0uL
+    }
 
     /**
      * Returns the low 32 bits of the magnitude as a `UInt`
@@ -873,78 +1076,6 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
         if (bitIndex >= 0)
             return Magia.extractULongAtBitIndex(magia, bitIndex)
         throw IllegalArgumentException("invalid bitIndex:$bitIndex")
-    }
-
-    /**
-     * Returns this BigInt as a signed Int, clamped to `Int.MIN_VALUE..Int.MAX_VALUE`.
-     *
-     * Values greater than `Int.MAX_VALUE` return `Int.MAX_VALUE`.
-     * Values less than `Int.MIN_VALUE` return `Int.MIN_VALUE`.
-     */
-    fun toIntClamped(): Int {
-        val bitLen = Magia.bitLen(magia)
-        val magnitude = magia[0]
-        return if (sign.isPositive) {
-            if (bitLen <= 31) magnitude else Int.MAX_VALUE
-        } else {
-            if (bitLen <= 31) -magnitude else Int.MIN_VALUE
-        }
-    }
-
-    /**
-     * Returns this BigInt as an unsigned UInt, clamped to `0..UInt.MAX_VALUE`.
-     *
-     * Values greater than `UInt.MAX_VALUE` return `UInt.MAX_VALUE`.
-     * Negative values return 0.
-     */
-    fun toUIntClamped(): UInt {
-        val bitLen = Magia.bitLen(magia)
-        val magnitude = magia[0]
-        return if (sign.isPositive) {
-            if (bitLen <= 32) magnitude.toUInt() else UInt.MAX_VALUE
-        } else {
-            0u
-        }
-    }
-
-    /**
-     * Returns this BigInt as a signed Long, clamped to `Long.MIN_VALUE..Long.MAX_VALUE`.
-     *
-     * Values greater than `Long.MAX_VALUE` return `Long.MAX_VALUE`.
-     * Values less than `Long.MIN_VALUE` return `Long.MIN_VALUE`.
-     */
-    fun toLongClamped(): Long {
-        val bitLen = Magia.bitLen(magia)
-        val magnitude = when (magia.size) {
-            0 -> 0L
-            1 -> magia[0].toLong() and 0xFFFF_FFFFL
-            else -> (magia[1].toLong() shl 32) or (magia[0].toLong() and 0xFFFF_FFFFL)
-        }
-        return if (sign.isPositive) {
-            if (bitLen <= 63) magnitude else Long.MAX_VALUE
-        } else {
-            if (bitLen <= 63) -magnitude else Long.MIN_VALUE
-        }
-    }
-
-    /**
-     * Returns this BigInt as an unsigned ULong, clamped to `0..ULong.MAX_VALUE`.
-     *
-     * Values greater than `ULong.MAX_VALUE` return `ULong.MAX_VALUE`.
-     * Negative values return 0.
-     */
-    fun toULongClamped(): ULong {
-        val bitLen = Magia.bitLen(magia)
-        val magnitude = when (magia.size) {
-            0 -> 0L
-            1 -> magia[0].toLong() and 0xFFFF_FFFFL
-            else -> (magia[1].toLong() shl 32) or (magia[0].toLong() and 0xFFFF_FFFFL)
-        }
-        return if (sign.isPositive) {
-            if (bitLen <= 64) magnitude.toULong() else ULong.MAX_VALUE
-        } else {
-            0uL
-        }
     }
 
 // Note: `magia` is shared with `negate` and `abs`.
@@ -1405,25 +1536,6 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
             x[x.size - 1] = x[x.size - 1] or (carry shl 31).toInt()
         } while (Magia.compare(x, xPrev) < 0)
         return BigInt(POSITIVE, xPrev)
-    }
-
-    /**
-     * Returns the greatest common divisor (GCD) of this value and [other].
-     *
-     * Implements Stein's binary GCD algorithm, which avoids full
-     * multiprecision division and relies only on subtraction,
-     * comparisons, and shifts—operations that are fast for BigInt.
-     *
-     * The result is always non-negative.
-     */
-    fun gcd(other: BigInt): BigInt {
-        if (this.isZero())
-            return other.abs()
-        if (other.isZero())
-            return this.abs()
-        val magia = Magia.gcd(this.magia, other.magia)
-        check(magia !== Magia.ZERO)
-        return BigInt(POSITIVE, magia)
     }
 
     /**
