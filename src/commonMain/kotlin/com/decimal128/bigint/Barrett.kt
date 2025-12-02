@@ -120,6 +120,7 @@ class Barrett private constructor (val m: BigInt,
         return r
     }
 
+
     fun reduceLimbs3(x: BigInt): BigInt {
         require (x >= 0)
         require (x < mSquared)
