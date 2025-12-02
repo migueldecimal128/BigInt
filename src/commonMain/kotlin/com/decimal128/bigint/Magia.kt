@@ -2333,6 +2333,37 @@ object Magia {
         return bytes.decodeToString()
     }
 
+    fun toHexUtf8(x: IntArray, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) =
+        toHexUtf8(x, x.size, utf8, off, digitCount, useUpperCase)
+
+    fun toHexUtf8(x: IntArray, xLen: Int, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
+        val alfaBase = if (useUpperCase) 'A' else 'a'
+        var ichMax = off + digitCount
+        var limbIndex = 0
+        var nybblesRemaining = 0
+        var w = 0
+        while (ichMax > off) {
+            if (nybblesRemaining == 0) {
+                if (limbIndex == xLen) {
+                    // if there are no limbs left then take as
+                    // many zero nybbles as you want
+                    nybblesRemaining = Int.MAX_VALUE
+                    check (w == 0)
+                } else {
+                    w = x[limbIndex]
+                    ++limbIndex
+                    nybblesRemaining = 8
+                }
+            }
+            val nybble = w and 0x0F
+            --nybblesRemaining
+            w = w ushr 4
+            val ch = if (nybble < 10) '0' + nybble else alfaBase + (nybble - 10)
+            --ichMax
+            utf8[ichMax] = ch.code.toByte()
+        }
+    }
+
     /**
      * Factory methods for constructing a numeric value from ASCII/Latin-1/UTF-8 encoded input.
      *

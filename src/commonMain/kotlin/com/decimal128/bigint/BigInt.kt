@@ -12,6 +12,7 @@ import kotlin.math.sqrt
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.random.Random
+import kotlin.text.HexFormat
 
 /**
  * Arbitrary-precision signed integers for Kotlin Multiplatform, serving as a
@@ -1040,6 +1041,8 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
             return BigInt(POSITIVE, lcm)
         }
 
+        private val HEX_PREFIX_UTF8_0x = byteArrayOf('0'.code.toByte(), 'x'.code.toByte())
+        private val HEX_SUFFIX_UTF8_nada = ByteArray(0)
     }
 
     /**
@@ -2177,7 +2180,41 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      *
      * @return a hexadecimal string representing the value of this BigInt
      */
-    fun toHexString() = Magia.toHexString(sign.isNegative, magia)
+    fun toHexString(): String =
+        toHexString(HEX_PREFIX_UTF8_0x, useUpperCase = true, minPrintLength = 1, HEX_SUFFIX_UTF8_nada)
+
+    fun toHexString(hexFormat: HexFormat): String {
+        if (hexFormat === HexFormat.UpperCase)
+            return toHexString()
+        return toHexString(
+            hexFormat.number.prefix.encodeToByteArray(),
+            hexFormat.upperCase,
+            hexFormat.number.minLength,
+            hexFormat.number.suffix.encodeToByteArray()
+            )
+    }
+
+    private fun toHexString(prefixUtf8: ByteArray, useUpperCase: Boolean, minPrintLength: Int, suffixUtf8: ByteArray): String {
+        val signCount = sign.bit
+        val prefixCount = prefixUtf8.size
+        val nybbleCount = max((magnitudeBitLen() + 3) / 4, minPrintLength)
+        val suffixCount = suffixUtf8.size
+        val totalLen = signCount + prefixCount + nybbleCount + suffixCount
+        val utf8 = ByteArray(totalLen)
+        utf8[0] = '-'.code.toByte()
+        var ich = signCount
+        for (b in prefixUtf8) {
+            utf8[ich] = b
+            ++ich
+        }
+        Magia.toHexUtf8(magia, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
+        ich += nybbleCount
+        for (b in suffixUtf8) {
+            utf8[ich] = b
+            ++ich
+        }
+        return utf8.decodeToString()
+    }
 
     /**
      * Converts this [BigInt] to a **big-endian two's-complement** byte array.
