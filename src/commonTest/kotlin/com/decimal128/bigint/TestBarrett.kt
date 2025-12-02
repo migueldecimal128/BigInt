@@ -124,7 +124,7 @@ class TestBarrett {
 
     @Test
     fun testProblem0() {
-        val m = "12345678901234567890".toBigInt()
+        val m = "12345678901234567890123".toBigInt()
         val x = "123456789012345678901234567890".toBigInt()
         val barrett = Barrett(m)
         val rKnuth = x % m

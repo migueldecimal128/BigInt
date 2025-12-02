@@ -145,7 +145,7 @@ object Magia {
     /**
      * Returns the number of nonzero limbs in [x], excluding any leading zeros.
      */
-    inline fun nonZeroLimbLen(x: IntArray): Int {
+    inline fun normalizedLimbLen(x: IntArray): Int {
         for (i in x.size - 1 downTo 0)
             if (x[i] != 0)
                 return i + 1
@@ -158,7 +158,7 @@ object Magia {
      *
      * @throws IllegalArgumentException if [xLen] is out of range for [x].
      */
-    fun nonZeroLimbLen(x: IntArray, xLen: Int): Int {
+    fun normalizedLimbLen(x: IntArray, xLen: Int): Int {
         if (xLen >= 0 && xLen <= x.size) {
             for (i in xLen - 1 downTo 0)
                 if (x[i] != 0)
@@ -168,6 +168,10 @@ object Magia {
             throw IllegalArgumentException()
         }
     }
+
+    fun isNormalized(x: IntArray) = x.isEmpty() || x[x.lastIndex] != 0
+
+    fun normalizedCopyIfNeeded(x: IntArray) = if (isNormalized(x)) x else newNormalizedCopy(x)
 
     /**
      * Allocates a new limb array large enough to represent a value whose
@@ -223,7 +227,7 @@ object Magia {
      *
      * If all limbs are zero, returns [ZERO].
      */
-    inline fun newCopyTrimmed(x: IntArray): IntArray = newCopyTrimmed(x, x.size)
+    inline fun newNormalizedCopy(x: IntArray): IntArray = newNormalizedCopy(x, x.size)
 
     /**
      * Returns a normalized copy of the first [xLen] limbs of [src],
@@ -233,7 +237,7 @@ object Magia {
      *
      * @throws IllegalArgumentException if [xLen] is out of range for [src].
      */
-    fun newCopyTrimmed(src: IntArray, xLen: Int): IntArray {
+    fun newNormalizedCopy(src: IntArray, xLen: Int): IntArray {
         if (xLen >= 0 && xLen <= src.size) {
             var lastIndex = xLen - 1
             while (lastIndex >= 0 && src[lastIndex] == 0)
@@ -435,7 +439,7 @@ object Magia {
      * This is a convenience overload that determines effective limb lengths:
      *
      * - `xLen` is taken as `x.size`
-     * - `yLen` is computed via [nonZeroLimbLen], ignoring any leading zero limbs
+     * - `yLen` is computed via [normalizedLimbLen], ignoring any leading zero limbs
      *
      * The semantic effect is identical to:
      *
@@ -446,7 +450,7 @@ object Magia {
      * @return the final carry as an unsigned 32-bit value (`0u` or `1u`).
      */
     fun mutateAdd(x: IntArray, y: IntArray) =
-        mutateAdd(x, x.size, y, nonZeroLimbLen(y))
+        mutateAdd(x, x.size, y, normalizedLimbLen(y))
 
     /**
      * Adds the first [yLen] limbs of [y] to the first [xLen] limbs of [x],
@@ -495,7 +499,7 @@ object Magia {
      * If the result is zero or the subtraction underflows, returns [ZERO].
      */
     fun newSub(x: IntArray, w: UInt): IntArray {
-        val z = IntArray(nonZeroLimbLen(x))
+        val z = IntArray(normalizedLimbLen(x))
         var orAccumulator = 0
         var borrow = w.toULong()
         for (i in z.indices) {
@@ -515,7 +519,7 @@ object Magia {
      * If the result is zero or the subtraction underflows, returns [ZERO].
      */
     fun newSub(x: IntArray, dw: ULong): IntArray {
-        val z = IntArray(nonZeroLimbLen(x))
+        val z = IntArray(normalizedLimbLen(x))
         var orAccumulator = 0
         var borrow = 0uL
         if (z.isNotEmpty()) {
@@ -551,8 +555,8 @@ object Magia {
      * If the result is zero, returns [ZERO].
      */
     fun newSub(x: IntArray, y: IntArray): IntArray {
-        val xLen = nonZeroLimbLen(x)
-        val yLen = nonZeroLimbLen(y)
+        val xLen = normalizedLimbLen(x)
+        val yLen = normalizedLimbLen(y)
         val z = IntArray(xLen)
         val zLen = setSub(z, x, xLen, y, yLen)
         return if (zLen == 0) ZERO else z
@@ -598,8 +602,8 @@ object Magia {
         //require (xLen <= z.size)
         require (yLen >= 0 && yLen <= y.size)
         require (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size)
-        val xLen2 = nonZeroLimbLen(x, xLen)
-        val yLen2 = nonZeroLimbLen(y, yLen)
+        val xLen2 = normalizedLimbLen(x, xLen)
+        val yLen2 = normalizedLimbLen(y, yLen)
         check (compare(x, xLen2, y, yLen2) >= 0)
         var borrow = 0uL
         var lastNonZeroIndex = -1
@@ -686,7 +690,7 @@ object Magia {
      * Returns [ZERO] if [x] or [w] is zero.
      */
     fun newMul(x: IntArray, w: UInt): IntArray {
-        val xLen = nonZeroLimbLen(x)
+        val xLen = normalizedLimbLen(x)
         if (xLen == 0 || w == 0u)
             return ZERO
         val xBitLen = bitLengthFromNormalized(x, xLen)
@@ -734,7 +738,7 @@ object Magia {
     fun newMul(x: IntArray, dw: ULong): IntArray {
         if ((dw shr 32) == 0uL)
             return newMul(x, dw.toUInt())
-        val xLen = nonZeroLimbLen(x)
+        val xLen = normalizedLimbLen(x)
         val xBitLen = bitLengthFromNormalized(x, xLen)
         if (xBitLen == 0)
             return ZERO
@@ -894,7 +898,7 @@ object Magia {
      * Returns [ZERO] if [x] is zero.
      */
     fun newSqr(x: IntArray): IntArray {
-        val xLen = nonZeroLimbLen(x)
+        val xLen = normalizedLimbLen(x)
         if (xLen == 0)
             return ZERO
         val bitLen = bitLengthFromNormalized(x, xLen)
@@ -1006,7 +1010,7 @@ object Magia {
      */
     fun newShiftRight(x: IntArray, bitCount: Int): IntArray {
         require(bitCount >= 0)
-        val xLen = nonZeroLimbLen(x)
+        val xLen = normalizedLimbLen(x)
         val newBitLen = bitLen(x, xLen) - bitCount
         if (newBitLen <= 0)
             return ZERO
@@ -1048,7 +1052,7 @@ object Magia {
      */
     fun setShiftRight(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
         require(bitCount >= 0 && xLen >= 0 && xLen <= x.size)
-        val xLenNormalized = nonZeroLimbLen(x, xLen)
+        val xLenNormalized = normalizedLimbLen(x, xLen)
         if (xLenNormalized == 0)
             return 0
         require(x[xLenNormalized - 1] != 0)
@@ -1318,8 +1322,8 @@ object Magia {
      *         or [ZERO] if the result is zero.
      */
     fun newOr(x: IntArray, y: IntArray): IntArray {
-        val xLen = nonZeroLimbLen(x)
-        val yLen = nonZeroLimbLen(y)
+        val xLen = normalizedLimbLen(x)
+        val yLen = normalizedLimbLen(y)
         val maxLen = max(xLen, yLen)
         val minLen = min(xLen, yLen)
         if (maxLen == 0)
@@ -1351,8 +1355,8 @@ object Magia {
      * @return an IntArray containing the XOR of [x] and [y], possibly with trailing zero limbs.
      */
     fun newXor(x: IntArray, y: IntArray): IntArray {
-        val xLen = nonZeroLimbLen(x)
-        val yLen = nonZeroLimbLen(y)
+        val xLen = normalizedLimbLen(x)
+        val yLen = normalizedLimbLen(y)
         val maxLen = max(xLen, yLen)
         val minLen = min(xLen, yLen)
         if (maxLen == 0)
@@ -1545,7 +1549,7 @@ object Magia {
      * @param y the 32-bit integer to compare against.
      * @return `true` if [x] equals [y], `false` otherwise.
      */
-    fun EQ(x: IntArray, y: Int) = nonZeroLimbLen(x) == 1 && x[0] == y
+    fun EQ(x: IntArray, y: Int) = normalizedLimbLen(x) == 1 && x[0] == y
 
     /**
      * Checks whether the unsigned integers represented by [x] and [y] are equal.
@@ -1568,8 +1572,8 @@ object Magia {
      * @return -1 if x < y, 0 if x == y, 1 if x > y.
      */
     fun compare(x: IntArray, y: IntArray): Int {
-        val xLen = nonZeroLimbLen(x)
-        val yLen = nonZeroLimbLen(y)
+        val xLen = normalizedLimbLen(x)
+        val yLen = normalizedLimbLen(y)
         if (xLen > yLen)
             return 1
         if (xLen < yLen)
@@ -1629,7 +1633,7 @@ object Magia {
      * @return `-1`, `0`, or `1` following the standard comparison semantics.
      */
     fun compare(x: IntArray, w: UInt): Int {
-        val limbLen = nonZeroLimbLen(x)
+        val limbLen = normalizedLimbLen(x)
         return when {
             (limbLen > 1) -> 1
             (limbLen == 0) -> if (w == 0u) 0 else -1
@@ -1637,7 +1641,7 @@ object Magia {
         }
     }
 
-    fun compare(x: IntArray, dw: ULong): Int = compare(x, nonZeroLimbLen(x), dw)
+    fun compare(x: IntArray, dw: ULong): Int = compare(x, normalizedLimbLen(x), dw)
 
     fun compare(x: IntArray, xLen: Int, dw: ULong): Int {
         if (xLen >= 0 && xLen <= x.size) {
@@ -1705,15 +1709,15 @@ object Magia {
      * @throws ArithmeticException if [w] is zero.
      */
     fun newDiv(x: IntArray, w: UInt): IntArray {
-        val q = newCopyTrimmed(x)
+        val q = newNormalizedCopy(x)
         mutateDivMod(q, w)
-        return if (nonZeroLimbLen(q) > 0) q else ZERO
+        return if (normalizedLimbLen(q) > 0) q else ZERO
     }
 
     fun newDiv(x: IntArray, dw: ULong): IntArray {
         if ((dw shr 32) == 0uL)
             return newDiv(x, dw.toUInt())
-        val xLen = nonZeroLimbLen(x)
+        val xLen = normalizedLimbLen(x)
         val cmp = compare(x, xLen, dw)
         when {
             cmp < 0 -> return ZERO
@@ -1725,14 +1729,14 @@ object Magia {
         val q = IntArray(m - 2 + 1)
         val r = null
         knuthDivide64(q, r, u, vnDw, m)
-        return if (nonZeroLimbLen(q) > 0) q else ZERO
+        return if (normalizedLimbLen(q) > 0) q else ZERO
     }
 
     fun newDiv(x: IntArray, y: IntArray): IntArray {
-        val n = nonZeroLimbLen(y)
+        val n = normalizedLimbLen(y)
         if (n < 2)
             return newDiv(x, y[0].toUInt())
-        val m = nonZeroLimbLen(x)
+        val m = normalizedLimbLen(x)
         if (m < n)
             return ZERO
         val u = x
@@ -1740,11 +1744,11 @@ object Magia {
         val q = IntArray(m - n + 1)
         val r = null
         knuthDivide(q, r, u, v, m, n)
-        return if (nonZeroLimbLen(q) > 0) q else ZERO
+        return if (normalizedLimbLen(q) > 0) q else ZERO
     }
 
     fun newMod(x: IntArray, w: UInt): IntArray {
-        val q = newCopyTrimmed(x)
+        val q = newNormalizedCopy(x)
         val rem = mutateDivMod(q, w)
         return if (rem == 0u) ZERO else intArrayOf(rem.toInt())
     }
@@ -1756,48 +1760,48 @@ object Magia {
     }
 
     fun newMod(x: IntArray, y: IntArray): IntArray {
-        val n = nonZeroLimbLen(y)
+        val n = normalizedLimbLen(y)
         if (n <= 1) {
             if (n == 0)
                 throw ArithmeticException("div by zero")
             return newMod(x, y[0].toUInt())
         }
-        val m = nonZeroLimbLen(x)
+        val m = normalizedLimbLen(x)
         if (m == 0)
             return ZERO
         if (m < n)
-            return newCopyTrimmed(x)
+            return newNormalizedCopy(x)
         val u = x
         val v = y
         val q = null
         val r = IntArray(y.size)
         knuthDivide(q, r, u, v, m, n)
-        check (nonZeroLimbLen(r) <= n)
-        return if (nonZeroLimbLen(r) > 0) r else ZERO
+        check (normalizedLimbLen(r) <= n)
+        return if (normalizedLimbLen(r) > 0) r else ZERO
     }
 
     fun newDivMod(x: IntArray, y: IntArray): Array<IntArray> {
-        val n = nonZeroLimbLen(y)
+        val n = normalizedLimbLen(y)
         if (n <= 1) {
             if (n == 0)
                 throw ArithmeticException("div by zero")
-            var div = newCopyTrimmed(x)
+            var div = newNormalizedCopy(x)
             val rem = mutateDivMod(div, y[0].toUInt())
-            if (nonZeroLimbLen(div) == 0)
+            if (normalizedLimbLen(div) == 0)
                 div = ZERO
             return arrayOf(div, if (rem != 0u) intArrayOf(rem.toInt()) else ZERO)
         }
-        val m = nonZeroLimbLen(x)
+        val m = normalizedLimbLen(x)
         if (m < n)
-            return arrayOf(ZERO, newCopyTrimmed(x))
+            return arrayOf(ZERO, newNormalizedCopy(x))
         val u = x
         val v = y
         val q = IntArray(m - n + 1)
         val r = IntArray(n)
         knuthDivide(q, r, u, v, m, n)
-        check (nonZeroLimbLen(r) <= n)
+        check (normalizedLimbLen(r) <= n)
         return arrayOf(
-            if (nonZeroLimbLen(q) > 0) q else ZERO, if (nonZeroLimbLen(r) > 0) r else ZERO
+            if (normalizedLimbLen(q) > 0) q else ZERO, if (normalizedLimbLen(r) > 0) r else ZERO
         )
     }
 
@@ -1836,7 +1840,7 @@ object Magia {
         knuthDivideNormalizedCore(q, un, vn, m, n)
 
         if (r != null) {
-            val unLen = nonZeroLimbLen(un)
+            val unLen = normalizedLimbLen(un)
             mutateShiftRight(un, unLen, shift)
             copy(r, un, unLen)
         }
@@ -1976,7 +1980,7 @@ object Magia {
      * @return the decimal string representation of the signed value.
      */
     fun toString(isNegative: Boolean, magia: IntArray): String =
-        toString(isNegative, magia, nonZeroLimbLen(magia))
+        toString(isNegative, magia, normalizedLimbLen(magia))
 
     /**
      * Converts a multi-limb integer to its decimal string representation.
@@ -1996,7 +2000,7 @@ object Magia {
             }
             val maxSignedLen = maxDigitLenFromBitLen(bitLen) + if (isNegative) 1 else 0
             val utf8 = ByteArray(maxSignedLen)
-            val limbLen = nonZeroLimbLen(x, xLen)
+            val limbLen = normalizedLimbLen(x, xLen)
             val t = newCopyWithExactLimbLen(x, limbLen)
             val len = destructiveToUtf8BeforeIndex(utf8, utf8.size, isNegative, t, limbLen)
             val startingIndex = utf8.size - len
@@ -2546,7 +2550,7 @@ object Magia {
      * Converts an arbitrary-precision integer into a binary representation within a [ByteArray],
      * automatically considering only the significant limbs (ignoring trailing zero limbs).
      *
-     * This is a convenience wrapper around [toBinaryBytes] that computes [xLen] via [nonZeroLimbLen].
+     * This is a convenience wrapper around [toBinaryBytes] that computes [xLen] via [normalizedLimbLen].
      *
      * @param x the array of 32-bit limbs representing the integer, least-significant limb first.
      * @param isNegative whether the integer should be treated as negative (for two's-complement output).
@@ -2560,7 +2564,7 @@ object Magia {
      */
     internal fun toBinaryBytes(x: IntArray, isNegative: Boolean, isBigEndian: Boolean,
                                bytes: ByteArray, off: Int, requestedLen: Int): Int =
-        toBinaryBytes(x, nonZeroLimbLen(x), isNegative, isBigEndian, bytes, off, requestedLen)
+        toBinaryBytes(x, normalizedLimbLen(x), isNegative, isBigEndian, bytes, off, requestedLen)
 
     /**
      * Converts an arbitrary-precision integer into a binary representation within a given [ByteArray].
@@ -2858,7 +2862,7 @@ object Magia {
 
     /**
      * Computes a hash code for the magnitude [x], ignoring any leading
-     * zero limbs. The effective length is determined by [nonZeroLimbLen],
+     * zero limbs. The effective length is determined by [normalizedLimbLen],
      * ensuring that numerically equal magnitudes with different limb
      * capacities produce the same hash.
      *
@@ -2881,7 +2885,7 @@ object Magia {
      * @return a hash code consistent with numeric equality of magnitudes
      */
     fun normalizedHashCode(x: IntArray): Int {
-        val xLen = nonZeroLimbLen(x)
+        val xLen = normalizedLimbLen(x)
         var h = 0
         var i = 0
         while (i + 3 < xLen) {
@@ -2900,8 +2904,8 @@ object Magia {
     }
 
     fun gcd(x: IntArray, y: IntArray): IntArray {
-        var u = newCopyTrimmed(x)
-        var v = newCopyTrimmed(y)
+        var u = newNormalizedCopy(x)
+        var v = newNormalizedCopy(y)
 
         var uLen = u.size
         var vLen = v.size
@@ -2913,11 +2917,11 @@ object Magia {
         val initialShift = min(ntzU, ntzV)
         if (ntzU > 0) {
             mutateShiftRight(u, uLen, ntzU)
-            uLen = nonZeroLimbLen(u, uLen)
+            uLen = normalizedLimbLen(u, uLen)
         }
         if (ntzV > 0) {
             mutateShiftRight(v, vLen, ntzV)
-            vLen = nonZeroLimbLen(v, vLen)
+            vLen = normalizedLimbLen(v, vLen)
         }
 
         // Now both u and v are odd
@@ -2926,7 +2930,7 @@ object Magia {
             val tz = ntz(v, vLen)
             if (tz > 0) {
                 mutateShiftRight(v, vLen, tz)
-                vLen = nonZeroLimbLen(v)
+                vLen = normalizedLimbLen(v)
             }
             // Ensure u <= v
             val cmp = compare(u, uLen, v, vLen)
@@ -2937,7 +2941,7 @@ object Magia {
             }
             // v = v - u
             mutateSub(v, vLen, u, uLen)
-            vLen = nonZeroLimbLen(v, vLen)
+            vLen = normalizedLimbLen(v, vLen)
         }
         // Final result = u * 2^shift
         if (initialShift > 0) {

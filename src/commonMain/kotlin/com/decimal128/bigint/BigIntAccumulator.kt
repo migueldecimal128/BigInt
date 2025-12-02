@@ -138,7 +138,7 @@ class BigIntAccumulator private constructor (
      * @param hi the source [BigInt].
      * @return this accumulator instance, for call chaining.
      */
-    fun set(hi: BigInt): BigIntAccumulator = set(hi.sign.isNegative, hi.magia, Magia.nonZeroLimbLen(hi.magia))
+    fun set(hi: BigInt): BigIntAccumulator = set(hi.sign.isNegative, hi.magia, Magia.normalizedLimbLen(hi.magia))
 
     /**
      * Sets this accumulator’s value from another [BigIntAccumulator].
@@ -260,7 +260,7 @@ class BigIntAccumulator private constructor (
      * @see plusAssign(Long)
      */
     operator fun plusAssign(hi: BigInt) =
-        mutateAddImpl(hi.sign.isNegative, hi.magia, Magia.nonZeroLimbLen(hi.magia))
+        mutateAddImpl(hi.sign.isNegative, hi.magia, Magia.normalizedLimbLen(hi.magia))
 
     /**
      * Adds the given BigIntAccumulator value to this accumulator.
@@ -319,7 +319,7 @@ class BigIntAccumulator private constructor (
      * @see minusAssign(Long)
      */
     operator fun minusAssign(hi: BigInt) =
-        mutateAddImpl(hi.sign.isPositive, hi.magia, Magia.nonZeroLimbLen(hi.magia))
+        mutateAddImpl(hi.sign.isPositive, hi.magia, Magia.normalizedLimbLen(hi.magia))
 
     /**
      * Subtracts the given BigIntAccumulator value from this accumulator.
@@ -400,7 +400,7 @@ class BigIntAccumulator private constructor (
      * @see timesAssign(Long)
      */
     operator fun timesAssign(hi: BigInt) =
-        mutateMulImpl(hi.sign.isNegative, hi.magia, Magia.nonZeroLimbLen(hi.magia))
+        mutateMulImpl(hi.sign.isNegative, hi.magia, Magia.normalizedLimbLen(hi.magia))
 
     /**
      * Multiplies this accumulator by the given BigIntAccumulator value.
@@ -484,7 +484,7 @@ class BigIntAccumulator private constructor (
         tmp1[1] = (lo64 shr 32).toInt()
         tmp1[2] = hi64.toInt()
         tmp1[3] = (hi64 shr 32).toInt()
-        mutateAddMagImpl(tmp1, Magia.nonZeroLimbLen(tmp1, 4))
+        mutateAddMagImpl(tmp1, Magia.normalizedLimbLen(tmp1, 4))
     }
 
     /**
@@ -493,7 +493,7 @@ class BigIntAccumulator private constructor (
      * @param hi the value to square and add.
      * @see addSquareOf(ULong)
      */
-    fun addSquareOf(hi: BigInt) = addSquareOfImpl(hi.magia, Magia.nonZeroLimbLen(hi.magia))
+    fun addSquareOf(hi: BigInt) = addSquareOfImpl(hi.magia, Magia.normalizedLimbLen(hi.magia))
 
     /**
      * Adds the square of the given BigIntAccumulator value to this accumulator.
@@ -547,7 +547,7 @@ class BigIntAccumulator private constructor (
      * @see addAbsValueOf(Long)
      */
     fun addAbsValueOf(hi: BigInt) =
-        mutateAddMagImpl(hi.magia, Magia.nonZeroLimbLen(hi.magia))
+        mutateAddMagImpl(hi.magia, Magia.normalizedLimbLen(hi.magia))
 
     /**
      * Adds the absolute value of the given BigIntAccumulator to this accumulator.
@@ -594,7 +594,7 @@ class BigIntAccumulator private constructor (
             limbLen == 0 -> set(otherSign, dw)
             limbLen > 2 || rawULong > dw -> {
                 Magia.mutateSub(magia, limbLen, dw)
-                limbLen = Magia.nonZeroLimbLen(magia, limbLen)
+                limbLen = Magia.normalizedLimbLen(magia, limbLen)
                 sign = Sign(sign.isNegative and (limbLen > 0))
             }
             rawULong < dw -> set(otherSign, dw - rawULong)
@@ -635,7 +635,7 @@ class BigIntAccumulator private constructor (
         when {
             cmp > 0 -> {
                 Magia.mutateSub(magia, limbLen, y, yLen)
-                limbLen = Magia.nonZeroLimbLen(magia, limbLen)
+                limbLen = Magia.normalizedLimbLen(magia, limbLen)
                 sign = Sign(sign.isNegative and (limbLen > 0))
             }
             cmp < 0 -> {
@@ -644,7 +644,7 @@ class BigIntAccumulator private constructor (
                 if (limbLen < yLen)
                     magia.fill(0, limbLen, yLen)
                 Magia.mutateReverseSub(magia, yLen, y, yLen)
-                limbLen = Magia.nonZeroLimbLen(magia, yLen)
+                limbLen = Magia.normalizedLimbLen(magia, yLen)
                 sign = Sign(ySign)
             }
             else -> {

@@ -807,7 +807,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
          * Converts a Little-Endian IntArray to a BigInt with the specified sign.
          */
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray, len: Int): BigInt {
-            val magia = Magia.newCopyTrimmed(littleEndianIntArray, len)
+            val magia = Magia.newNormalizedCopy(littleEndianIntArray, len)
             return if (magia.isNotEmpty()) BigInt(Sign(sign), magia) else ZERO
         }
 
@@ -1082,7 +1082,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
     fun fitsInt(): Boolean {
         if (isZero())
             return true
-        val limbLen = Magia.nonZeroLimbLen(magia)
+        val limbLen = Magia.normalizedLimbLen(magia)
         if (limbLen > 1)
             return false
         val limb = magia[0]
@@ -1095,14 +1095,14 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 32-bit integer (`0 .. UInt.MAX_VALUE`).
      */
-    fun fitsUInt() = sign.isPositive && Magia.nonZeroLimbLen(magia) <= 1
+    fun fitsUInt() = sign.isPositive && Magia.normalizedLimbLen(magia) <= 1
 
     /**
      * Returns `true` if this value fits in a signed 64-bit integer
      * (`Long.MIN_VALUE .. Long.MAX_VALUE`).
      */
     fun fitsLong(): Boolean {
-        val limbLen = Magia.nonZeroLimbLen(magia)
+        val limbLen = Magia.normalizedLimbLen(magia)
         return when {
             limbLen > 2 -> false
             limbLen < 2 -> true
@@ -1115,7 +1115,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 64-bit integer (`0 .. ULong.MAX_VALUE`).
      */
-    fun fitsULong() = sign.isPositive && Magia.nonZeroLimbLen(magia) <= 2
+    fun fitsULong() = sign.isPositive && Magia.normalizedLimbLen(magia) <= 2
 
     /**
      * Returns the low 32 bits of this value, interpreted as a signed
@@ -1576,7 +1576,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      */
     fun sqr(): BigInt {
         if (this.isNotZero()) {
-            check(Magia.nonZeroLimbLen(this.magia) > 0)
+            check(Magia.normalizedLimbLen(this.magia) > 0)
             val magiaSqr = Magia.newSqr(this.magia)
             return BigInt(POSITIVE, magiaSqr)
         }
@@ -1610,7 +1610,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
                 val maxBitLen = Magia.bitLen(this.magia) * n
                 val maxBitLimbLen = (maxBitLen + 0x1F) ushr 5
                 var baseMag = Magia.newCopyWithExactLimbLen(this.magia, maxBitLimbLen)
-                var baseLen = Magia.nonZeroLimbLen(this.magia)
+                var baseLen = Magia.normalizedLimbLen(this.magia)
                 var resultMag = IntArray(maxBitLimbLen)
                 resultMag[0] = 1
                 var resultLen = 1
@@ -2204,7 +2204,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * @return a new [ByteArray] containing the binary representation
      */
     fun toBinaryByteArray(isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray =
-        Magia.toBinaryByteArray(sign.isNegative, magia, Magia.nonZeroLimbLen(magia), isTwosComplement, isBigEndian)
+        Magia.toBinaryByteArray(sign.isNegative, magia, Magia.normalizedLimbLen(magia), isTwosComplement, isBigEndian)
 
     /**
      * Writes this [BigInt] into the provided [bytes] array in the requested binary format.
@@ -2253,7 +2253,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      *
      * @return a new IntArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianIntArray(): IntArray = Magia.newCopyTrimmed(magia)
+    fun magnitudeToLittleEndianIntArray(): IntArray = Magia.newNormalizedCopy(magia)
 
     /**
      * Returns a copy of the magnitude as a little-endian LongArray.
@@ -2265,7 +2265,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * @return a new LongArray containing the magnitude in little-endian order
      */
     fun magnitudeToLittleEndianLongArray(): LongArray {
-        val intLen = Magia.nonZeroLimbLen(magia)
+        val intLen = Magia.normalizedLimbLen(magia)
         val longLen = (intLen + 1) ushr 1
         val z = LongArray(longLen)
         var iw = 0
@@ -2293,10 +2293,10 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * Normalization is not required for correctness, but a normalized
      * representation avoids unnecessary high-order zero limbs.
      */
-    fun isNormalized() = magia === Magia.ZERO || magia[magia.size - 1] != 0
+    fun isNormalized() = magia.isEmpty() || magia[magia.lastIndex] != 0
 
     fun normalize(): BigInt =
-        if (isNormalized()) this else BigInt(sign, Magia.newCopyTrimmed(magia))
+        if (isNormalized()) this else BigInt(sign, Magia.newNormalizedCopy(magia))
 
     /**
      * Internal helper for addition or subtraction between two BigInts.
@@ -2436,10 +2436,10 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
         return when {
             wMag == 0u -> throw ArithmeticException("div by zero")
             this.isNotZero() -> {
-                val quot = Magia.newCopyTrimmed(this.magia)
+                val quot = Magia.newNormalizedCopy(this.magia)
                 val remN = Magia.mutateDivMod(quot, wMag)
                 val hiQuot =
-                    if (Magia.nonZeroLimbLen(quot) > 0) BigInt(this.sign xor wSign, quot) else ZERO
+                    if (Magia.normalizedLimbLen(quot) > 0) BigInt(this.sign xor wSign, quot) else ZERO
                 val hiRem = if (remN != 0u) BigInt(this.sign, intArrayOf(remN.toInt())) else ZERO
                 hiQuot to hiRem
             }
