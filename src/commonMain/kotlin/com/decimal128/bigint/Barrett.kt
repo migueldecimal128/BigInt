@@ -214,12 +214,15 @@ class Barrett private constructor (val m: BigInt,
         // q1 = floor(x / b**(k - 1))
         // val q1 = x ushr (kLimbsMinus1 * 32)
         val q1Len = xLen - kLimbsMinus1
+        check (q1Len <= kLimbsPlus1)
         val q1Magia = IntArray(q1Len)
         x.magia.copyInto(q1Magia, 0, kLimbsMinus1, xLen)
         //check (Magia.compare(q1.magia, Magia.normalizedLimbLen(q1.magia), q1Magia, q1Len) == 0)
 
         // q2 = q1 * mu
         // val q2 = q1 * muLimbs
+        println("mulimbs.magia.size:${muLimbs.magia.size}  kLimbs:$kLimbs")
+        check (muLimbs.magia.size == kLimbs)
         val q2Magia = IntArray(muLimbs.magia.size * 2)
         val q2Len = Magia.mul(q2Magia, q1Magia, q1Len, muLimbs.magia, muLimbs.magia.size)
         // check (Magia.compare(q2.magia, Magia.normalizedLimbLen(q2.magia), q2Magia, q2Len) == 0)

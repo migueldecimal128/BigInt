@@ -158,7 +158,7 @@ object Magia {
      *
      * @throws IllegalArgumentException if [xLen] is out of range for [x].
      */
-    fun normalizedLimbLen(x: IntArray, xLen: Int): Int {
+    inline fun normalizedLimbLen(x: IntArray, xLen: Int): Int {
         if (xLen >= 0 && xLen <= x.size) {
             for (i in xLen - 1 downTo 0)
                 if (x[i] != 0)
@@ -169,8 +169,38 @@ object Magia {
         }
     }
 
+    /**
+     * Returns `true` if this limb array is in normalized form.
+     *
+     * A limb array is considered *normalized* when:
+     *
+     *  - it is empty (representing the canonical zero), or
+     *  - its most significant limb (the last element) is non-zero.
+     *
+     * In other words, a normalized array contains no unused leading zero limbs.
+     * This check does not modify the array.
+     *
+     * @param x the limb array to test
+     * @return `true` if `x` has no trailing zero limbs; `false` otherwise
+     */
     fun isNormalized(x: IntArray) = x.isEmpty() || x[x.lastIndex] != 0
 
+    /**
+     * Returns `x` if it is already in normalized limb form; otherwise returns
+     * a new `IntArray` containing the normalized representation.
+     *
+     * Normalization removes any unused most-significant zero limbs so that:
+     *
+     *  - either the array is a single zero limb, or
+     *  - the most significant limb is non-zero.
+     *
+     * This function never modifies the input array. If normalization is required,
+     * a trimmed copy is produced; otherwise the original array is returned
+     * unchanged.
+     *
+     * @param x the limb array to check
+     * @return `x` if it is already normalized, or a newly allocated normalized copy
+     */
     fun normalizedCopyIfNeeded(x: IntArray) = if (isNormalized(x)) x else newNormalizedCopy(x)
 
     /**
@@ -230,68 +260,62 @@ object Magia {
     inline fun newNormalizedCopy(x: IntArray): IntArray = newNormalizedCopy(x, x.size)
 
     /**
-     * Returns a normalized copy of the first [xLen] limbs of [src],
+     * Returns a normalized copy of the first [len] limbs of [x],
      * with any leading zero limbs removed.
      *
      * If all limbs are zero, returns [ZERO].
      *
-     * @throws IllegalArgumentException if [xLen] is out of range for [src].
+     * @throws IllegalArgumentException if [len] is out of range for [x].
      */
-    fun newNormalizedCopy(src: IntArray, xLen: Int): IntArray {
-        if (xLen >= 0 && xLen <= src.size) {
-            var lastIndex = xLen - 1
-            while (lastIndex >= 0 && src[lastIndex] == 0)
-                --lastIndex
-            if (lastIndex < 0)
-                return ZERO
-            val limbLen = lastIndex + 1
-            val z = IntArray(limbLen)
-            //System.arraycopy(src, 0, z, 0, limbLen)
-            src.copyInto(z, 0, 0, limbLen)
+    fun newNormalizedCopy(x: IntArray, len: Int): IntArray {
+        val normLen = normalizedLimbLen(x, len)
+        if (normLen > 0) {
+            val z = IntArray(normLen)
+            x.copyInto(z, 0, 0, normLen)
             return z
         }
-        throw IllegalArgumentException()
+        return ZERO
     }
 
     /**
-     * Returns a copy of [src] extended to at least [floorLen] elements.
+     * Returns a copy of [x] extended to at least [floorLen] elements.
      *
-     * The new array preserves the contents of [src] and zero-fills the remainder.
+     * The new array preserves the contents of [x] and zero-fills the remainder.
      *
-     * @throws IllegalArgumentException if [floorLen] is not greater than [src.size].
+     * @throws IllegalArgumentException if [floorLen] is not greater than [x.size].
      */
-    fun newCopyWithFloorLen(src: IntArray, floorLen: Int) : IntArray {
-        if (floorLen > src.size) {
+    fun newCopyWithFloorLen(x: IntArray, floorLen: Int) : IntArray {
+        if (floorLen > x.size) {
             val z = newWithFloorLen(floorLen)
-            //System.arraycopy(src, 0, z, 0, min(src.size, z.size))
-            src.copyInto(z, 0, 0, min(src.size, z.size))
+            x.copyInto(z, 0, 0, min(x.size, z.size))
             return z
         } else {
             throw IllegalArgumentException()
         }
     }
 
-    fun newCopyWithExactBitLen(src: IntArray, exactBitLen: Int): IntArray =
-        newCopyWithExactLimbLen(src, (exactBitLen + 0x1F) ushr 5)
+    /**
+     * Returns a copy of [x] whose length is the minimum number of limbs required
+     * to hold [exactBitLen] bits. Leading limbs are preserved or truncated as needed.
+     */
+    fun newCopyWithExactBitLen(x: IntArray, exactBitLen: Int): IntArray =
+        newCopyWithExactLimbLen(x, (exactBitLen + 0x1F) ushr 5)
 
-    fun newCopyWithExactLimbLen(src: IntArray, exactLimbLen: Int): IntArray {
+    /**
+     * Returns a copy of [x] resized to exactly `exactLimbLen` limbs.
+     * If the new length is larger, high-order limbs are zero-filled; if smaller,
+     * high-order limbs are truncated.
+     */
+    fun newCopyWithExactLimbLen(x: IntArray, exactLimbLen: Int): IntArray {
         if (exactLimbLen in 1..MAX_ALLOC_SIZE) {
             val dst = IntArray(exactLimbLen)
             //System.arraycopy(src, 0, dst, 0, min(src.size, dst.size))
-            src.copyInto(dst, 0, 0, min(src.size, dst.size))
+            x.copyInto(dst, 0, 0, min(x.size, dst.size))
             return dst
         }
         if (exactLimbLen == 0)
             return ZERO
         throw IllegalArgumentException("invalid allocation length:$exactLimbLen")
-    }
-
-    private fun newCopyWithBitLen(src: IntArray, newBitLen: Int): IntArray {
-
-        val dst = newWithBitLen(newBitLen)
-        //copy(dst, src)
-        src.copyInto(dst, 0, 0, min(src.size, dst.size))
-        return dst
     }
 
     /**
@@ -339,33 +363,14 @@ object Magia {
     /**
      * Returns a new limb array representing the sum of [x] and [y].
      *
-     * The result is sized to accommodate any carry produced by the addition.
+     * The result will sometimes be not normalized.
      */
     fun newAdd(x: IntArray, y: IntArray): IntArray {
-        val newBitLen = max(bitLen(x), bitLen(y)) + 1
+        val xNormLen = normalizedLimbLen(x)
+        val yNormLen = normalizedLimbLen(y)
+        val newBitLen = max(bitLen(x, xNormLen), bitLen(y, yNormLen)) + 1
         val z = newWithBitLen(newBitLen)
-
-        val min = min(z.size, min(x.size, y.size))
-        var carry = 0uL
-        var i = 0
-        while (i < min) {
-            val t = dw32(x[i]) + dw32(y[i]) + carry
-            z[i] = t.toInt()
-            carry = t shr 32
-            check((carry shr 1) == 0uL)
-            ++i
-        }
-        val longer = if (x.size > y.size) x else y
-        while (i < longer.size && i < z.size) {
-            val t = dw32(longer[i]) + carry
-            z[i] = t.toInt()
-            carry = t shr 32
-            ++i
-        }
-        if (carry != 0uL) {
-            check (carry == 1uL)
-            z[i] = 1
-        }
+        setAdd(z, x, xNormLen, y, yNormLen)
         return z
     }
 
@@ -387,7 +392,7 @@ object Magia {
     /**
      * Adds the unsigned 32-bit value [w] to the first [xLen] limbs of [x], modifying [x] in place.
      *
-     * A non-zero return indicates a single limb that must be
+     * A non-zero return represents a single limb that must be
      * handled by the caller.
      *
      * @return the final carry as an unsigned 32-bit value.
@@ -417,7 +422,8 @@ object Magia {
      *
      * @return the resulting carry as an unsigned 64-bit value.
      * @throws IllegalArgumentException if [xLen] is out of range for [x].
-     */    fun mutateAdd(x: IntArray, xLen: Int, dw: ULong): ULong {
+     */
+    fun mutateAdd(x: IntArray, xLen: Int, dw: ULong): ULong {
         if (xLen >= 0 && xLen <= x.size) {
             var carry = dw
             var i = 0
@@ -434,16 +440,7 @@ object Magia {
     }
 
     /**
-     * Adds the magnitude in [y] to [x] **in place**.
-     *
-     * This is a convenience overload that determines effective limb lengths:
-     *
-     * - `xLen` is taken as `x.size`
-     * - `yLen` is computed via [normalizedLimbLen], ignoring any leading zero limbs
-     *
-     * The semantic effect is identical to:
-     *
-     *     mutateAdd(x, x.size, y, nonZeroLimbLen(y))
+     * Adds [y] to [x] **in place**.
      *
      * The caller must ensure that `x.size >= nonZeroLimbLen(y)`.
      *
@@ -491,6 +488,51 @@ object Magia {
         } else {
             throw IllegalArgumentException()
         }
+    }
+
+    /**
+     * Computes `z = x + y` using the low-order [xLen] and [yLen] limbs of the
+     * inputs and returns the normalized limb length of the sum. The caller must
+     * ensure that [z] is large enough to hold the result; the minimum size is
+     * `max(bitLen(x), bitLen(y)) + 1` bits.
+     *
+     * @return the normalized limb count of the sum
+     * @throws ArithmeticException if the result does not fit in [z]
+     */
+    fun setAdd(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
+        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
+            val xNormLen = normalizedLimbLen(x, xLen)
+            val yNormLen = normalizedLimbLen(y, yLen)
+            val maxNormLen = max(xNormLen, yNormLen)
+            val minNormLen = min(xNormLen, yNormLen)
+            if (z.size >= maxNormLen) {
+                var carry = 0uL
+                var i = 0
+                while (i < minNormLen) {
+                    val t = dw32(x[i]) + dw32(y[i]) + carry
+                    z[i] = t.toInt()
+                    carry = t shr 32
+                    check((carry shr 1) == 0uL)
+                    ++i
+                }
+                val longer = if (xNormLen > yNormLen) x else y
+                while (i < maxNormLen && i < z.size) {
+                    val t = dw32(longer[i]) + carry
+                    z[i] = t.toInt()
+                    carry = t shr 32
+                    ++i
+                }
+                if (carry != 0uL) {
+                    check(carry == 1uL)
+                    if (i == z.size)
+                        throw ArithmeticException("addition overflow ... sum destination too small")
+                    z[i] = 1
+                    ++i
+                }
+                return i
+            }
+        }
+        throw IllegalArgumentException()
     }
 
     /**
@@ -595,21 +637,33 @@ object Magia {
         }
     }
 
+    /**
+     * Computes `z = x - y` using the low-order [xLen] and [yLen] limbs of
+     * the input arrays and returns the normalized limb length of the result.
+     *
+     * This operation:
+     *  • assumes signed-magnitude representation with 32-bit limbs,
+     *  • requires that `x ≥ y` (checked via `compare`),
+     *  • writes the difference into [z] without allocating,
+     *  • trims high-order zero limbs and returns `(lastNonZeroIndex + 1)`.
+     *
+     * The arrays [x], [y], and [z] may be distinct, and [z] must have
+     * capacity for at least [xLen] limbs.
+     *
+     * @return the number of limbs in the normalized result
+     * @throws ArithmeticException if `x < y`
+     */
     fun setSub(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        require (xLen >= 0 && xLen <= x.size)
-        //if (xLen > z.size)
-        //    println("kilroy was here!")
-        //require (xLen <= z.size)
-        require (yLen >= 0 && yLen <= y.size)
-        require (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size)
-        val xLen2 = normalizedLimbLen(x, xLen)
-        val yLen2 = normalizedLimbLen(y, yLen)
-        check (compare(x, xLen2, y, yLen2) >= 0)
+        check (xLen >= 0 && xLen <= x.size)
+        check (yLen >= 0 && yLen <= y.size)
+        val xNormLen = normalizedLimbLen(x, xLen)
+        val yNormLen = normalizedLimbLen(y, yLen)
+        check (compare(x, xNormLen, y, yNormLen) >= 0)
         var borrow = 0uL
         var lastNonZeroIndex = -1
-        if (xLen2 >= yLen2) {
+        if (xNormLen >= yNormLen) {
             var i = 0
-            while (i < yLen2) {
+            while (i < yNormLen) {
                 val t = dw32(x[i]) - dw32(y[i]) - borrow
                 val zi = t.toInt()
                 z[i] = zi
@@ -618,7 +672,7 @@ object Magia {
                 borrow = t shr 63
                 ++i
             }
-            while (i < xLen2) {
+            while (i < xNormLen) {
                 val t = dw32(x[i]) - borrow
                 val zi = t.toInt()
                 z[i] = zi
@@ -1094,7 +1148,7 @@ object Magia {
      */
     fun newShiftLeft(x: IntArray, bitCount: Int): IntArray {
         val newBitLen = bitLen(x) + bitCount
-        val z = newCopyWithBitLen(x, newBitLen)
+        val z = newCopyWithExactBitLen(x, newBitLen)
         mutateShiftLeft(z, bitCount)
         return z
     }
