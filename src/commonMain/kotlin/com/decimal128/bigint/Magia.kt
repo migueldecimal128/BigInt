@@ -31,6 +31,7 @@ private const val S_1E9_DIV_1E4 = 43
 private const val LOG2_10_CEIL_32 = 14_267_572_565uL
 
 private const val ERROR_ADD_OVERFLOW = "add overflow ... destination too small"
+private const val ERROR_SUB_UNDERFLOW = "sub underflow ... minuend too small for subtrahend"
 private const val ERROR_MUL_OVERFLOW = "mul overflow ... destination too small"
 
 
@@ -647,53 +648,57 @@ object Magia {
     }
 
     /**
-     * Computes `z = x - y` using the low-order [xLen] and [yLen] limbs of
-     * the input arrays and returns the normalized limb length of the result.
+     * Computes `z = x - y` using the low-order [xLen] and [yLen] limbs and returns
+     * the normalized limb length of the result.
      *
      * This operation:
-     *  • assumes signed-magnitude representation with 32-bit limbs,
-     *  • requires that `x ≥ y` (checked via `compare`),
-     *  • writes the difference into [z] without allocating,
-     *  • trims high-order zero limbs and returns `(lastNonZeroIndex + 1)`.
+     *  • reads each limb before writing it,
+     *  • allows `z` to alias `x` or `y` safely,
+     *  • requires `x ≥ y`,
+     *  • and writes the result into [z] without allocation.
      *
-     * The arrays [x], [y], and [z] may be distinct, and [z] must have
-     * capacity for at least [xLen] limbs.
+     * [z] must have capacity for the normalized length of `x`.
      *
-     * @return the number of limbs in the normalized result
+     * @return normalized limb count of the result
      * @throws ArithmeticException if `x < y`
      */
     fun setSub(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        check (xLen >= 0 && xLen <= x.size)
-        check (yLen >= 0 && yLen <= y.size)
-        val xNormLen = normalizedLimbLen(x, xLen)
-        val yNormLen = normalizedLimbLen(y, yLen)
-        check (compare(x, xNormLen, y, yNormLen) >= 0)
-        var borrow = 0uL
-        var lastNonZeroIndex = -1
-        if (xNormLen >= yNormLen) {
-            var i = 0
-            while (i < yNormLen) {
-                val t = dw32(x[i]) - dw32(y[i]) - borrow
-                val zi = t.toInt()
-                z[i] = zi
-                val nonZeroMask = (zi or -zi) shr 31
-                lastNonZeroIndex = (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
-                borrow = t shr 63
-                ++i
+        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
+            val xNormLen = normalizedLimbLen(x, xLen)
+            val yNormLen = normalizedLimbLen(y, yLen)
+            if (z.size >= xNormLen) {
+                if (xNormLen >= yNormLen) {
+                    var borrow = 0uL
+                    var lastNonZeroIndex = -1
+                    var i = 0
+                    while (i < yNormLen) {
+                        val t = dw32(x[i]) - dw32(y[i]) - borrow
+                        val zi = t.toInt()
+                        z[i] = zi
+                        val nonZeroMask = (zi or -zi) shr 31
+                        lastNonZeroIndex = (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
+                        borrow = t shr 63
+                        ++i
+                    }
+                    while (i < xNormLen) {
+                        val t = dw32(x[i]) - borrow
+                        val zi = t.toInt()
+                        z[i] = zi
+                        val nonZeroMask = (zi or -zi) shr 31
+                        lastNonZeroIndex = (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
+                        borrow = t shr 63
+                        ++i
+                    }
+                    if (borrow == 0uL) {
+                        val normalizedLen = lastNonZeroIndex + 1
+                        check(isNormalized(z, normalizedLen))
+                        return normalizedLen
+                    }
+                }
+                throw ArithmeticException(ERROR_SUB_UNDERFLOW)
             }
-            while (i < xNormLen) {
-                val t = dw32(x[i]) - borrow
-                val zi = t.toInt()
-                z[i] = zi
-                val nonZeroMask = (zi or -zi) shr 31
-                lastNonZeroIndex = (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
-                borrow = t shr 63
-                ++i
-            }
-            if (borrow == 0uL)
-                return lastNonZeroIndex + 1
         }
-        throw ArithmeticException("minuend is smaller than subtrahend")
+        throw IllegalArgumentException()
     }
 
     /**
