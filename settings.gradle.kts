@@ -1,1 +1,1 @@
-rootProject.name = "hugeint"
+rootProject.name = "bigint"
