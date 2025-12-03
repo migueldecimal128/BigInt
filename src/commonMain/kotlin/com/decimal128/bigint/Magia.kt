@@ -229,7 +229,7 @@ object Magia {
     fun newWithBitLen(bitLen: Int): IntArray {
         return when {
             bitLen in 1..(MAX_ALLOC_SIZE*32) ->
-                IntArray(limbLenFromBitLen(bitLen))
+                IntArray(normalizedLenFromBitLen(bitLen))
             bitLen == 0 -> ZERO
             else ->
                 throw IllegalArgumentException("invalid allocation bitLen:$bitLen")
@@ -733,10 +733,10 @@ object Magia {
      * Returns [ZERO] if [x] or [w] is zero.
      */
     fun newMul(x: IntArray, w: UInt): IntArray {
-        val xNormLen = normalizedLimbLen(x)
-        if (xNormLen == 0 || w == 0u)
+        val xBitLen = bitLen(x)
+        if (xBitLen == 0 || w == 0u)
             return ZERO
-        val xBitLen = bitLengthFromNormalized(x, xNormLen)
+        val xNormLen = normalizedLenFromBitLen(xBitLen)
         val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul(z, x, xNormLen, w)
@@ -783,10 +783,10 @@ object Magia {
      * Returns [ZERO] if [x] or [dw] is zero.
      */
     fun newMul(x: IntArray, dw: ULong): IntArray {
-        val xNormLen = normalizedLimbLen(x)
-        if (xNormLen == 0 || dw == 0uL)
+        val xBitLen = bitLen(x)
+        if (xBitLen == 0 || dw == 0uL)
             return ZERO
-        val xBitLen = bitLengthFromNormalized(x, xNormLen)
+        val xNormLen = normalizedLenFromBitLen(xBitLen)
         val zBitLen = xBitLen + 64 - dw.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul(z, x, xNormLen, dw)
@@ -856,7 +856,7 @@ object Magia {
         if (xBitLen == 0 || yBitLen == 0)
             return ZERO
         val z = newWithBitLen(xBitLen + yBitLen)
-        val zNormLen = setMul(z, x, limbLenFromBitLen(xBitLen), y, limbLenFromBitLen(yBitLen))
+        val zNormLen = setMul(z, x, normalizedLenFromBitLen(xBitLen), y, normalizedLenFromBitLen(yBitLen))
         check (isNormalized(z, zNormLen))
         return z
     }
@@ -966,10 +966,10 @@ object Magia {
      * Returns [ZERO] if [x] is zero.
      */
     fun newSqr(x: IntArray): IntArray {
-        val xNormLen = normalizedLimbLen(x)
-        if (xNormLen == 0)
+        val bitLen = bitLen(x)
+        if (bitLen == 0)
             return ZERO
-        val bitLen = bitLengthFromNormalized(x, xNormLen)
+        val xNormLen = normalizedLenFromBitLen(bitLen)
         val sqrBitLen = 2 * bitLen
         val z = newWithBitLen(sqrBitLen)
         val zNormLen = setSqr(z, x, xNormLen)
@@ -1193,7 +1193,8 @@ object Magia {
         val innerShift = bitCount and ((1 shl 5) - 1)
         if (wordShift >= xLen) {
             x.fill(0, 0, xLen)
-            return
+            throw RuntimeException("I don't want to be throwing away extra bits")
+            //return
         }
         if (wordShift > 0) {
             //val newLen = xLen - wordShift
@@ -1281,27 +1282,7 @@ object Magia {
      * @param bitLen the number of significant bits.
      * @return the minimum number of 32-bit limbs needed to hold that many bits.
      */
-    inline fun limbLenFromBitLen(bitLen: Int): Int = (bitLen + 0x1F) ushr 5
-
-    /**
-     * Fast path to return the bit length of [x] with a normalized [xLen].
-     *
-     * The parameter [xLen] _must_ represent a normalized length — that is,
-     * if [xLen] > 0, then the most significant limb at index [xLen - 1]
-     * must be non-zero. The result is the number of bits required to
-     * represent the value contained in the lower [xLen] limbs of [x].
-     *
-     * @param x the array of 32-bit limbs.
-     * @param xLen the number of significant limbs; must be normalized.
-     * @return the bit length of the value represented by [x].
-     */
-    inline fun bitLengthFromNormalized(x: IntArray, xLen: Int): Int =
-        if (xLen != 0) {
-            check(xLen >= 0 && xLen <= x.size && x[xLen - 1] != 0)
-            32 - x[xLen - 1].countLeadingZeroBits() + ((xLen - 1) shl 5)
-        } else {
-            0
-        }
+    inline fun normalizedLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
 
     /**
      * Overload of [bitLengthBigIntegerStyle] that considers all limbs in [x].
@@ -3014,7 +2995,7 @@ object Magia {
         // Final result = u * 2^shift
         if (initialShift > 0) {
             val shiftedBitLen = bitLen(u, uLen) + initialShift
-            val shiftedLimbLen = limbLenFromBitLen(shiftedBitLen)
+            val shiftedLimbLen = normalizedLenFromBitLen(shiftedBitLen)
             for (i in uLen..<shiftedLimbLen)
                 u[i] = 0
             uLen = shiftedLimbLen
