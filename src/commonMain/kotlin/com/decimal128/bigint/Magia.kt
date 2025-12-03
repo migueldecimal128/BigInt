@@ -33,6 +33,7 @@ private const val LOG2_10_CEIL_32 = 14_267_572_565uL
 private const val ERROR_ADD_OVERFLOW = "add overflow ... destination too small"
 private const val ERROR_SUB_UNDERFLOW = "sub underflow ... minuend too small for subtrahend"
 private const val ERROR_MUL_OVERFLOW = "mul overflow ... destination too small"
+private const val ERROR_SHL_OVERFLOW = "shl overflow ... destination too small"
 
 
 /**
@@ -1193,8 +1194,7 @@ object Magia {
         val innerShift = bitCount and ((1 shl 5) - 1)
         if (wordShift >= xLen) {
             x.fill(0, 0, xLen)
-            throw RuntimeException("I don't want to be throwing away extra bits")
-            //return
+            return
         }
         if (wordShift > 0) {
             //val newLen = xLen - wordShift
@@ -1209,6 +1209,32 @@ object Magia {
                 x[i] = (x[i] shl innerShift) or (x[i - 1] ushr -innerShift)
             x[0] = x[0] shl innerShift
         }
+    }
+
+    fun setShiftLeft(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
+        if (xLen >= 0 && xLen <= x.size && bitCount >= 0) {
+            val xBitLen = bitLen(x, xLen)
+            val xNormLen = normalizedLenFromBitLen(xBitLen)
+            val zBitLen = xBitLen + bitCount
+            val zNormLen = normalizedLenFromBitLen(zBitLen)
+            if (zNormLen > z.size)
+                throw ArithmeticException(ERROR_SHL_OVERFLOW)
+            val wordShift = bitCount ushr 5 // whole word shift
+            val innerShift = bitCount and 0x1F
+            if (innerShift == 0) {
+                x.copyInto(z, wordShift, 0, xNormLen)
+            } else {
+                for (i in zNormLen - 1 downTo wordShift + 1) {
+                    val j = i - wordShift
+                    z[i] = (x[j] shl innerShift) or (x[j - 1] ushr (32 - innerShift))
+                }
+                z[wordShift] = x[0] shl innerShift
+            }
+            z.fill(0, 0, wordShift)
+            check (isNormalized(z, zNormLen))
+            return zNormLen
+        }
+        throw IllegalArgumentException()
     }
 
     /**
