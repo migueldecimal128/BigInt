@@ -965,7 +965,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
             f[1] = (twentyBang ushr 32).toInt()
             var fLen = 2
             for (i in 21u..w) {
-                Magia.mul(f, f, fLen, i)
+                Magia.setMul(f, f, fLen, i)
                 fLen += if (fLen < f.size && f[fLen] != 0) 1 else 0
             }
             return BigInt(POSITIVE, f)
@@ -1623,7 +1623,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
                 while (true) {
                     if ((exp and 1) != 0) {
                         tmpMag.fill(0, 0, baseLen)
-                        resultLen = Magia.mul(tmpMag, resultMag, resultLen, baseMag, baseLen)
+                        resultLen = Magia.setMul(tmpMag, resultMag, resultLen, baseMag, baseLen)
                         val t = tmpMag
                         tmpMag = resultMag
                         resultMag = t

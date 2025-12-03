@@ -30,6 +30,10 @@ private const val S_1E9_DIV_1E4 = 43
 
 private const val LOG2_10_CEIL_32 = 14_267_572_565uL
 
+private const val ERROR_ADD_OVERFLOW = "add overflow ... destination too small"
+private const val ERROR_MUL_OVERFLOW = "mul overflow ... destination too small"
+
+
 /**
  * Provides low-level support for arbitrary-precision **unsigned** integer arithmetic.
  *
@@ -184,6 +188,11 @@ object Magia {
      * @return `true` if `x` has no trailing zero limbs; `false` otherwise
      */
     fun isNormalized(x: IntArray) = x.isEmpty() || x[x.lastIndex] != 0
+
+    fun isNormalized(x: IntArray, xLen: Int): Boolean {
+        check (xLen >= 0 && xLen <= x.size)
+        return xLen == 0 || x[xLen - 1] != 0
+    }
 
     /**
      * Returns `x` if it is already in normalized limb form; otherwise returns
@@ -523,12 +532,12 @@ object Magia {
                     ++i
                 }
                 if (carry != 0uL) {
-                    check(carry == 1uL)
                     if (i == z.size)
-                        throw ArithmeticException("addition overflow ... sum destination too small")
+                        throw ArithmeticException(ERROR_ADD_OVERFLOW)
                     z[i] = 1
                     ++i
                 }
+                check (isNormalized(z, i))
                 return i
             }
         }
@@ -748,39 +757,41 @@ object Magia {
         if (xLen == 0 || w == 0u)
             return ZERO
         val xBitLen = bitLengthFromNormalized(x, xLen)
-        val pBitLen = xBitLen + 32 - w.countLeadingZeroBits()
-        val p = newWithBitLen(pBitLen)
-        mul(p, x, xLen, w)
-        return p
+        val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
+        val z = newWithBitLen(zBitLen)
+        setMul(z, x, xLen, w)
+        return z
     }
 
     /**
-     * Multiplies the first [xLen] limbs of [x] by the unsigned 32-bit value [w], storing the result in [p].
+     * Multiplies a normalized multi-limb integer [x] (first [xLen] limbs) by a single 32-bit word [w],
+     * storing the result in [z]. The operation is safe in-place, so [z] may be the same array as [x].
      *
-     * Requirements:
-     * - [w] must not be zero.
-     * - [p.size] should be at least [xLen] + 1 ... unless you counted your bits carefully
-     * - [p] does not need to be zero-initialized.
-     *
-     * The final carry will always be written to [p][xLen] if present, even if zero.
-     * The result is non-normalized; any additional limbs in [p] beyond [xLen] + 1 are not zeroed.
-     *
-     * This function can mutate [x] === [p] in-place.
-     *
-     * @throws IllegalArgumentException if [p.size] is too small to hold the result and carry.
+     * @return number of significant limbs written to [z]
+     * @throws ArithmeticException if [z] is too small to hold the full product (including carry)
+     * @throws IllegalArgumentException if [xLen] <= 0 or [xLen] >= x.size
      */
-    fun mul(p: IntArray, x: IntArray, xLen: Int, w: UInt) {
-        val w64 = w.toULong()
-        var carry = 0uL
-        for (i in 0..<xLen) {
-            val t = dw32(x[i]) * w64 + carry
-            p[i] = t.toInt()
-            carry = t shr 32
+    fun setMul(z: IntArray, x: IntArray, xLen: Int, w: UInt): Int {
+        if (xLen > 0 && xLen <= x.size) {
+            val xNormLen = normalizedLimbLen(x, xLen)
+            val w64 = w.toULong()
+            var carry = 0uL
+            var i = 0
+            while (i < xNormLen) {
+                val t = dw32(x[i]) * w64 + carry
+                z[i] = t.toInt()
+                carry = t shr 32
+                ++i
+            }
+            if (carry == 0uL)
+                return i
+            if (z.size > i) {
+                z[i] = carry.toInt()
+                return i + 1
+            }
+            throw ArithmeticException(ERROR_MUL_OVERFLOW)
         }
-        if (p.size > xLen)
-            p[xLen] = carry.toInt()
-        else if (carry != 0uL)
-            throw IllegalArgumentException()
+        throw IllegalArgumentException()
     }
 
     /**
@@ -798,7 +809,7 @@ object Magia {
             return ZERO
         val newBitLen = bitLen(x) + (64 - dw.countLeadingZeroBits())
         val z = newWithBitLen(newBitLen)
-        mul(z, z.size, x, xLen, dw)
+        setMul(z, x, xLen, dw)
         return z
     }
 
@@ -810,12 +821,13 @@ object Magia {
      * - [zLen] must be greater than [xLen]; caller must ensure it is large enough to hold the full product.
      *
      * The caller is responsible for ensuring that [zLen] is sufficient, either by checking limb lengths
-     * (typically requiring +2 limbs) or by checking bit lengths (1 or 2 extra limbs).
+     * (typically requiring +2 limbs) or by checking bit lengths (0 to 2 extra limbs).
      *
      * @throws IllegalArgumentException if [xLen], [zLen], or array sizes are invalid.
      */
-    fun mul(z: IntArray, zLen: Int, x: IntArray, xLen: Int, dw: ULong) {
-        if (zLen >= 0 && zLen <= z.size && xLen >= 0 && xLen <= x.size && zLen > xLen) {
+    fun setMul(z: IntArray, x: IntArray, xLen: Int, dw: ULong): Int {
+        if (xLen >= 0 && xLen <= x.size) {
+            val xNormLen = normalizedLimbLen(x, xLen)
             val lo = dw and 0xFFFF_FFFFuL
             val hi = dw shr 32
 
@@ -823,20 +835,29 @@ object Magia {
 
 
             // i = 1…n-1: do both halves in one pass
-            for (i in 0..<xLen) {
+            var i = 0
+            while (i < xNormLen) {
                 val xi = dw32(x[i])
 
                 val pp = xi * lo + (ppPrevHi and 0xFFFF_FFFFuL)
                 z[i] = pp.toInt()
 
                 ppPrevHi = xi * hi + (ppPrevHi shr 32) + (pp shr 32)
+                ++i
             }
-            for (i in xLen..<zLen) {
+            if (ppPrevHi != 0uL && i < z.size) {
                 z[i] = ppPrevHi.toInt()
                 ppPrevHi = ppPrevHi shr 32
+                ++i
+            }
+            if (ppPrevHi != 0uL && i < z.size) {
+                z[i] = ppPrevHi.toInt()
+                ppPrevHi = ppPrevHi shr 32
+                ++i
             }
             if (ppPrevHi == 0uL)
-                return
+                return i
+            throw ArithmeticException(ERROR_MUL_OVERFLOW)
         }
         throw IllegalArgumentException()
     }
@@ -852,45 +873,45 @@ object Magia {
         if (xBitLen == 0 || yBitLen == 0)
             return ZERO
         val p = newWithBitLen(xBitLen + yBitLen)
-        mul(p, x, limbLenFromBitLen(xBitLen), y, limbLenFromBitLen(yBitLen))
+        setMul(p, x, limbLenFromBitLen(xBitLen), y, limbLenFromBitLen(yBitLen))
         return p
     }
 
     /**
      * Multiplies the first [xLen] limbs of [x] by the first [yLen] limbs of [y],
-     * accumulating the result into [p].
+     * accumulating the result into [z].
      *
      * Requirements:
-     * - [p] must be of size [xLen] + [yLen] or [xLen] + [yLen] - 1.
-     * - The first [yLen] entries of [p] must be zeroed by the caller.
+     * - [z] must be of sufficient size to hold the product
+     *   `bitLen(x) + bitLen(y)`, at least [xLen] + [yLen] - 1.
+     * - The first [yLen] entries of [z] must be zeroed by the caller.
      * - [xLen] and [yLen] must be greater than zero and within the array bounds.
-     * - The most significant limbs of [x] and [y] must be nonzero.
      * - For efficiency, if one array is longer, it is preferable to use it as [y].
      *
-     * @return the number of limbs actually used in [p].
+     * @return the number of limbs actually used in [z].
      * @throws IllegalArgumentException if preconditions on array sizes or lengths are violated.
      */
-    fun mul(p: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        if (xLen > 0 && yLen > 0 && xLen <= x.size && yLen <= y.size && (xLen + yLen) <= p.size + 1) {
-            check (x[xLen - 1] != 0)
-            check (y[yLen - 1] != 0)
-            for (i in 0..<xLen) {
+    fun setMul(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
+        if (xLen > 0 && xLen <= x.size && yLen > 0 && yLen <= y.size && z.size >= xLen + yLen - 1) {
+            val xNormLen = normalizedLimbLen(x, xLen)
+            val yNormLen = normalizedLimbLen(y, yLen)
+            for (i in 0..<xNormLen) {
                 val xLimb = dw32(x[i])
                 var carry = 0uL
-                for (j in 0..<yLen) {
+                for (j in 0..<yNormLen) {
                     val yLimb = dw32(y[j])
-                    val t = xLimb * yLimb + dw32(p[i + j]) + carry
-                    p[i + j] = t.toInt()
+                    val t = xLimb * yLimb + dw32(z[i + j]) + carry
+                    z[i + j] = t.toInt()
                     carry = t shr 32
                 }
-                if (i + yLen < p.size)
-                    p[i + yLen] = carry.toInt()
+                if (i + yNormLen < z.size)
+                    z[i + yNormLen] = carry.toInt()
                 else if (carry != 0uL)
-                    throw IllegalArgumentException()
+                    throw ArithmeticException(ERROR_MUL_OVERFLOW)
             }
-            val lastIndex = min(xLen + yLen, p.size) - 1
-            check (p[lastIndex] != 0 || p[lastIndex - 1] != 0)
-            return lastIndex + (if (p[lastIndex] == 0) 0 else 1)
+            val lastIndex = min(xNormLen + yNormLen, z.size) - 1
+            check (z[lastIndex] != 0 || z[lastIndex - 1] != 0)
+            return lastIndex + (if (z[lastIndex] == 0) 0 else 1)
         } else if (xLen == 0 || yLen == 0) {
             return 0
         } else {

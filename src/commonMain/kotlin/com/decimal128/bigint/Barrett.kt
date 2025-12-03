@@ -145,7 +145,7 @@ class Barrett private constructor (val m: BigInt,
         // q2 = q1 * mu
         val q2 = q1 * muLimbs
         val mq2 = IntArray(muLimbs.magia.size * 2)
-        val mq2Len = Magia.mul(mq2, mq1, mq1Len, muLimbs.magia, muLimbs.magia.size)
+        val mq2Len = Magia.setMul(mq2, mq1, mq1Len, muLimbs.magia, muLimbs.magia.size)
         check (Magia.compare(q2.magia, Magia.normalizedLimbLen(q2.magia), mq2, mq2Len) == 0)
 
         // q3 = floor(q2 / b**(k + 1))
@@ -164,7 +164,7 @@ class Barrett private constructor (val m: BigInt,
         // r2 = (q3 * m) % b**(k + 1)
         val pq3m = q3 * m
         val mpq3m = IntArray(2 * kLimbs)
-        val mpq3mLen = Magia.mul(mpq3m, mq3, mq3Len, mMagia, mMagia.size)
+        val mpq3mLen = Magia.setMul(mpq3m, mq3, mq3Len, mMagia, mMagia.size)
         check (Magia.compare(pq3m.magia, Magia.normalizedLimbLen(pq3m.magia), mpq3m, mpq3mLen) == 0)
 
         val r2 = pq3m and BigInt.withBitMask(kLimbsPlus1 * 32)
@@ -224,7 +224,7 @@ class Barrett private constructor (val m: BigInt,
         println("mulimbs.magia.size:${muLimbs.magia.size}  kLimbs:$kLimbs")
         check (muLimbs.magia.size == kLimbs)
         val q2Magia = IntArray(muLimbs.magia.size * 2)
-        val q2Len = Magia.mul(q2Magia, q1Magia, q1Len, muLimbs.magia, muLimbs.magia.size)
+        val q2Len = Magia.setMul(q2Magia, q1Magia, q1Len, muLimbs.magia, muLimbs.magia.size)
         // check (Magia.compare(q2.magia, Magia.normalizedLimbLen(q2.magia), q2Magia, q2Len) == 0)
 
         // q3 = floor(q2 / b**(k + 1))
@@ -243,7 +243,7 @@ class Barrett private constructor (val m: BigInt,
         // r2 = (q3 * m) % b**(k + 1)
         // val pq3m = q3 * m
         val pMagia = IntArray(2 * kLimbs)
-        val pLen = Magia.mul(pMagia, q3Magia, q3Len, mMagia, mMagia.size)
+        val pLen = Magia.setMul(pMagia, q3Magia, q3Len, mMagia, mMagia.size)
         // check (Magia.compare(pq3m.magia, Magia.normalizedLimbLen(pq3m.magia), pMagia, pLen) == 0)
 
         // val r2 = pq3m and BigInt.withBitMask(kLimbsPlus1 * 32)

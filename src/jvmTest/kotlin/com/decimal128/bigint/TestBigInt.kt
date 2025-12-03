@@ -24,6 +24,7 @@ class TestBigInt {
 
     @Test
     fun testProblemChild() {
+        testSqr(BigInteger("12345678901234567890123456789012345678901234567890"))
         testBigEndianByteArray(BigInteger("-11593"))
         testBigEndianByteArray(BigInteger("851028216441256846883624947"))
         testBigEndianByteArray(BigInteger("851028216441256846883624947"))
@@ -35,7 +36,6 @@ class TestBigInt {
         testHexStr(BigInteger("123"))
         testHexStr(BigInteger("12345678901234567890123456789012345678901234567890"))
         testWithIndexedBitMask(3, 0)
-        testSqr(BigInteger("12345678901234567890123456789012345678901234567890"))
         testSqr(BigInteger("99999999999"))
         testAdd(BigInteger.ZERO, BigInteger.ZERO)
         testAdd(BigInteger("-4418548"), BigInteger.ZERO)

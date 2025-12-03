@@ -757,7 +757,7 @@ class BigIntAccumulator private constructor (
         if (magia.size < newLimbLenMax)
             magia = Magia.newCopyWithFloorLen(magia, newLimbLenMax)
         magia[limbLen] = 0
-        Magia.mul(magia, magia, limbLen, w)
+        Magia.setMul(magia, magia, limbLen, w)
         sign = sign xor wSign
         limbLen += if (magia[limbLen] == 0) 0 else 1
     }
@@ -785,10 +785,7 @@ class BigIntAccumulator private constructor (
             return
         if (magia.size < limbLen + 2)
             magia = Magia.newCopyWithFloorLen(magia, limbLen + 2)
-        magia[limbLen] = 0
-        magia[limbLen + 1] = 0
-        Magia.mul(magia, limbLen + 2, magia, limbLen, dw)
-        limbLen += if (magia[limbLen + 1] == 0) 1 else 2
+        limbLen = Magia.setMul(magia, magia, limbLen, dw)
         sign = sign xor wSign
         validate()
     }
@@ -823,7 +820,7 @@ class BigIntAccumulator private constructor (
             tmp1 = Magia.newWithFloorLen(pLen)
         else
             tmp1.fill(0, 0, pLen)
-        Magia.mul(tmp1, magia, limbLen, y, yLen)
+        Magia.setMul(tmp1, magia, limbLen, y, yLen)
         val t = magia
         magia = tmp1
         tmp1 = t
