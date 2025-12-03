@@ -328,27 +328,7 @@ object Magia {
         throw IllegalArgumentException("invalid allocation length:$exactLimbLen")
     }
 
-    /**
-     * Returns a new limb array representing [x] plus the unsigned 32-bit value [w].
-     *
-     * The result is sized to accommodate any carry from the addition.
-     */
-    fun newAdd(x: IntArray, w: UInt): IntArray {
-        val newBitLen = max(bitLen(x), (32 - w.countLeadingZeroBits())) + 1
-        val z = newWithBitLen(newBitLen)
-        var carry = w.toULong()
-        val indexLimit = min(x.size, z.size)
-        for (i in 0..<indexLimit) {
-            val t = dw32(x[i]) + carry
-            z[i] = t.toInt()
-            carry = t shr 32
-        }
-        if (carry != 0uL)
-            z[z.lastIndex] = 1
-        return z
-    }
-
-    /**
+     /**
      * Returns a new limb array representing [x] plus the unsigned 64-bit value [dw].
      *
      * The result is extended as needed to hold any carry or sign extension from the addition.
@@ -384,44 +364,26 @@ object Magia {
         return z
     }
 
-    /**
-     * Adds the unsigned 32-bit value [w] to [x], mutating it in place when possible.
-     *
-     * If the addition produces a carry beyond the current length of [x],
-     * a new extended array is returned.
-     */
-    fun newOrMutateAdd(x: IntArray, w: UInt): IntArray {
-        val carry = mutateAdd(x, x.size, w)
-        if (carry == 0u)
-            return x
-        val z = newCopyWithExactLimbLen(x, x.size + 1)
-        z[x.size] = carry.toInt()
-        return z
-    }
-
-    /**
-     * Adds the unsigned 32-bit value [w] to the first [xLen] limbs of [x], modifying [x] in place.
-     *
-     * A non-zero return represents a single limb that must be
-     * handled by the caller.
-     *
-     * @return the final carry as an unsigned 32-bit value.
-     * @throws IllegalArgumentException if [xLen] is out of range for [x].
-     */
-    fun mutateAdd(x: IntArray, xLen: Int, w: UInt): UInt {
-        if (xLen >= 0 && xLen <= x.size) {
-            var carry = w.toULong()
-            var i = 0
-            while (carry != 0uL && i < xLen) {
-                val t = dw32(x[i]) + carry
-                x[i] = t.toInt()
-                carry = t shr 32
-                ++i
-            }
-            return carry.toUInt()
-        } else {
-            throw IllegalArgumentException()
+    fun newOrMutateIncrement(x: IntArray): IntArray {
+        // FIXME - change this to dw: ULong
+        //  only called from 1 spot with argument 1u
+        //  perhaps make a dedicated newOrMutateIncrement
+        var carry = 1uL
+        var i = 0
+        while (carry != 0uL && i < x.size) {
+            val t = dw32(x[i]) + carry
+            x[i] = t.toInt()
+            carry = t shr 32
+            ++i
         }
+        if (carry == 0uL)
+            return x
+        // the only way we can have a carry is if all limbs
+        // have mutated to zero
+        check (normalizedLimbLen(x) == 0)
+        val z = IntArray(x.size + 1)
+        z[x.size] = 1
+        return z
     }
 
     /**

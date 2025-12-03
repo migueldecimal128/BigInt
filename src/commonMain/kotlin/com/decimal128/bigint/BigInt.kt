@@ -1922,7 +1922,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
                     magia !== Magia.ZERO -> {
                         // Mimic twos-complement rounding down for negative numbers
                         if (sign.isNegative && Magia.testAnyBitInLowerN(this.magia, bitCount))
-                            magia = Magia.newOrMutateAdd(magia, 1u)
+                            magia = Magia.newOrMutateIncrement(magia)
                         BigInt(this.sign, magia)
                     }
 
@@ -2390,10 +2390,10 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
         }
         val thisSign = this.sign xor signFlipThis
         if (thisSign.isNegative == otherSign)
-            return BigInt(thisSign, Magia.newAdd(this.magia, w))
+            return BigInt(thisSign, Magia.newAdd(this.magia, w.toULong()))
         val cmp = this.magnitudeCompareTo(w)
         val ret = when {
-            cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, w))
+            cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, w.toULong()))
             cmp < 0 -> BigInt(Sign(otherSign), intArrayOf(w.toInt() - this.magia[0]))
             else -> ZERO
         }
