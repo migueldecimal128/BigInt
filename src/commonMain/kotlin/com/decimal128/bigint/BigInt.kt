@@ -1632,7 +1632,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
                     if (exp == 0)
                         break
                     tmpMag.fill(0, 0, min(tmpMag.size, 2 * baseLen))
-                    baseLen = Magia.sqr(tmpMag, baseMag, baseLen)
+                    baseLen = Magia.setSqr(tmpMag, baseMag, baseLen)
                     val t = tmpMag
                     tmpMag = baseMag
                     baseMag = t

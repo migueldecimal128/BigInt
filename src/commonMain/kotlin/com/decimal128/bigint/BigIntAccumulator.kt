@@ -729,7 +729,7 @@ class BigIntAccumulator private constructor (
             tmp1 = Magia.newWithFloorLen(sqrLenMax)
         else
             tmp1.fill(0, 0, sqrLenMax)
-        Magia.sqr(tmp1, y, yLen)
+        Magia.setSqr(tmp1, y, yLen)
         val sqrLen = sqrLenMax - if (tmp1[sqrLenMax - 1] == 0) 1 else 0
         mutateAddMagImpl(tmp1, sqrLen)
     }
@@ -847,7 +847,7 @@ class BigIntAccumulator private constructor (
             val t = magia
             magia = tmp1
             tmp1 = t
-            limbLen = Magia.sqr(magia, t, limbLen)
+            limbLen = Magia.setSqr(magia, t, limbLen)
             sign = POSITIVE
         }
     }

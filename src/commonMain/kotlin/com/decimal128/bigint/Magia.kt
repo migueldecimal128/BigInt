@@ -580,6 +580,7 @@ object Magia {
                 }
                 check (borrow == 0uL)
                 val zNormLen = lastNonZeroIndex + 1
+                check (isNormalized(z, zNormLen))
                 return zNormLen
             }
         }
@@ -596,8 +597,9 @@ object Magia {
         val xLen = normalizedLimbLen(x)
         val yLen = normalizedLimbLen(y)
         val z = IntArray(xLen)
-        val zLen = setSub(z, x, xLen, y, yLen)
-        return if (zLen == 0) ZERO else z
+        val zNormLen = setSub(z, x, xLen, y, yLen)
+        check (isNormalized(z, zNormLen))
+        return if (zNormLen == 0) ZERO else z
     }
 
     /**
@@ -676,9 +678,9 @@ object Magia {
                         ++i
                     }
                     if (borrow == 0uL) {
-                        val normalizedLen = lastNonZeroIndex + 1
-                        check(isNormalized(z, normalizedLen))
-                        return normalizedLen
+                        val zNormLen = lastNonZeroIndex + 1
+                        check(isNormalized(z, zNormLen))
+                        return zNormLen
                     }
                 }
                 throw ArithmeticException(ERROR_SUB_UNDERFLOW)
@@ -698,10 +700,9 @@ object Magia {
      */
     fun mutateSub(x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
         if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            check(xLen == 0 || x[xLen - 1] != 0)
-            check(yLen == 0 || y[yLen - 1] != 0)
-            check(xLen >= yLen)
-            return setSub(x, x, xLen, y, yLen)
+            val zNormLen = setSub(x, x, xLen, y, yLen)
+            check (isNormalized(x, zNormLen))
+            return zNormLen
         }
         throw IllegalArgumentException()
     }
@@ -717,25 +718,13 @@ object Magia {
      *
      * @throws IllegalArgumentException if [xLen] or [yLen] are out of range for [x] or [y].
      */
-    fun mutateReverseSub(x: IntArray, xLen: Int, y: IntArray, yLen: Int) {
+    fun mutateReverseSub(x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
         if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            // x is usually not normalized .. so don't check for it
-            check(yLen == 0 || y[yLen - 1] != 0)
-            if (xLen != yLen)
-                print("foo!")
-            check(xLen == yLen)
-            var borrow = 0uL // 0 or 1
-            var i = 0
-            while (i < yLen) {
-                borrow = dw32(y[i]) - dw32(x[i]) - borrow
-                x[i] = borrow.toInt()
-                borrow = borrow shr 63
-                ++i
-            }
-            check(borrow == 0uL)
-        } else {
-            throw IllegalArgumentException()
+            val zNormLen = setSub(x, y, yLen, x, xLen)
+            check (isNormalized(x, zNormLen))
+            return zNormLen
         }
+        throw IllegalArgumentException()
     }
 
     /**
@@ -744,13 +733,14 @@ object Magia {
      * Returns [ZERO] if [x] or [w] is zero.
      */
     fun newMul(x: IntArray, w: UInt): IntArray {
-        val xLen = normalizedLimbLen(x)
-        if (xLen == 0 || w == 0u)
+        val xNormLen = normalizedLimbLen(x)
+        if (xNormLen == 0 || w == 0u)
             return ZERO
-        val xBitLen = bitLengthFromNormalized(x, xLen)
+        val xBitLen = bitLengthFromNormalized(x, xNormLen)
         val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
-        setMul(z, x, xLen, w)
+        val zNormLen = setMul(z, x, xNormLen, w)
+        check (isNormalized(z, zNormLen))
         return z
     }
 
@@ -774,13 +764,15 @@ object Magia {
                 carry = t shr 32
                 ++i
             }
-            if (carry == 0uL)
-                return i
-            if (z.size > i) {
+            if (carry != 0uL) {
+                if (i == z.size)
+                    throw ArithmeticException(ERROR_MUL_OVERFLOW)
                 z[i] = carry.toInt()
-                return i + 1
+                ++i
             }
-            throw ArithmeticException(ERROR_MUL_OVERFLOW)
+            check (isNormalized(z, i))
+            return i
+
         }
         throw IllegalArgumentException()
     }
@@ -788,19 +780,17 @@ object Magia {
     /**
      * Returns a new limb array representing [x] multiplied by the unsigned 64-bit value [dw].
      *
-     * Optimized to delegate to [newMul] with a 32-bit value if the upper 32 bits of [dw] are zero.
      * Returns [ZERO] if [x] or [dw] is zero.
      */
     fun newMul(x: IntArray, dw: ULong): IntArray {
-        if ((dw shr 32) == 0uL)
-            return newMul(x, dw.toUInt())
-        val xLen = normalizedLimbLen(x)
-        val xBitLen = bitLengthFromNormalized(x, xLen)
-        if (xBitLen == 0)
+        val xNormLen = normalizedLimbLen(x)
+        if (xNormLen == 0 || dw == 0uL)
             return ZERO
-        val newBitLen = bitLen(x) + (64 - dw.countLeadingZeroBits())
-        val z = newWithBitLen(newBitLen)
-        setMul(z, x, xLen, dw)
+        val xBitLen = bitLengthFromNormalized(x, xNormLen)
+        val zBitLen = xBitLen + 64 - dw.countLeadingZeroBits()
+        val z = newWithBitLen(zBitLen)
+        val zNormLen = setMul(z, x, xNormLen, dw)
+        check (isNormalized(z, zNormLen))
         return z
     }
 
@@ -817,6 +807,8 @@ object Magia {
      * @throws IllegalArgumentException if [xLen], [zLen], or array sizes are invalid.
      */
     fun setMul(z: IntArray, x: IntArray, xLen: Int, dw: ULong): Int {
+        if ((dw shr 32) == 0uL)
+            return setMul(z, x, xLen, dw.toUInt())
         if (xLen >= 0 && xLen <= x.size) {
             val xNormLen = normalizedLimbLen(x, xLen)
             val lo = dw and 0xFFFF_FFFFuL
@@ -824,8 +816,6 @@ object Magia {
 
             var ppPrevHi = 0uL
 
-
-            // i = 1…n-1: do both halves in one pass
             var i = 0
             while (i < xNormLen) {
                 val xi = dw32(x[i])
@@ -846,8 +836,10 @@ object Magia {
                 ppPrevHi = ppPrevHi shr 32
                 ++i
             }
-            if (ppPrevHi == 0uL)
+            if (ppPrevHi == 0uL) {
+                check (isNormalized(z, i))
                 return i
+            }
             throw ArithmeticException(ERROR_MUL_OVERFLOW)
         }
         throw IllegalArgumentException()
@@ -863,9 +855,10 @@ object Magia {
         val yBitLen = bitLen(y)
         if (xBitLen == 0 || yBitLen == 0)
             return ZERO
-        val p = newWithBitLen(xBitLen + yBitLen)
-        setMul(p, x, limbLenFromBitLen(xBitLen), y, limbLenFromBitLen(yBitLen))
-        return p
+        val z = newWithBitLen(xBitLen + yBitLen)
+        val zNormLen = setMul(z, x, limbLenFromBitLen(xBitLen), y, limbLenFromBitLen(yBitLen))
+        check (isNormalized(z, zNormLen))
+        return z
     }
 
     /**
@@ -886,23 +879,32 @@ object Magia {
         if (xLen > 0 && xLen <= x.size && yLen > 0 && yLen <= y.size && z.size >= xLen + yLen - 1) {
             val xNormLen = normalizedLimbLen(x, xLen)
             val yNormLen = normalizedLimbLen(y, yLen)
-            for (i in 0..<xNormLen) {
-                val xLimb = dw32(x[i])
+            val corto = if (xNormLen < yNormLen) x else y
+            val largo = if (xNormLen < yNormLen) y else x
+            val cortoLen = if (xNormLen < yNormLen) xNormLen else yNormLen
+            val largoLen = if (xNormLen < yNormLen) yNormLen else xNormLen
+
+            for (i in 0..<cortoLen) {
+                val cortoLimb = dw32(corto[i])
                 var carry = 0uL
-                for (j in 0..<yNormLen) {
-                    val yLimb = dw32(y[j])
-                    val t = xLimb * yLimb + dw32(z[i + j]) + carry
+                for (j in 0..<largoLen) {
+                    val largoLimb = dw32(largo[j])
+                    val t = cortoLimb * largoLimb + dw32(z[i + j]) + carry
                     z[i + j] = t.toInt()
                     carry = t shr 32
                 }
-                if (i + yNormLen < z.size)
-                    z[i + yNormLen] = carry.toInt()
+                if (i + largoLen < z.size)
+                    z[i + largoLen] = carry.toInt()
                 else if (carry != 0uL)
                     throw ArithmeticException(ERROR_MUL_OVERFLOW)
             }
-            val lastIndex = min(xNormLen + yNormLen, z.size) - 1
-            check (z[lastIndex] != 0 || z[lastIndex - 1] != 0)
-            return lastIndex + (if (z[lastIndex] == 0) 0 else 1)
+            var lastIndex = cortoLen + largoLen - 1
+            // >= instead of == to help bounds check elimination
+            if (lastIndex >= z.size || z[lastIndex] == 0)
+                --lastIndex
+            val zNormLen = lastIndex + 1
+            check (isNormalized(z, zNormLen))
+            return zNormLen
         } else if (xLen == 0 || yLen == 0) {
             return 0
         } else {
@@ -964,103 +966,95 @@ object Magia {
      * Returns [ZERO] if [x] is zero.
      */
     fun newSqr(x: IntArray): IntArray {
-        val xLen = normalizedLimbLen(x)
-        if (xLen == 0)
+        val xNormLen = normalizedLimbLen(x)
+        if (xNormLen == 0)
             return ZERO
-        val bitLen = bitLengthFromNormalized(x, xLen)
+        val bitLen = bitLengthFromNormalized(x, xNormLen)
         val sqrBitLen = 2 * bitLen
-        val p = newWithBitLen(sqrBitLen)
-        sqr(p, x, xLen)
-        return p
+        val z = newWithBitLen(sqrBitLen)
+        val zNormLen = setSqr(z, x, xNormLen)
+        check (isNormalized(z, zNormLen))
+        return z
     }
 
     /**
-     * Squares the first [xLen] limbs of [x], storing the result in [p].
+     * Squares the first [xLen] limbs of [x], storing the result in [z].
      *
      * Requirements:
-     * - [p] must be completely zero-initialized by the caller.
-     * - [p.size] must be sufficient to hold the squared result (2 * [xLen] or 2 * [xLen] - 1 limbs).
+     * - [z] must be completely zero-initialized by the caller.
+     * - [z.size] must be sufficient to hold the squared result (2 * [xLen] or 2 * [xLen] - 1 limbs).
      *
-     * Only the minimum required limbs are written to [p]; if only 2 * [xLen] - 1 limbs are non-zero,
+     * Only the minimum required limbs are written to [z]; if only 2 * [xLen] - 1 limbs are non-zero,
      * that is how many will be written. The caller must ensure zero-initialization of all 2 * [xLen] limbs.
      *
      * @return the normalized limb length of the result.
      */
-    fun sqr(p: IntArray, x: IntArray, xLen: Int) : Int {
-        // test to encourage bounds check elimination
-        if (xLen > 0 && xLen <= x.size && xLen * 2 <= p.size + 1) {
-            // 1) Cross terms: for i<j, add (x[i]*x[j]) twice into p[i+j]
-            // these terms are doubled
-            for (i in 0..<xLen) {
-                val xi = dw32(x[i])
-                var carry = 0uL
-                for (j in (i + 1)..<xLen) {
-                    val prod = xi * dw32(x[j])        // 32x32 -> 64
-                    // add once
-                    val t1 = prod + dw32(p[i + j]) + carry
-                    val p1 = t1 and 0xFFFF_FFFFuL
-                    carry = t1 shr 32
-                    // add second time (doubling) — avoids (prod << 1) overflow
-                    val t2 = prod + p1
-                    p[i + j] = t2.toInt()
-                    carry += t2 shr 32
-                }
-                // flush carry to the next limb(s)
-                val k = i + xLen
-                if (carry != 0uL) {
-                    val t = dw32(p[k]) + carry
-                    p[k] = t.toInt()
-                    carry = t shr 32
-                    if (carry != 0uL)
-                        ++p[k + 1]
-                }
-            }
-
-            // 2) Diagonals: add x[i]**2 into columns 2*i and 2*i+1
-            // terms on the diagonal are not doubled
-            for (i in 0..<xLen) {
-                val sq = dw32(x[i]) * dw32(x[i])      // 64-bit
-                // add low 32 to p[2*i]
-                var t = dw32(p[2 * i]) + (sq and 0xFFFF_FFFFuL)
-                p[2 * i] = t.toInt()
-                var carry = t shr 32
-                // add high 32 (and carry) to p[2*i+1]
-                val s = (sq shr 32) + carry
-                if (s != 0uL) {
-                    t = dw32(p[2 * i + 1]) + s
-                    p[2 * i + 1] = t.toInt()
-                    carry = t shr 32
-                    // propagate any remaining carry
-                    var k = 2 * i + 2
-                    while (carry != 0uL) {
-                        t = dw32(p[k]) + carry
-                        p[k] = t.toInt()
+    fun setSqr(z: IntArray, x: IntArray, xLen: Int) : Int {
+        if (xLen > 0 && xLen <= x.size) {
+            val xNormLen = normalizedLimbLen(x, xLen)
+            if (z.size >= 2 * xNormLen - 1) {
+                // 1) Cross terms: for i<j, add (x[i]*x[j]) twice into p[i+j]
+                // these terms are doubled
+                for (i in 0..<xNormLen) {
+                    val xi = dw32(x[i])
+                    var carry = 0uL
+                    for (j in (i + 1)..<xNormLen) {
+                        val prod = xi * dw32(x[j])        // 32x32 -> 64
+                        // add once
+                        val t1 = prod + dw32(z[i + j]) + carry
+                        val p1 = t1 and 0xFFFF_FFFFuL
+                        carry = t1 shr 32
+                        // add second time (doubling) — avoids (prod << 1) overflow
+                        val t2 = prod + p1
+                        z[i + j] = t2.toInt()
+                        carry += t2 shr 32
+                    }
+                    // flush carry to the next limb(s)
+                    val k = i + xNormLen
+                    if (carry != 0uL) {
+                        val t = dw32(z[k]) + carry
+                        z[k] = t.toInt()
                         carry = t shr 32
-                        k++
+                        if (carry != 0uL)
+                            ++z[k + 1]
                     }
                 }
+
+                // 2) Diagonals: add x[i]**2 into columns 2*i and 2*i+1
+                // terms on the diagonal are not doubled
+                for (i in 0..<xLen) {
+                    val sq = dw32(x[i]) * dw32(x[i])      // 64-bit
+                    // add low 32 to p[2*i]
+                    var t = dw32(z[2 * i]) + (sq and 0xFFFF_FFFFuL)
+                    z[2 * i] = t.toInt()
+                    var carry = t shr 32
+                    // add high 32 (and carry) to p[2*i+1]
+                    val s = (sq shr 32) + carry
+                    if (s != 0uL) {
+                        t = dw32(z[2 * i + 1]) + s
+                        z[2 * i + 1] = t.toInt()
+                        carry = t shr 32
+                        // propagate any remaining carry
+                        var k = 2 * i + 2
+                        while (carry != 0uL) {
+                            if (k >= z.size)
+                                throw IllegalArgumentException(ERROR_MUL_OVERFLOW)
+                            t = dw32(z[k]) + carry
+                            z[k] = t.toInt()
+                            carry = t shr 32
+                            k++
+                        }
+                    }
+                }
+                var lastIndex = 2 * xNormLen - 1
+                if (lastIndex >= z.size || z[lastIndex] == 0)
+                    --lastIndex
+                val zNormLen = lastIndex + 1
+                check (isNormalized(z, zNormLen))
+                return zNormLen
             }
-            var lastIndex = min(2 * xLen, p.size) - 1
-            while (p[lastIndex] == 0)
-                --lastIndex
-            return lastIndex + 1
-        } else {
-            throw IllegalArgumentException()
         }
-    }
-
-    private fun copy(dst: IntArray, src: IntArray) = copy(dst, src, src.size)
-
-    private fun copy(dst: IntArray, src: IntArray, srcLen: Int) {
-        check (srcLen >= 0 && srcLen <= src.size)
-        var i = 0
-        val m = min(dst.size, srcLen)
-        while (i < m) {
-            dst[i] = src[i]
-            ++i
-        }
-        while (i < dst.size)
-            dst[i++] = 0
+        throw IllegalArgumentException()
     }
 
     /**
@@ -1125,12 +1119,12 @@ object Magia {
         val newBitLen = bitLen(x, xLenNormalized) - bitCount
         if (newBitLen <= 0)
             return 0
-        val zLen = (newBitLen + 0x1F) ushr 5
-        require (zLen <= z.size)
+        val zNormLen = (newBitLen + 0x1F) ushr 5
+        require (zNormLen <= z.size)
         val wordShift = bitCount ushr 5
         val innerShift = bitCount and ((1 shl 5) - 1)
         if (innerShift != 0) {
-            val iLast = zLen - 1
+            val iLast = zNormLen - 1
             for (i in 0..<iLast)
                 z[i] = (x[i + wordShift + 1] shl -innerShift) or (x[i + wordShift] ushr innerShift)
             val srcIndex = iLast + wordShift + 1
@@ -1141,10 +1135,11 @@ object Magia {
                         0) or
                     (x[iLast + wordShift] ushr innerShift)
         } else {
-            for (i in 0..<zLen)
+            for (i in 0..<zNormLen)
                 z[i] = x[i + wordShift]
         }
-        return zLen
+        check (isNormalized(z, zNormLen))
+        return zNormLen
     }
 
     /**
@@ -1884,7 +1879,7 @@ object Magia {
         if (r != null) {
             val unLen = normalizedLimbLen(un)
             mutateShiftRight(un, unLen, shift)
-            copy(r, un, unLen)
+            un.copyInto(r, 0, 0, unLen)
         }
     }
 
