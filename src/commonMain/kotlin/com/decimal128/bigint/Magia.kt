@@ -544,6 +544,49 @@ object Magia {
     }
 
     /**
+     * Subtracts a 64-bit unsigned integer [dw] from a multi-limb big integer [x] (first [xLen] limbs),
+     * storing the result in [z].
+     *
+     * Returns the normalized length of [z] (excluding trailing zero limbs).
+     *
+     * @param z the destination array to receive the result; must have size >= normalized length of [x]
+     * @param x the source big integer limbs array
+     * @param xLen number of limbs from [x] to consider
+     * @param dw the 64-bit unsigned integer to subtract from [x]
+     * @return normalized length of the subtraction result in [z]
+     * @throws IllegalArgumentException if input lengths are invalid or arrays too small
+     * @throws ArithmeticException if the subtraction underflows (i.e., dw > x)
+     */
+    fun setSub(z: IntArray, x: IntArray, xLen: Int, dw: ULong): Int {
+        if (xLen >= 0 && xLen <= x.size) {
+            val xNormLen = normalizedLimbLen(x, xLen)
+            if (z.size >= xNormLen) {
+                if (xNormLen < 3 && toRawULong(x) < dw)
+                    throw ArithmeticException(ERROR_SUB_UNDERFLOW)
+                var lastNonZeroIndex = -1
+                var borrow = dw
+                var i = 0
+                while (i < xNormLen) {
+                    val t = dw32(x[i]) - (borrow and 0xFFFF_FFFFuL)
+                    val zi = t.toInt()
+                    z[i] = zi
+                    val carryOut = t shr 63         // 1 if borrow-in consumed more than limb
+                    borrow = (borrow shr 32) + carryOut
+                    // branchless update of last non-zero
+                    val nonZeroMask = (zi or -zi) shr 31
+                    lastNonZeroIndex =
+                        (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
+                    ++i
+                }
+                check (borrow == 0uL)
+                val zNormLen = lastNonZeroIndex + 1
+                return zNormLen
+            }
+        }
+        throw IllegalArgumentException()
+    }
+
+    /**
      * Returns a new limb array representing [x] minus [y].
      *
      * Requires that [x] is greater than or equal to [y].
