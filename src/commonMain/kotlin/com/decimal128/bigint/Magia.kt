@@ -508,25 +508,6 @@ object Magia {
     }
 
     /**
-     * Returns a new limb array representing [x] minus the unsigned integer [w].
-     *
-     * If the result is zero or the subtraction underflows, returns [ZERO].
-     */
-    fun newSub(x: IntArray, w: UInt): IntArray {
-        val z = IntArray(normalizedLimbLen(x))
-        var orAccumulator = 0
-        var borrow = w.toULong()
-        for (i in z.indices) {
-            val t = dw32(x[i]) - borrow
-            val zi = t.toInt()
-            z[i] = zi
-            orAccumulator = orAccumulator or zi
-            borrow = t shr 63
-        }
-        return if (orAccumulator == 0 || borrow != 0uL) ZERO else z
-    }
-
-    /**
      * Returns a new limb array representing [x] minus the unsigned 64-bit value [dw].
      * The caller must ensure that x >= y.
      *
@@ -1659,36 +1640,12 @@ object Magia {
         }
     }
 
-
-    /**
-     * Compares a multi-limb unsigned integer [x] with a single-limb unsigned value [w].
-     *
-     * - Returns `-1` if `x < w`
-     * - Returns `0`  if `x == w`
-     * - Returns `1`  if `x > w`
-     *
-     * The comparison treats [x] as an unsigned integer represented by its
-     * 32-bit limbs, with the least significant limb at index 0.
-     *
-     * @param x the multi-limb unsigned integer to compare.
-     * @param w the single-limb unsigned value to compare against.
-     * @return `-1`, `0`, or `1` following the standard comparison semantics.
-     */
-    fun compare(x: IntArray, w: UInt): Int {
-        val limbLen = normalizedLimbLen(x)
-        return when {
-            (limbLen > 1) -> 1
-            (limbLen == 0) -> if (w == 0u) 0 else -1
-            else -> x[0].toUInt().compareTo(w)
-        }
-    }
-
-    fun compare(x: IntArray, dw: ULong): Int = compare(x, normalizedLimbLen(x), dw)
+    fun compare(x: IntArray, dw: ULong): Int = compare(x, x.size, dw)
 
     fun compare(x: IntArray, xLen: Int, dw: ULong): Int {
         if (xLen >= 0 && xLen <= x.size) {
-            check (xLen == 0 || x[xLen - 1] != 0)
-            return if (xLen > 2) 1 else toRawULong(x).compareTo(dw)
+            val xNormLen = normalizedLimbLen(x, xLen)
+            return if (xNormLen > 2) 1 else toRawULong(x).compareTo(dw)
         } else {
             throw IllegalArgumentException()
         }

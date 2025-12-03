@@ -2038,9 +2038,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * @return -1,0,1
      */
     fun magnitudeCompareTo(other: BigInt) = Magia.compare(this.magia, other.magia)
-    fun magnitudeCompareTo(n: Int) = Magia.compare(this.magia, n.toUInt())
-    fun magnitudeCompareTo(un: UInt) = Magia.compare(this.magia, un)
-    fun magnitudeCompareTo(l: Long) = Magia.compare(this.magia, l.toULong())
+    fun magnitudeCompareTo(un: UInt) = Magia.compare(this.magia, un.toULong())
     fun magnitudeCompareTo(ul: ULong) = Magia.compare(this.magia, ul)
     fun magnitudeCompareTo(littleEndianIntArray: IntArray) =
         Magia.compare(this.magia, littleEndianIntArray)
