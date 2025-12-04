@@ -1413,6 +1413,27 @@ object Magia {
         return z
     }
 
+    fun setAnd(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
+        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
+            val minLen = min(xLen, yLen)
+            if (minLen <= z.size) {
+                var i = minLen
+                do {
+                    --i
+                    if (i < 0)
+                        return 0
+                } while ((x[i] and y[i]) == 0)
+                val zNormLen = i + 1
+                while (i >= 0) {
+                    z[i] = x[i] and y[i]
+                    --i
+                }
+                return zNormLen
+            }
+        }
+        throw IllegalArgumentException()
+    }
+
     /**
      * Returns a new normalized array representing the bitwise OR of [x] and [y].
      *
@@ -1447,6 +1468,28 @@ object Magia {
                 y.copyInto(z, i, i, yLen) //System.arraycopy(y, i, z, i, yLen - i)
         }
         return z
+    }
+
+    fun setOr(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
+        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
+            val xNormLen = normalizedLimbLen(x, xLen)
+            val yNormLen = normalizedLimbLen(y, yLen)
+            val maxLen = max(xNormLen, yNormLen)
+            if (maxLen <= z.size) {
+                val minLen = min(xNormLen, yNormLen)
+                val zNormLen = maxLen
+                for (i in 0..<minLen)
+                    z[i] = x[i] or y[i]
+                when {
+                    minLen < xNormLen ->
+                        x.copyInto(z, minLen, minLen, xNormLen)
+                    minLen < yNormLen ->
+                        y.copyInto(z, minLen, minLen, yNormLen)
+                }
+                return zNormLen
+            }
+        }
+        throw IllegalArgumentException()
     }
 
     /**
@@ -1484,6 +1527,38 @@ object Magia {
             else -> if (nonZeroAccumulator == 0) return ZERO
         }
         return z
+    }
+
+    fun setXor(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
+        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
+            val xNormLen = normalizedLimbLen(x, xLen)
+            val yNormLen = normalizedLimbLen(y, yLen)
+            val maxLen = max(xNormLen, yNormLen)
+            if (maxLen <= z.size) {
+                val minLen = min(xNormLen, yNormLen)
+                var i = minLen
+                do {
+                    --i
+                    if (i < 0)
+                        return 0
+                    val zi = x[i] xor y[i]
+                    z[i] = zi
+                } while (zi == 0)
+                val zNormLen = when {
+                    minLen < xNormLen -> {
+                        x.copyInto(z, minLen, minLen, xNormLen)
+                        xNormLen
+                    }
+                    minLen < yNormLen -> {
+                        y.copyInto(z, minLen, minLen, yNormLen)
+                        yNormLen
+                    }
+                    else -> i + 1
+                }
+                return zNormLen
+            }
+        }
+        throw IllegalArgumentException()
     }
 
     /**
