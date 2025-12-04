@@ -1196,28 +1196,8 @@ object Magia {
      * @param bitCount the number of bits to shift left; must be non-negative.
      * @throws IllegalArgumentException if [bitCount] is negative.
      */
-    fun mutateShiftLeft(x: IntArray, xLen: Int, bitCount: Int) {
-        require (bitCount >= 0 && xLen >= 0 && xLen <= x.size)
-        val wordShift = bitCount ushr 5
-        val innerShift = bitCount and ((1 shl 5) - 1)
-        if (wordShift >= xLen) {
-            x.fill(0, 0, xLen)
-            return
-        }
-        if (wordShift > 0) {
-            //val newLen = xLen - wordShift
-            //System.arraycopy(x, 0, x, wordShift, newLen)
-            for (i in xLen - 1 downTo wordShift)
-                x[i] = x[i - wordShift]
-            for (i in wordShift - 1 downTo 0)
-                x[i] = 0
-        }
-        if (innerShift > 0) {
-            for (i in xLen - 1 downTo 1)
-                x[i] = (x[i] shl innerShift) or (x[i - 1] ushr -innerShift)
-            x[0] = x[0] shl innerShift
-        }
-    }
+    fun mutateShiftLeft(x: IntArray, xLen: Int, bitCount: Int): Int =
+        setShiftLeft(x, x, xLen, bitCount)
 
     fun setShiftLeft(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
         require(xLen in 0..x.size && bitCount >= 0)
@@ -1293,41 +1273,6 @@ object Magia {
 
         check(isNormalized(z, zNormLen))
         return zNormLen
-    }
-
-
-    fun setShiftLeft_x(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
-        if (xLen >= 0 && xLen <= x.size && bitCount >= 0) {
-            val xBitLen = bitLen(x, xLen)
-            if (xBitLen == 0)
-                return 0
-            val xNormLen = normalizedLenFromBitLen(xBitLen)
-            if (bitCount == 0) {
-                if (z !== x)
-                    x.copyInto(z, 0, 0, xNormLen)
-                return xNormLen
-            }
-            val zBitLen = xBitLen + bitCount
-            val zNormLen = normalizedLenFromBitLen(zBitLen)
-            if (zNormLen > z.size)
-                throw ArithmeticException(ERROR_SHL_OVERFLOW)
-            val wordShift = bitCount ushr 5 // whole word shift
-            val innerShift = bitCount and 0x1F
-            if (innerShift == 0) {
-                x.copyInto(z, wordShift, 0, xNormLen)
-            } else {
-                z[zNormLen - 1] = x[xNormLen - 1] ushr (32 - innerShift)
-                for (i in zNormLen - 2 downTo wordShift + 1) {
-                    val j = i - wordShift
-                    z[i] = (x[j] shl innerShift) or (x[j - 1] ushr (32 - innerShift))
-                }
-                z[wordShift] = x[0] shl innerShift
-            }
-            z.fill(0, 0, wordShift)
-            check (isNormalized(z, zNormLen))
-            return zNormLen
-        }
-        throw IllegalArgumentException()
     }
 
     /**
