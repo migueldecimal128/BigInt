@@ -1155,9 +1155,17 @@ object Magia {
      * @throws IllegalArgumentException if [bitCount] is negative.
      */
     fun newShiftLeft(x: IntArray, bitCount: Int): IntArray {
-        val newBitLen = bitLen(x) + bitCount
-        val z = newCopyWithExactBitLen(x, newBitLen)
-        mutateShiftLeft(z, bitCount)
+        val xBitLen = bitLen(x)
+        if (xBitLen == 0)
+            return ZERO
+        if (bitCount == 0)
+            return newNormalizedCopy(x)
+        val zBitLen = bitLen(x) + bitCount
+        val zNormLen = normalizedLenFromBitLen(zBitLen)
+        val z = IntArray(zNormLen)
+        val zNormLen2 = setShiftLeft(z, x, x.size, bitCount)
+        check (zNormLen == zNormLen2)
+        check (isNormalized(z, zNormLen))
         return z
     }
 
@@ -1212,9 +1220,93 @@ object Magia {
     }
 
     fun setShiftLeft(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
+        require(xLen in 0..x.size && bitCount >= 0)
+
+        val xBitLen = bitLen(x, xLen)
+        if (xBitLen == 0) {
+            // x == 0 → result is 0 regardless of shift
+            // normalize as zero
+            // (you may want to special-case this according to your ZERO handling)
+            z.fill(0)
+            check(isNormalized(z, 0))
+            return 0
+        }
+
+        val xNormLen = normalizedLenFromBitLen(xBitLen)
+
+        val wordShift = bitCount ushr 5
+        val innerShift = bitCount and 31
+
+        // ------------------------------------------------------------
+        // 1. Compute required bit length and limb length from *math*
+        // ------------------------------------------------------------
+        val zBitLen = xBitLen + bitCount
+        val zNormLen = normalizedLenFromBitLen(zBitLen)
+
+        if (zNormLen > z.size)
+            throw ArithmeticException(ERROR_SHL_OVERFLOW)
+
+        // ------------------------------------------------------------
+        // 2. Fast path: whole-limb shift only
+        // ------------------------------------------------------------
+        if (innerShift == 0) {
+            // new length is xNormLen + wordShift, but we trust zNormLen from bitLen
+            x.copyInto(z, wordShift, 0, xNormLen)
+            z.fill(0, 0, wordShift)
+
+            check(isNormalized(z, zNormLen))
+            return zNormLen
+        }
+
+        // ------------------------------------------------------------
+        // 3. Non-zero inner shift: detect spill from top limb
+        // ------------------------------------------------------------
+        val top = x[xNormLen - 1]
+        val spill = top ushr (32 - innerShift)   // 0 if no spill
+
+        // Sanity: math-based zNormLen must match spill-based expectation
+        // (optional, but nice while debugging)
+        // val expected = xNormLen + wordShift + if (spill != 0) 1 else 0
+        // check(expected == zNormLen)
+
+        // ------------------------------------------------------------
+        // 4. Write spill limb FIRST (important if z === x)
+        // ------------------------------------------------------------
+        if (spill != 0) {
+            z[zNormLen - 1] = spill
+        }
+
+        // ------------------------------------------------------------
+        // 5. Main shift loop: high → low (in-place safe)
+        // ------------------------------------------------------------
+        for (src in xNormLen - 1 downTo 1) {
+            val dst = src + wordShift
+            z[dst] = (x[src] shl innerShift) or
+                    (x[src - 1].ushr(32 - innerShift))
+        }
+
+        // lowest shifted limb
+        z[wordShift] = x[0] shl innerShift
+
+        // clear lower limbs
+        z.fill(0, 0, wordShift)
+
+        check(isNormalized(z, zNormLen))
+        return zNormLen
+    }
+
+
+    fun setShiftLeft_x(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
         if (xLen >= 0 && xLen <= x.size && bitCount >= 0) {
             val xBitLen = bitLen(x, xLen)
+            if (xBitLen == 0)
+                return 0
             val xNormLen = normalizedLenFromBitLen(xBitLen)
+            if (bitCount == 0) {
+                if (z !== x)
+                    x.copyInto(z, 0, 0, xNormLen)
+                return xNormLen
+            }
             val zBitLen = xBitLen + bitCount
             val zNormLen = normalizedLenFromBitLen(zBitLen)
             if (zNormLen > z.size)
@@ -1224,7 +1316,8 @@ object Magia {
             if (innerShift == 0) {
                 x.copyInto(z, wordShift, 0, xNormLen)
             } else {
-                for (i in zNormLen - 1 downTo wordShift + 1) {
+                z[zNormLen - 1] = x[xNormLen - 1] ushr (32 - innerShift)
+                for (i in zNormLen - 2 downTo wordShift + 1) {
                     val j = i - wordShift
                     z[i] = (x[j] shl innerShift) or (x[j - 1] ushr (32 - innerShift))
                 }
