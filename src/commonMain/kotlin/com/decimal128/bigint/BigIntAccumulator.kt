@@ -210,6 +210,55 @@ class BigIntAccumulator private constructor (
     fun toBigInt(): BigInt =
         BigInt.fromLittleEndianIntArray(sign.isNegative, magia, limbLen)
 
+    /*
+
+    fun setAdd(x: BigInt, y: BigInt) =
+        setAddImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setAdd(x: BigInt, y: BigIntAccumulator) =
+        setAddImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setAdd(x: BigIntAccumulator, y: BigInt) =
+        setAddImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setAdd(x: BigIntAccumulator, y: BigIntAccumulator) =
+        setAddImpl(x.sign, x.magia, y.sign, y.magia)
+
+    fun setSub(x: BigInt, y: BigInt) =
+        setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)
+    fun setSub(x: BigInt, y: BigIntAccumulator) =
+        setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)
+    fun setSub(x: BigIntAccumulator, y: BigInt) =
+        setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)
+    fun setSub(x: BigIntAccumulator, y: BigIntAccumulator) =
+        setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)
+
+    fun setMul(x: BigInt, y: BigInt) =
+        setMulImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setMul(x: BigInt, y: BigIntAccumulator) =
+        setMulImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setMul(x: BigIntAccumulator, y: BigInt) =
+        setMulImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setMul(x: BigIntAccumulator, y: BigIntAccumulator) =
+        setMulImpl(x.sign, x.magia, y.sign, y.magia)
+
+    fun setDiv(x: BigInt, y: BigInt) =
+        setDivImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setDiv(x: BigInt, y: BigIntAccumulator) =
+        setDivImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setDiv(x: BigIntAccumulator, y: BigInt) =
+        setDivImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator) =
+        setDivImpl(x.sign, x.magia, y.sign, y.magia)
+
+    fun setRem(x: BigInt, y: BigInt) =
+        setRemImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setRem(x: BigInt, y: BigIntAccumulator) =
+        setRemImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setRem(x: BigIntAccumulator, y: BigInt) =
+        setRemImpl(x.sign, x.magia, y.sign, y.magia)
+    fun setRem(x: BigIntAccumulator, y: BigIntAccumulator) =
+        setRemImpl(x.sign, x.magia, y.sign, y.magia)
+
+     */
+
     /**
      * Adds the given Int value to this accumulator.
      *
@@ -265,11 +314,11 @@ class BigIntAccumulator private constructor (
     /**
      * Adds the given BigIntAccumulator value to this accumulator.
      *
-     * @param hia the value to add.
+     * @param acc the value to add.
      * @see plusAssign(Long)
      */
-    operator fun plusAssign(hia: BigIntAccumulator) =
-        mutateAddImpl(hia.sign.isNegative, hia.magia, hia.limbLen)
+    operator fun plusAssign(acc: BigIntAccumulator) =
+        mutateAddImpl(acc.sign.isNegative, acc.magia, acc.limbLen)
 
     /**
      * Subtracts the given Int value from this accumulator.
@@ -324,11 +373,11 @@ class BigIntAccumulator private constructor (
     /**
      * Subtracts the given BigIntAccumulator value from this accumulator.
      *
-     * @param hia the value to subtract.
+     * @param acc the value to subtract.
      * @see minusAssign(Long)
      */
-    operator fun minusAssign(hia: BigIntAccumulator) =
-        mutateAddImpl(hia.sign.isPositive, hia.magia, hia.limbLen)
+    operator fun minusAssign(acc: BigIntAccumulator) =
+        mutateAddImpl(acc.sign.isPositive, acc.magia, acc.limbLen)
 
     /**
      * Multiplies this accumulator by the given value in place.
@@ -408,14 +457,14 @@ class BigIntAccumulator private constructor (
      * If `this === other`, a specialized squaring routine is used to avoid aliasing
      * issues and improve performance.
      *
-     * @param hia the value to multiply by.
+     * @param acc the value to multiply by.
      * @see timesAssign(Long)
      */
-    operator fun timesAssign(hia: BigIntAccumulator) {
-        if (this === hia)
+    operator fun timesAssign(acc: BigIntAccumulator) {
+        if (this === acc)
             mutateSquare()  // prevent aliasing problems & improve performance
         else
-            mutateMulImpl(hia.sign.isNegative, hia.magia, hia.limbLen)
+            mutateMulImpl(acc.sign.isNegative, acc.magia, acc.limbLen)
     }
 
     /**
@@ -552,11 +601,11 @@ class BigIntAccumulator private constructor (
     /**
      * Adds the absolute value of the given BigIntAccumulator to this accumulator.
      *
-     * @param hia the value to add.
+     * @param acc the value to add.
      * @see addAbsValueOf(Long)
      */
-    fun addAbsValueOf(hia: BigIntAccumulator) =
-        mutateAddMagImpl(hia.magia, hia.limbLen)
+    fun addAbsValueOf(acc: BigIntAccumulator) =
+        mutateAddMagImpl(acc.magia, acc.limbLen)
 
     /**
      * Returns the current value of this accumulator as a raw unsigned 64-bit value.
