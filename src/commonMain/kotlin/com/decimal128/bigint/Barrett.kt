@@ -128,7 +128,7 @@ class Barrett private constructor (val m: BigInt,
         require (x < mSquared)
 
         val xMagia = x.magia
-        val xLen = Magia.normalizedLimbLen(xMagia)
+        val xLen = Magia.normLen(xMagia)
 
         if (x < m) {
             check (Magia.compare(x.magia, xLen, mMagia, mMagia.size) < 0)
@@ -140,38 +140,38 @@ class Barrett private constructor (val m: BigInt,
         val mq1Len = xLen - kLimbsMinus1
         val mq1 = IntArray(mq1Len)
         x.magia.copyInto(mq1, 0, kLimbsMinus1, xLen)
-        check (Magia.compare(q1.magia, Magia.normalizedLimbLen(q1.magia), mq1, mq1Len) == 0)
+        check (Magia.compare(q1.magia, Magia.normLen(q1.magia), mq1, mq1Len) == 0)
 
         // q2 = q1 * mu
         val q2 = q1 * muLimbs
         val mq2 = IntArray(muLimbs.magia.size * 2)
         val mq2Len = Magia.setMul(mq2, mq1, mq1Len, muLimbs.magia, muLimbs.magia.size)
-        check (Magia.compare(q2.magia, Magia.normalizedLimbLen(q2.magia), mq2, mq2Len) == 0)
+        check (Magia.compare(q2.magia, Magia.normLen(q2.magia), mq2, mq2Len) == 0)
 
         // q3 = floor(q2 / b**(k + 1))
         val q3 = q2 ushr (kLimbsPlus1 * 32)
         val mq3 = IntArray(kLimbs * 2)
         val mq3Len = mq2Len - kLimbsPlus1
         mq2.copyInto(mq3, 0, kLimbsPlus1, mq2Len)
-        check (Magia.compare(q3.magia, Magia.normalizedLimbLen(q3.magia), mq3, mq3Len) == 0)
+        check (Magia.compare(q3.magia, Magia.normLen(q3.magia), mq3, mq3Len) == 0)
 
         // r1 = x % b**(k + 1)
         val r1 = x and BigInt.withBitMask(kLimbsPlus1 * 32)
         val mr1 = IntArray(kLimbsPlus1)
         xMagia.copyInto(mr1, 0, 0, min(kLimbsPlus1, xLen))
-        val mr1Len = Magia.normalizedLimbLen(mr1, kLimbsPlus1)
-        check (Magia.compare(r1.magia, Magia.normalizedLimbLen(r1.magia), mr1, mr1Len) == 0)
+        val mr1Len = Magia.normLen(mr1, kLimbsPlus1)
+        check (Magia.compare(r1.magia, Magia.normLen(r1.magia), mr1, mr1Len) == 0)
         // r2 = (q3 * m) % b**(k + 1)
         val pq3m = q3 * m
         val mpq3m = IntArray(2 * kLimbs)
         val mpq3mLen = Magia.setMul(mpq3m, mq3, mq3Len, mMagia, mMagia.size)
-        check (Magia.compare(pq3m.magia, Magia.normalizedLimbLen(pq3m.magia), mpq3m, mpq3mLen) == 0)
+        check (Magia.compare(pq3m.magia, Magia.normLen(pq3m.magia), mpq3m, mpq3mLen) == 0)
 
         val r2 = pq3m and BigInt.withBitMask(kLimbsPlus1 * 32)
         val mr2 = IntArray(kLimbsPlus1)
         mpq3m.copyInto(mr2, 0, 0, kLimbsPlus1)
-        val mr2Len = Magia.normalizedLimbLen(mr2, kLimbsPlus1)
-        check (Magia.compare(r2.magia, Magia.normalizedLimbLen(r2.magia), mr2, mr2Len) == 0)
+        val mr2Len = Magia.normLen(mr2, kLimbsPlus1)
+        check (Magia.compare(r2.magia, Magia.normLen(r2.magia), mr2, mr2Len) == 0)
         // r = r1 - r2
         //var r = r1 - r2
         var r = r1
@@ -186,16 +186,16 @@ class Barrett private constructor (val m: BigInt,
         }
         r -= r2
         mrLen = Magia.mutateSub(mr, mrLen, mr2, mr2Len)
-        check (Magia.compare(r.magia, Magia.normalizedLimbLen(r.magia), mr, mrLen) == 0)
+        check (Magia.compare(r.magia, Magia.normLen(r.magia), mr, mrLen) == 0)
 
         while (r >= m) {
-            check (Magia.compare(r.magia, Magia.normalizedLimbLen(r.magia), mMagia, mMagia.size) >= 0)
+            check (Magia.compare(r.magia, Magia.normLen(r.magia), mMagia, mMagia.size) >= 0)
             r -= m
             mrLen = Magia.mutateSub(mr, mrLen, mMagia, mMagia.size)
-            check (Magia.compare(r.magia, Magia.normalizedLimbLen(r.magia), mr, mrLen) == 0)
+            check (Magia.compare(r.magia, Magia.normLen(r.magia), mr, mrLen) == 0)
         }
         val magiaR = BigInt.fromLittleEndianIntArray(false, mr, mrLen)
-        check (Magia.compare(r.magia, Magia.normalizedLimbLen(r.magia),
+        check (Magia.compare(r.magia, Magia.normLen(r.magia),
             magiaR.magia, magiaR.magia.size) == 0)
 
         return r
@@ -209,7 +209,7 @@ class Barrett private constructor (val m: BigInt,
             return x
 
         val xMagia = x.magia
-        val xLen = Magia.normalizedLimbLen(xMagia)
+        val xLen = Magia.normLen(xMagia)
 
         // q1 = floor(x / b**(k - 1))
         // val q1 = x ushr (kLimbsMinus1 * 32)
@@ -238,7 +238,7 @@ class Barrett private constructor (val m: BigInt,
         // val r1 = x and BigInt.withBitMask(kLimbsPlus1 * 32)
         val r1Magia = IntArray(kLimbsPlus1)
         xMagia.copyInto(r1Magia, 0, 0, min(kLimbsPlus1, xLen))
-        val r1Len = Magia.normalizedLimbLen(r1Magia, kLimbsPlus1)
+        val r1Len = Magia.normLen(r1Magia, kLimbsPlus1)
         // check (Magia.compare(r1.magia, Magia.normalizedLimbLen(r1.magia), r1Magia, r1Len) == 0)
         // r2 = (q3 * m) % b**(k + 1)
         // val pq3m = q3 * m
@@ -249,7 +249,7 @@ class Barrett private constructor (val m: BigInt,
         // val r2 = pq3m and BigInt.withBitMask(kLimbsPlus1 * 32)
         val r2Magia = IntArray(kLimbsPlus1)
         pMagia.copyInto(r2Magia, 0, 0, kLimbsPlus1)
-        val r2Len = Magia.normalizedLimbLen(r2Magia, kLimbsPlus1)
+        val r2Len = Magia.normLen(r2Magia, kLimbsPlus1)
         // check (Magia.compare(r2.magia, Magia.normalizedLimbLen(r2.magia), r2Magia, r2Len) == 0)
         // r = r1 - r2
         //var r = r1 - r2

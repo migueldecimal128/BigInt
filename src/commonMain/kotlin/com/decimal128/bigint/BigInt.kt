@@ -1085,7 +1085,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
     fun fitsInt(): Boolean {
         if (isZero())
             return true
-        val limbLen = Magia.normalizedLimbLen(magia)
+        val limbLen = Magia.normLen(magia)
         if (limbLen > 1)
             return false
         val limb = magia[0]
@@ -1098,14 +1098,14 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 32-bit integer (`0 .. UInt.MAX_VALUE`).
      */
-    fun fitsUInt() = sign.isPositive && Magia.normalizedLimbLen(magia) <= 1
+    fun fitsUInt() = sign.isPositive && Magia.normLen(magia) <= 1
 
     /**
      * Returns `true` if this value fits in a signed 64-bit integer
      * (`Long.MIN_VALUE .. Long.MAX_VALUE`).
      */
     fun fitsLong(): Boolean {
-        val limbLen = Magia.normalizedLimbLen(magia)
+        val limbLen = Magia.normLen(magia)
         return when {
             limbLen > 2 -> false
             limbLen < 2 -> true
@@ -1118,7 +1118,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 64-bit integer (`0 .. ULong.MAX_VALUE`).
      */
-    fun fitsULong() = sign.isPositive && Magia.normalizedLimbLen(magia) <= 2
+    fun fitsULong() = sign.isPositive && Magia.normLen(magia) <= 2
 
     /**
      * Returns the low 32 bits of this value, interpreted as a signed
@@ -1579,7 +1579,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      */
     fun sqr(): BigInt {
         if (this.isNotZero()) {
-            check(Magia.normalizedLimbLen(this.magia) > 0)
+            check(Magia.normLen(this.magia) > 0)
             val magiaSqr = Magia.newSqr(this.magia)
             return BigInt(POSITIVE, magiaSqr)
         }
@@ -1613,7 +1613,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
                 val maxBitLen = Magia.bitLen(this.magia) * n
                 val maxBitLimbLen = (maxBitLen + 0x1F) ushr 5
                 var baseMag = Magia.newCopyWithExactLimbLen(this.magia, maxBitLimbLen)
-                var baseLen = Magia.normalizedLimbLen(this.magia)
+                var baseLen = Magia.normLen(this.magia)
                 var resultMag = IntArray(maxBitLimbLen)
                 resultMag[0] = 1
                 var resultLen = 1
@@ -2239,7 +2239,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * @return a new [ByteArray] containing the binary representation
      */
     fun toBinaryByteArray(isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray =
-        Magia.toBinaryByteArray(sign.isNegative, magia, Magia.normalizedLimbLen(magia), isTwosComplement, isBigEndian)
+        Magia.toBinaryByteArray(sign.isNegative, magia, Magia.normLen(magia), isTwosComplement, isBigEndian)
 
     /**
      * Writes this [BigInt] into the provided [bytes] array in the requested binary format.
@@ -2300,7 +2300,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
      * @return a new LongArray containing the magnitude in little-endian order
      */
     fun magnitudeToLittleEndianLongArray(): LongArray {
-        val intLen = Magia.normalizedLimbLen(magia)
+        val intLen = Magia.normLen(magia)
         val longLen = (intLen + 1) ushr 1
         val z = LongArray(longLen)
         var iw = 0
@@ -2474,7 +2474,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
                 val quot = Magia.newNormalizedCopy(this.magia)
                 val remN = Magia.mutateDivMod(quot, wMag)
                 val hiQuot =
-                    if (Magia.normalizedLimbLen(quot) > 0) BigInt(this.sign xor wSign, quot) else ZERO
+                    if (Magia.normLen(quot) > 0) BigInt(this.sign xor wSign, quot) else ZERO
                 val hiRem = if (remN != 0u) BigInt(this.sign, intArrayOf(remN.toInt())) else ZERO
                 hiQuot to hiRem
             }
