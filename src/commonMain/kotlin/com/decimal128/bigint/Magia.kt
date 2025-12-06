@@ -390,13 +390,13 @@ object Magia {
     /**
      * Adds the unsigned 64-bit value [dw] to the first [xLen] limbs of [x], modifying [x] in place.
      *
-     * It is the caller's responsibility to properly handle the returned final carry,
-     * which may occupy one or two additional limbs.
+     * It is the caller's responsibility to ensure that [x] has sufficient
+     * space to ensure no overflow ... an additional two limbs for a DWORD ULong.
      *
-     * @return the resulting carry as an unsigned 64-bit value.
+     * @return the normalized length
      * @throws IllegalArgumentException if [xLen] is out of range for [x].
      */
-    fun mutateAdd(x: IntArray, xLen: Int, dw: ULong): ULong {
+    fun mutateAdd(x: IntArray, xLen: Int, dw: ULong): Int {
         if (xLen >= 0 && xLen <= x.size) {
             var carry = dw
             var i = 0
@@ -406,21 +406,24 @@ object Magia {
                 carry = (carry shr 32) + (s shr 32)
                 ++i
             }
-            return carry
-        } else {
-            throw IllegalArgumentException()
+            if (carry == 0uL)
+                return normLen(x, xLen)
+            if (i < x.size) {
+                x[i] = carry.toInt()
+                carry = carry shr 32
+                ++i
+                if (carry == 0uL)
+                    return normLen(x, i)
+                if (i < x.size) {
+                    x[i] = carry.toInt()
+                    ++i
+                    return normLen(x, i)
+                }
+            }
+            throw ArithmeticException(ERROR_ADD_OVERFLOW)
         }
+        throw IllegalArgumentException()
     }
-
-    /**
-     * Adds [y] to [x] **in place**.
-     *
-     * The caller must ensure that `x.size >= nonZeroLimbLen(y)`.
-     *
-     * @return the final carry as an unsigned 32-bit value (`0u` or `1u`).
-     */
-    fun mutateAdd(x: IntArray, y: IntArray) =
-        mutateAdd(x, x.size, y, normLen(y))
 
     /**
      * Adds the first [yLen] limbs of [y] to the first [xLen] limbs of [x],
@@ -1088,6 +1091,7 @@ object Magia {
      * Returns [x] for convenience.
      *
      * @throws IllegalArgumentException if [xLen] or [bitCount] is out of range.
+     * @return normLen
      */
     fun mutateShiftRight(x: IntArray, xLen: Int, bitCount: Int): IntArray {
         require (bitCount >= 0 && xLen >= 0 && xLen <= x.size)
@@ -1113,11 +1117,11 @@ object Magia {
      */
     fun setShiftRight(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
         require(bitCount >= 0 && xLen >= 0 && xLen <= x.size)
-        val xLenNormalized = normLen(x, xLen)
-        if (xLenNormalized == 0)
+        val xNormLen = normLen(x, xLen)
+        if (xNormLen == 0)
             return 0
-        require(x[xLenNormalized - 1] != 0)
-        val newBitLen = bitLen(x, xLenNormalized) - bitCount
+        require(x[xNormLen - 1] != 0)
+        val newBitLen = bitLen(x, xNormLen) - bitCount
         if (newBitLen <= 0)
             return 0
         val zNormLen = (newBitLen + 0x1F) ushr 5
@@ -1127,7 +1131,7 @@ object Magia {
         if (innerShift != 0) {
             val iLast = zNormLen - 1
             for (i in 0..<iLast)
-                z[i] = (x[i + wordShift + 1] shl -innerShift) or (x[i + wordShift] ushr innerShift)
+                z[i] = (x[i + wordShift + 1] shl (32-innerShift)) or (x[i + wordShift] ushr innerShift)
             val srcIndex = iLast + wordShift + 1
             z[iLast] = (
                     if (srcIndex < xLen)
@@ -1775,7 +1779,7 @@ object Magia {
 
     /**
      * Compares two arbitrary-precision integers represented as arrays of 32-bit limbs,
-     * considering only the first [xLen] limbs of [x] and [yLen] limbs of [y].
+     * considering only the first [xNormLen] limbs of [x] and [yNormLen] limbs of [y].
      *
      * Both input ranges must be normalized: the last limb of each range (if non-zero length)
      * must be non-zero.
@@ -1783,21 +1787,21 @@ object Magia {
      * Comparison is unsigned per-limb (32-bit) from most significant to least significant limb.
      *
      * @param x the first integer array (least significant limb first).
-     * @param xLen the number of significant limbs in [x] to consider; must be normalized.
+     * @param xNormLen the number of significant limbs in [x] to consider; must be normalized.
      * @param y the second integer array (least significant limb first).
-     * @param yLen the number of significant limbs in [y] to consider; must be normalized.
+     * @param yNormLen the number of significant limbs in [y] to consider; must be normalized.
      * @return -1 if x < y, 0 if x == y, 1 if x > y.
-     * @throws IllegalArgumentException if [xLen] or [yLen] are out of bounds for the respective arrays.
+     * @throws IllegalArgumentException if [xNormLen] or [yNormLen] are out of bounds for the respective arrays.
      */
-    fun compare(x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            check(xLen == 0 || x[xLen - 1] != 0)
-            check(yLen == 0 || y[yLen - 1] != 0)
-            if (xLen != yLen)
-                return if (xLen > yLen) 1 else -1
-            for (i in xLen - 1 downTo 0) {
+    fun compare(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
+            check(xNormLen == 0 || x[xNormLen - 1] != 0)
+            check(yNormLen == 0 || y[yNormLen - 1] != 0)
+            if (xNormLen != yNormLen)
+                return if (xNormLen > yNormLen) 1 else -1
+            for (i in xNormLen - 1 downTo 0) {
                 if (x[i] != y[i])
-                    return (((dw32(x[i]) - dw32(y[i])).toLong() shr 63) shl 1).toInt() + 1
+                    return ((dw32(x[i]) - dw32(y[i])).toLong() shr 63).toInt() or 1
             }
             return 0
         } else {
@@ -1896,11 +1900,16 @@ object Magia {
         return if (normLen(q) > 0) q else ZERO
     }
 
-    fun newDiv(x: IntArray, y: IntArray): IntArray {
-        val n = normLen(y)
+    fun newDiv(x: IntArray, y: IntArray): IntArray =
+        newDiv(x, normLen(x), y, normLen(y))
+
+    fun newDiv(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
+        val n = yNormLen
         if (n < 2)
             return newDiv(x, y[0].toUInt())
-        val m = normLen(x)
+        val m = xNormLen
         if (m < n)
             return ZERO
         val u = x

@@ -715,15 +715,11 @@ class BigIntAccumulator private constructor (
      * @param dw the unsigned magnitude to add.
      */
     private fun mutateAddMagImpl(dw: ULong) {
-        val carry = Magia.mutateAdd(magia, limbLen, dw)
-        if (carry == 0uL)
-            return
-        val newLen = limbLen + if ((carry shr 32) == 0uL) 1 else 2
-        if (newLen > magia.size)
-            magia = Magia.newCopyWithFloorLen(magia, newLen)
-        magia[newLen - 1] = (carry shr 32).toInt() // overwritten when carry hi word == 0
-        magia[limbLen] = carry.toInt()
-        limbLen = newLen
+        if (magia.size < limbLen + 2) {
+            magia = Magia.newCopyWithFloorLen(magia, limbLen + 2)
+        }
+        val normLen = Magia.mutateAdd(magia, limbLen, dw)
+        limbLen = normLen
     }
 
     /**

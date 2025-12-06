@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class TestBigIntAccum {
 
-    val verbose = false
+    val verbose = true
 
     @Test
     fun testBigIntAccum() {
@@ -19,6 +19,12 @@ class TestBigIntAccum {
             testAddAbsValue()
             testAddSquareOf()
         }
+    }
+
+    fun testEQ(bi: BigInt, bia: BigIntAccumulator): Boolean {
+        if (bi EQ bia.toBigInt())
+            return true
+        return false
     }
 
     fun testAddSub() {
@@ -56,17 +62,19 @@ class TestBigIntAccum {
 
 
         repeat(rng.nextInt(100)) {
-            val rand = randomBigInt(200)
+            val rand = BigInt.randomWithBitLen(31)
             hia += rand
             hi += rand
+            assertTrue(testEQ(hi, hia))
         }
-        assertTrue(hi EQ hia.toBigInt())
+        assertTrue(testEQ(hi, hia))
 
         for (i in 0..<5) {
             hia += hia
             hi += hi
+            assertTrue(testEQ(hi, hia))
         }
-        assertTrue(hi EQ hia.toBigInt())
+        assertTrue(testEQ(hi, hia))
 
         // now start subtracting
 
@@ -74,40 +82,45 @@ class TestBigIntAccum {
             val n = randomInt()
             hia -= n
             hi -= n
+            assertTrue(testEQ(hi, hia))
         }
-        assertTrue(hi EQ hia.toBigInt())
+        assertTrue(testEQ(hi, hia))
 
         repeat(rng.nextInt(1000)) {
             val w = randomUInt()
             hia -= w
             hi -= w
+            assertTrue(testEQ(hi, hia))
         }
-        assertTrue(hi EQ hia.toBigInt())
 
         repeat(rng.nextInt(1000)) {
             val l = randomLong()
             hia -= l
             hi -= l
+            assertTrue(testEQ(hi, hia))
         }
-        assertTrue(hi EQ hia.toBigInt())
 
         repeat(rng.nextInt(1000)) {
             val dw = randomULong()
             hia -= dw
             hi -= dw
+            assertTrue(testEQ(hi, hia))
         }
-        assertTrue(hi EQ hia.toBigInt())
 
         repeat(rng.nextInt(100)) {
             val rand = randomBigInt(200)
+            if (verbose)
+                println("before: hia:$hia hi:$hi rand:$rand")
             hia -= rand
             hi -= rand
+            if (verbose)
+                println("after: hia:$hia hi:$hi")
+            assertTrue(testEQ(hi, hia))
         }
-        assertTrue(hi EQ hia.toBigInt())
 
         hia -= hia
         hi -= hi
-        assertTrue(hi EQ hia.toBigInt())
+        assertTrue(testEQ(hi, hia))
     }
 
     fun testMul() {

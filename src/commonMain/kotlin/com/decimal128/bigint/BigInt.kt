@@ -1765,7 +1765,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
         do {
             xPrev = x
             x = Magia.newDiv(this.magia, xPrev)
-            val carry = Magia.mutateAdd(x, xPrev)
+            val carry = Magia.mutateAdd(x, x.size, xPrev, xPrev.size)
             Magia.mutateShiftRight(x, x.size, 1)
             x[x.size - 1] = x[x.size - 1] or (carry shl 31).toInt()
         } while (Magia.compare(x, xPrev) < 0)
