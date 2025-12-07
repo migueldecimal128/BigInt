@@ -8,24 +8,24 @@ import kotlin.jvm.JvmInline
  *
  * Layout (bit numbering from MSB to LSB):
  *
- *     meta = [ signBit | bitLen (31 bits) ]
+ *     meta = [ signBit | normLen (31 bits) ]
  *
  * where:
  *   • signBit = 0 → non-negative
  *   • signBit = 1 → negative
- *   • bitLen  = an unsigned 31-bit magnitude bit-length (>= 0)
+ *   • normLen  = an unsigned 31-bit magnitude normalized limb length (>= 0)
  *
  * This type is a `value class`, so it introduces **no runtime allocation**
- * and is represented as a raw `Int` at call sites. Packing sign and bitLen
+ * and is represented as a raw `Int` at call sites. Packing sign and normLen
  * together reduces parameter count and register pressure in arithmetic operations.
  *
  * Construction:
- *   Meta(signBit, bitLen) packs the MSB explicitly.
- *   Meta(signFlag, bitLen) sets the MSB via XOR with `Int.MIN_VALUE`.
+ *   Meta(signBit, normLen) packs the MSB explicitly.
+ *   Meta(signFlag, normLen) sets the MSB via XOR with `Int.MIN_VALUE`.
  *
  * Invariants:
- *   • bitLen must be >= 0 and fit within 31 bits.
- *   • ZERO is represented by bitLen = 0 and a non-negative sign.
+ *   • normLen must be >= 0 and fit within 31 bits.
+ *   • ZERO is represented by normLen == 0 and a non-negative sign.
  *
  */
 @JvmInline
@@ -33,26 +33,36 @@ value class Meta private constructor(val meta: Int) {
     companion object {
 
         /**
-         * Creates a `Meta` value from an explicit sign bit and magnitude bit-length.
+         * Creates a `Meta` value from an explicit sign bit and magnitude normalized limb length.
          *
          * @param signBit 0 for non-negative, 1 for negative.
-         * @param bitLen  non-negative bit-length stored in the lower 31 bits.
+         * @param normLen  non-negative normalizedLength stored in the lower 31 bits.
          */
-        operator fun invoke(signBit: Int, bitLen: Int): Meta {
+        operator fun invoke(signBit: Int, normLen: Int): Meta {
             check ((signBit shr 1) == 0)
-            check (bitLen >= 0)
-            return Meta((signBit shl 31) or bitLen)
+            check (normLen >= 0)
+            return Meta((signBit shl 31) or normLen)
         }
 
         /**
          * Creates a `Meta` value from a sign flag and magnitude bit-length.
          *
          * @param signFlag true for negative
-         * @param bitLen  non-negative bit-length stored in the lower 31 bits.
+         * @param limbLen  non-negative limb-length stored in the lower 31 bits.
          */
-        operator fun invoke(signFlag: Boolean, bitLen: Int): Meta {
-            check (bitLen >= 0)
-            return Meta(bitLen xor (if (signFlag) Int.MIN_VALUE else 0))
+        operator fun invoke(signFlag: Boolean, normLen: Int): Meta {
+            check (normLen >= 0)
+            return Meta(normLen xor (if (signFlag) Int.MIN_VALUE else 0))
+        }
+
+        operator fun invoke(signFlag: Boolean, x: IntArray, xLen: Int): Meta =
+            Meta(signFlag, Magia.normLen(x, xLen))
+
+        operator fun invoke(signFlag: Boolean, x: IntArray): Meta {
+            var normLen = x.size
+            while (normLen > 0 && x[normLen-1] == 0)
+                --normLen
+            return Meta(signFlag, normLen)
         }
 
     }
@@ -87,7 +97,7 @@ value class Meta private constructor(val meta: Int) {
         get() = meta >= 0
 
     /**
-     * Returns the negation of the sign with the same bitLen magnitude.
+     * Returns the negation of the sign with the same normLen magnitude.
      */
     fun negate() = Meta(meta xor Int.MIN_VALUE)
 
@@ -104,5 +114,8 @@ value class Meta private constructor(val meta: Int) {
      */
     val signNeg1or1: Int
         get() = signMask or 1
+
+    val normLen: Int
+        get() = meta and Int.MIN_VALUE
 
 }
