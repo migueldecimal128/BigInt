@@ -598,10 +598,10 @@ object Magia {
      * If the result is zero, returns [ZERO].
      */
     fun newSub(x: IntArray, y: IntArray): IntArray {
-        val xLen = normLen(x)
-        val yLen = normLen(y)
-        val z = IntArray(xLen)
-        val zNormLen = setSub(z, x, xLen, y, yLen)
+        val xNormLen = normLen(x)
+        val yNormLen = normLen(y)
+        val z = IntArray(xNormLen)
+        val zNormLen = setSub(z, x, xNormLen, y, yNormLen)
         check (isNormalized(z, zNormLen))
         return if (zNormLen == 0) ZERO else z
     }
@@ -689,44 +689,6 @@ object Magia {
                 }
                 throw ArithmeticException(ERROR_SUB_UNDERFLOW)
             }
-        }
-        throw IllegalArgumentException()
-    }
-
-    /**
-     * Subtracts the first [yLen] limbs of [y] from the first [xLen] limbs of [x], mutating [x] in place.
-     *
-     * Requires that [x] is greater than or equal to [y].
-     *
-     * @throws ArithmeticException if [xLen] or [yLen] are out of range for [x] or [y].
-     * @throws IllegalArgumentException if xLen or yLen are out of bounds
-     * @returns the new normalized limb length
-     */
-    fun mutateSub(x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            val zNormLen = setSub(x, x, xLen, y, yLen)
-            check (isNormalized(x, zNormLen))
-            return zNormLen
-        }
-        throw IllegalArgumentException()
-    }
-
-    /**
-     * Subtracts the first [xLen] limbs of [x] from the first [yLen] limbs of [y],
-     * storing the result back into [x] and mutating it in place.
-     *
-     * This is effectively a "reverse" subtraction: result = y - x.
-     * Requires that [xLen] equals [yLen] and that [y] is normalized.
-     * The actual value of [x] must be less than [y], so the caller
-     * should zero-pad [x] up to [xLen].
-     *
-     * @throws IllegalArgumentException if [xLen] or [yLen] are out of range for [x] or [y].
-     */
-    fun mutateReverseSub(x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            val zNormLen = setSub(x, y, yLen, x, xLen)
-            check (isNormalized(x, zNormLen))
-            return zNormLen
         }
         throw IllegalArgumentException()
     }
@@ -3144,8 +3106,9 @@ object Magia {
                 val tmpL = uLen; uLen = vLen; vLen = tmpL
             }
             // v = v - u
-            mutateSub(v, vLen, u, uLen)
-            vLen = normLen(v, vLen)
+            //mutateSub(v, vLen, u, uLen)
+            //vLen = normLen(v, vLen)
+            vLen = setSub(v, v, vLen, u, uLen)
         }
         // Final result = u * 2^shift
         if (initialShift > 0) {

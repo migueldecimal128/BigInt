@@ -185,13 +185,15 @@ class Barrett private constructor (val m: BigInt,
             mrLen = kLimbsPlus1 + 1
         }
         r -= r2
-        mrLen = Magia.mutateSub(mr, mrLen, mr2, mr2Len)
+        //mrLen = Magia.mutateSub(mr, mrLen, mr2, mr2Len)
+        mrLen = Magia.setSub(mr, mr, mrLen, mr2, mr2Len)
         check (Magia.compare(r.magia, Magia.normLen(r.magia), mr, mrLen) == 0)
 
         while (r >= m) {
             check (Magia.compare(r.magia, Magia.normLen(r.magia), mMagia, mMagia.size) >= 0)
             r -= m
-            mrLen = Magia.mutateSub(mr, mrLen, mMagia, mMagia.size)
+            //mrLen = Magia.mutateSub(mr, mrLen, mMagia, mMagia.size)
+            mrLen = Magia.setSub(mr, mr, mrLen, mMagia, mMagia.size)
             check (Magia.compare(r.magia, Magia.normLen(r.magia), mr, mrLen) == 0)
         }
         val magiaR = BigInt.fromLittleEndianIntArray(false, mr, mrLen)
@@ -265,13 +267,15 @@ class Barrett private constructor (val m: BigInt,
             mrLen = kLimbsPlus1 + 1
         }
         // r -= r2
-        mrLen = Magia.mutateSub(mr, mrLen, r2Magia, r2Len)
+        // mrLen = Magia.mutateSub(mr, mrLen, r2Magia, r2Len)
+        mrLen = Magia.setSub(mr, mr, mrLen, r2Magia, r2Len)
         // check (Magia.compare(r.magia, Magia.normalizedLimbLen(r.magia), mr, mrLen) == 0)
 
         while (Magia.compare(mr, mrLen, mMagia, mMagia.size) >= 0) {
             // check (r >= m)
             // r -= m
-            mrLen = Magia.mutateSub(mr, mrLen, mMagia, mMagia.size)
+            // mrLen = Magia.mutateSub(mr, mrLen, mMagia, mMagia.size)
+            mrLen = Magia.setSub(mr, mr, mrLen, mMagia, mMagia.size)
             // check (Magia.compare(r.magia, Magia.normalizedLimbLen(r.magia), mr, mrLen) == 0)
         }
         val magiaR = BigInt.fromLittleEndianIntArray(false, mr, mrLen)
