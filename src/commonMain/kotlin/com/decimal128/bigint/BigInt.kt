@@ -89,6 +89,14 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             return BigInt(meta, magia)
         }
 
+        internal operator fun invoke(sign: Boolean, magia: IntArray): BigInt {
+            if (magia.isEmpty())
+                return ZERO
+            val signBit = if (sign) 1 else 0
+            val meta = Meta(signBit, magia)
+            return BigInt(meta, magia)
+        }
+
         /**
          * Converts a 32-bit signed [Int] into a signed [BigInt].
          *
@@ -159,8 +167,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
 
         fun from(sign: Boolean, dwMagnitude: ULong) = when {
             dwMagnitude == 0uL -> ZERO
-            (dwMagnitude shr 32) == 0uL -> BigInt(Sign(sign), intArrayOf(dwMagnitude.toInt()))
-            else -> BigInt(Sign(sign), intArrayOf(dwMagnitude.toInt(), (dwMagnitude shr 32).toInt()))
+            (dwMagnitude shr 32) == 0uL -> BigInt(sign, intArrayOf(dwMagnitude.toInt()))
+            else -> BigInt(sign, intArrayOf(dwMagnitude.toInt(), (dwMagnitude shr 32).toInt()))
         }
 
         /**
@@ -819,7 +827,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
          */
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray, len: Int): BigInt {
             val magia = Magia.newNormalizedCopy(littleEndianIntArray, len)
-            return if (magia.isNotEmpty()) BigInt(Sign(sign), magia) else ZERO
+            return if (magia.isNotEmpty()) BigInt(sign, magia) else ZERO
         }
 
         /**
@@ -946,7 +954,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                                 else -> magia[magia.size - 1] = lo
                             }
                         }
-                        BigInt(Sign(sign), magia)
+                        BigInt(sign, magia)
                     }
                 }
             }
