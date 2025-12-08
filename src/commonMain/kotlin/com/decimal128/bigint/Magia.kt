@@ -1092,36 +1092,6 @@ object Magia {
     }
 
     /**
-     * Shifts [x] left by [bitCount] bits in place.
-     *
-     * Bits shifted out of the low end propagate into higher limbs.
-     * The array [x] is mutated to contain the shifted result; its length
-     * must be sufficient to hold any carry propagated into the top limb.
-     * Otherwise, bits will be lost out the top.
-     *
-     * @param x the magnitude to shift, in little-endian limb order.
-     * @param bitCount the number of bits to shift left; must be non-negative.
-     * @throws IllegalArgumentException if [bitCount] is negative.
-     */
-    fun mutateShiftLeft(x: IntArray, bitCount: Int) =
-        mutateShiftLeft(x, x.size, bitCount)
-
-    /**
-     * Shifts the lower [xLen] limbs of [x] left by [bitCount] bits, in place.
-     *
-     * Bits shifted out of the top (xLen-1) limb are discarded. Limbs at indices
-     * >= [xLen] are not modified. This operation mutates [x] directly and does
-     * not extend its length or preserve overflow bits.
-     *
-     * @param x the array of limbs, in little-endian order.
-     * @param xLen the number of valid limbs to process from [x].
-     * @param bitCount the number of bits to shift left; must be non-negative.
-     * @throws IllegalArgumentException if [bitCount] is negative.
-     */
-    fun mutateShiftLeft(x: IntArray, xLen: Int, bitCount: Int): Int =
-        setShiftLeft(x, x, xLen, bitCount)
-
-    /**
      * @return normLen
      */
     fun setShiftLeft(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
@@ -1903,7 +1873,7 @@ object Magia {
      * m: number of words in u (≥ n)
      * n: number of words in v (≥ 1)
      *
-     * Returns 0 on success, 1 if (m < n || n < 2 || v[n − 1] == 0).
+     * @return qNormLen if q != null, rNormLen if r != null, else -1
      */
     fun knuthDivide(
         q: IntArray?,
@@ -1912,7 +1882,7 @@ object Magia {
         v: IntArray,
         m: Int,
         n: Int
-    ) {
+    ): Int {
         if (m < n || n < 2 || v[n - 1] == 0)
             throw IllegalArgumentException()
 
@@ -1921,16 +1891,20 @@ object Magia {
         val vn = newCopyWithExactLimbLen(v, n)
         val shift = vn[n - 1].countLeadingZeroBits()
         if (shift > 0) {
-            mutateShiftLeft(vn, shift)
-            mutateShiftLeft(un, shift)
+            setShiftLeft(vn, vn, n, shift)
+            setShiftLeft(un, un, m, shift)
         }
 
         knuthDivideNormalizedCore(q, un, vn, m, n)
 
-        if (r != null) {
-            val unLen = normLen(un)
-            mutateShiftRight(un, unLen, shift)
-            un.copyInto(r, 0, 0, unLen)
+        var rNormLen = 0
+        if (r != null)
+            rNormLen = setShiftRight(r, un, normLen(un), shift)
+
+        return when {
+            q != null -> normLen(q, m-n+1)
+            r != null -> rNormLen
+            else -> -1
         }
     }
 
