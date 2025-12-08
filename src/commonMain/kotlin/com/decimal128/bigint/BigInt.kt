@@ -2240,7 +2240,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * @return a new [ByteArray] containing the binary representation
      */
     fun toBinaryByteArray(isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray =
-        Magia.toBinaryByteArray(meta.isNegative, magia, Magia.normLen(magia), isTwosComplement, isBigEndian)
+        Magia.toBinaryByteArray(meta.isNegative, magia, meta.normLen, isTwosComplement, isBigEndian)
 
     /**
      * Writes this [BigInt] into the provided [bytes] array in the requested binary format.

@@ -2708,21 +2708,22 @@ object Magia {
      *
      * @param sign `true` if the number is negative, `false` otherwise.
      * @param x the array of 32-bit limbs representing the integer, least-significant limb first.
-     * @param xLen the number of significant limbs to consider; must be normalized (trailing zeros ignored).
+     * @param xNormLen the number of significant limbs to consider; must be normalized (trailing zeros ignored).
      * @param isTwosComplement if `true`, the number is converted to two's-complement form.
      *                        Otherwise, magnitude-only representation is used.
      * @param isBigEndian if `true`, the most significant byte is first in the output array;
      *                    if `false`, least significant byte is first.
      * @return a [ByteArray] containing the binary representation of the integer.
-     * @throws IllegalArgumentException if [xLen] is out of bounds (negative or greater than x.size).
+     * @throws IllegalArgumentException if [xNormLen] is out of bounds (negative or greater than x.size).
      */
-    fun toBinaryByteArray(sign: Boolean, x: IntArray, xLen: Int, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
-        if (xLen >= 0 && xLen <= x.size) {
+    fun toBinaryByteArray(sign: Boolean, x: IntArray, xNormLen: Int, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size) {
             val bitLen =
-                if (isTwosComplement) bitLengthBigIntegerStyle(sign, x, xLen) + 1 else max(bitLen(x, xLen), 1)
+                if (isTwosComplement) bitLengthBigIntegerStyle(sign, x, xNormLen) + 1 else max(bitLen(x, xNormLen), 1)
             val byteLen = (bitLen + 7) ushr 3
             val bytes = ByteArray(byteLen)
-            toBinaryBytes(x, xLen, sign and isTwosComplement, isBigEndian, bytes, 0, byteLen)
+            toBinaryBytes(x, xNormLen, sign and isTwosComplement, isBigEndian, bytes, 0, byteLen)
             return bytes
         } else {
             throw IllegalArgumentException()
@@ -2758,7 +2759,7 @@ object Magia {
      * representation for negative numbers.
      *
      * @param x the array of 32-bit limbs representing the integer, least-significant limb first.
-     * @param xLen the number of significant limbs in [x] to process.
+     * @param xNormLen the number of significant limbs in [x] to process.
      * @param isNegative whether the integer should be treated as negative (for two's-complement output).
      * @param isBigEndian if `true`, the most significant byte is stored first; if `false`, the least significant byte is first.
      * @param bytes the destination byte array.
@@ -2766,21 +2767,22 @@ object Magia {
      * @param requestedLen the number of bytes to write; if non-positive, the minimal number of bytes
      *                     required to represent the value is used.
      * @return the actual number of bytes written.
-     * @throws IllegalArgumentException if [xLen] or [off] is out of bounds, or if [requestedLen] exceeds the available space.
+     * @throws IllegalArgumentException if [xNormLen] or [off] is out of bounds, or if [requestedLen] exceeds the available space.
      *
      * @implNote This function manually handles byte ordering and sign extension to allow
      * efficient serialization of large integers without additional temporary arrays.
      */
-    internal fun toBinaryBytes(x: IntArray, xLen: Int, isNegative: Boolean, isBigEndian: Boolean,
+    internal fun toBinaryBytes(x: IntArray, xNormLen: Int, isNegative: Boolean, isBigEndian: Boolean,
                                bytes: ByteArray, off: Int, requestedLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size &&
+        check (isNormalized(x, xNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size &&
             off >= 0 && (requestedLen <= 0 || requestedLen <= bytes.size - off)) {
 
             val actualLen = if (requestedLen > 0) requestedLen else {
                 val bitLen = if (isNegative)
-                    bitLengthBigIntegerStyle(isNegative, x, xLen) + 1
+                    bitLengthBigIntegerStyle(isNegative, x, xNormLen) + 1
                 else
-                    max(bitLen(x, xLen), 1)
+                    max(bitLen(x, xNormLen), 1)
                 (bitLen + 7) ushr 3
             }
 
@@ -2804,7 +2806,7 @@ object Magia {
 
             var carry = -negativeMask.toLong() // if (isNegative) then carry = 1 else 0
 
-            while (remaining >= 4 && iw < xLen) {
+            while (remaining >= 4 && iw < xNormLen) {
                 val v = x[iw++]
                 carry += (v xor negativeMask).toLong() and 0xFFFF_FFFFL
                 val w = carry.toInt()
@@ -2824,7 +2826,7 @@ object Magia {
                 remaining -= 4
             }
             if (remaining > 0) {
-                val v = if (iw < xLen) x[iw++] else 0
+                val v = if (iw < xNormLen) x[iw++] else 0
                 var w = (v xor negativeMask).toLong() + carry.toInt()
                 do {
                     bytes[ib] = w.toByte()
@@ -2832,7 +2834,7 @@ object Magia {
                     w = w shr 8
                 } while (--remaining > 0)
             }
-            check(iw == xLen || x[iw] == 0)
+            check(iw == xNormLen || x[iw] == 0)
             check(ib - step1LoToHi == ibMsb)
             return actualLen
         } else {
