@@ -97,6 +97,14 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             return BigInt(meta, magia)
         }
 
+        internal operator fun invoke(magia: IntArray): BigInt {
+            if (magia.isEmpty())
+                return ZERO
+            val signBit = 0
+            val meta = Meta(signBit, magia)
+            return BigInt(meta, magia)
+        }
+
         /**
          * Converts a 32-bit signed [Int] into a signed [BigInt].
          *
@@ -108,7 +116,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
          * @return the corresponding [BigInt] representation.
          */
         fun from(n: Int): BigInt = when {
-            n > 0 -> BigInt(POSITIVE, intArrayOf(n))
+            n > 0 -> BigInt(intArrayOf(n))
             n < 0 -> BigInt(NEGATIVE, intArrayOf(-n))
             else -> ZERO
         }
@@ -131,7 +139,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
          * @param w the unsigned integer to convert.
          * @return the corresponding non-negative [BigInt].
          */
-        fun from(w: UInt) = if (w != 0u) BigInt(POSITIVE, intArrayOf(w.toInt())) else ZERO
+        fun from(w: UInt) = if (w != 0u) BigInt(intArrayOf(w.toInt())) else ZERO
 
         /**
          * Converts a 64-bit signed [Long] into a signed [BigInt].
@@ -534,8 +542,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 }
                 return when {
                     zeroTest == 0 -> ZERO
-                    !withRandomSign -> BigInt(POSITIVE, magia)
-                    else -> BigInt(Sign(rng.nextInt() shr 31), magia)
+                    !withRandomSign -> BigInt(magia)
+                    else -> BigInt(rng.nextBoolean(), magia)
                 }
             }
             if (maxBitLen == 0)
@@ -593,9 +601,9 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 check (limbIndex == magia.size - 1)
                 magia[limbIndex] = magia[limbIndex] or (1 shl (topBitIndex and 0x1F))
                 return if (!withRandomSign)
-                    BigInt(POSITIVE, magia)
+                    BigInt(magia)
                 else
-                    BigInt(Sign(rng.nextInt() shr 31), magia)
+                    BigInt(rng.nextBoolean(), magia)
             }
             if (bitLen == 0)
                 return ZERO
@@ -846,7 +854,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
             val magia2 = Magia.newWithSetBit(bitIndex)
             check (Magia.EQ(magia, magia2))
-            return BigInt(POSITIVE, magia)
+            return BigInt(magia)
         }
 
         /**
@@ -863,7 +871,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                     magia.fill(-1)
                     val leadingZeroCount = (magia.size * 32) - bitWidth
                     magia[magia.lastIndex] = -1 ushr leadingZeroCount
-                    BigInt(POSITIVE, magia)
+                    BigInt(magia)
                 }
 
                 bitWidth == 1 -> ONE
@@ -902,7 +910,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                     if (remainingBitCount > 0)
                         magia[wordIndex] = (1 shl remainingBitCount) - 1
                 }
-                BigInt(POSITIVE, magia)
+                BigInt(magia)
             }
 
             bitIndex < 0 || bitWidth < 0 ->
@@ -986,7 +994,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 Magia.setMul(f, f, fLen, i)
                 fLen += if (fLen < f.size && f[fLen] != 0) 1 else 0
             }
-            return BigInt(POSITIVE, f)
+            return BigInt(f)
         }
 
         private fun estimateFactorialLimbLen(w: UInt): Int {
@@ -1036,7 +1044,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 return a.abs()
             val magia = Magia.gcd(a.magia, b.magia)
             check(magia !== Magia.ZERO)
-            return BigInt(POSITIVE, magia)
+            return BigInt(magia)
         }
 
         /**
@@ -1056,7 +1064,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 Magia.newMul(Magia.newDiv(a.magia, gcd), b.magia)
             else
                 Magia.newMul(Magia.newDiv(b.magia, gcd), a.magia)
-            return BigInt(POSITIVE, lcm)
+            return BigInt(lcm)
         }
 
         private val HEX_PREFIX_UTF8_0x = byteArrayOf('0'.code.toByte(), 'x'.code.toByte())
@@ -1340,7 +1348,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      *
      *@see absoluteValue
      */
-    fun abs() = if (sign.isNegative) BigInt(POSITIVE, magia) else this
+    fun abs() = if (sign.isNegative) BigInt(magia) else this
 
     /**
      * Kotlin-style property for the absolute value of this BigInt.
@@ -1580,7 +1588,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         if (this.isNotZero()) {
             check(Magia.normLen(this.magia) > 0)
             val magiaSqr = Magia.newSqr(this.magia)
-            return BigInt(POSITIVE, magiaSqr)
+            return BigInt(magiaSqr)
         }
         return ZERO
     }
@@ -1768,7 +1776,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             Magia.mutateShiftRight(x, x.size, 1)
             x[x.size - 1] = x[x.size - 1] or (carry shl 31).toInt()
         } while (Magia.compare(x, xPrev) < 0)
-        return BigInt(POSITIVE, xPrev)
+        return BigInt(xPrev)
     }
 
     /**
@@ -1860,7 +1868,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      */
     infix fun and(other: BigInt): BigInt {
         val magiaAnd = Magia.newAnd(this.magia, other.magia)
-        return if (magiaAnd.isNotEmpty()) BigInt(POSITIVE, magiaAnd) else ZERO
+        return if (magiaAnd.isNotEmpty()) BigInt(magiaAnd) else ZERO
     }
 
     /**
@@ -1871,7 +1879,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      */
     infix fun or(other: BigInt): BigInt {
         val magiaOr = Magia.newOr(this.magia, other.magia)
-        return if (magiaOr.isNotEmpty()) BigInt(POSITIVE, magiaOr) else ZERO
+        return if (magiaOr.isNotEmpty()) BigInt(magiaOr) else ZERO
     }
 
     /**
@@ -1882,7 +1890,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      */
     infix fun xor(other: BigInt): BigInt {
         val magiaXor = Magia.newXor(this.magia, other.magia)
-        return if (magiaXor.isNotEmpty()) BigInt(POSITIVE, magiaXor) else ZERO
+        return if (magiaXor.isNotEmpty()) BigInt(magiaXor) else ZERO
     }
 
     /**
@@ -1897,7 +1905,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         return when {
             bitCount > 0 -> {
                 val magia = Magia.newShiftRight(this.magia, bitCount)
-                if (magia !== Magia.ZERO) BigInt(POSITIVE, magia) else ZERO
+                if (magia !== Magia.ZERO) BigInt(magia) else ZERO
             }
 
             bitCount == 0 -> abs()
