@@ -1657,7 +1657,7 @@ object Magia {
      * @param y the second array of 32-bit limbs representing an unsigned integer.
      * @return `true` if [x] and [y] represent the same value, `false` otherwise.
      */
-    fun EQ(x: IntArray, y: IntArray): Boolean = compare(x, y) == 0
+    fun EQ(x: IntArray, y: IntArray): Boolean = compare(x, normLen(x), y, normLen(y)) == 0
 
     /**
      * Compares two arbitrary-precision integers represented as arrays of 32-bit limbs.
@@ -1668,19 +1668,7 @@ object Magia {
      * @param y the second integer array (least significant limb first).
      * @return -1 if x < y, 0 if x == y, 1 if x > y.
      */
-    fun compare(x: IntArray, y: IntArray): Int {
-        val xLen = normLen(x)
-        val yLen = normLen(y)
-        if (xLen > yLen)
-            return 1
-        if (xLen < yLen)
-            return -1
-        for (i in xLen - 1 downTo 0) {
-            if (x[i] != y[i])
-                return (((dw32(x[i]) - dw32(y[i])).toLong() shr 63) shl 1).toInt() + 1
-        }
-        return 0
-    }
+    fun compare(x: IntArray, y: IntArray): Int = compare(x, normLen(x), y, normLen(y))
 
     /**
      * Compares two arbitrary-precision integers represented as arrays of 32-bit limbs,
@@ -1699,9 +1687,9 @@ object Magia {
      * @throws IllegalArgumentException if [xNormLen] or [yNormLen] are out of bounds for the respective arrays.
      */
     fun compare(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
-            check(xNormLen == 0 || x[xNormLen - 1] != 0)
-            check(yNormLen == 0 || y[yNormLen - 1] != 0)
             if (xNormLen != yNormLen)
                 return if (xNormLen > yNormLen) 1 else -1
             for (i in xNormLen - 1 downTo 0) {

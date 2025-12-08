@@ -105,6 +105,18 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             return BigInt(meta, magia)
         }
 
+        internal operator fun invoke(magia: IntArray, normLen: Int): BigInt {
+            if (magia.isEmpty()) {
+                check (magia === Magia.ZERO)
+                return ZERO
+            }
+            val signBit = 0
+            for (i in normLen..<magia.size)
+                magia[i] = 0
+            val meta = Meta(signBit, normLen)
+            return BigInt(meta, magia)
+        }
+
         /**
          * Converts a 32-bit signed [Int] into a signed [BigInt].
          *
@@ -1761,16 +1773,40 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         val crossCheck = topSqrt * topSqrt
         topSqrt += (crossCheck - top) shr 63 // add 1 iff crossCheck < top
 
-        var x = Magia.newWithUIntAtBitIndex(topSqrt.toUInt(), topBitsIndex shr 1)
-        var xPrev: IntArray
+        // FIXME
+        //  improve 27 bit sqrt initial guess by shifting left 5 bits
+        //  and dividing into the to 64 bits of N
+        //  Do this in the 64-bit world
+        //  Roll this into a better initial guess
+        //  complicated because this might all be clamped by
+        //  topBitsIndex
+
+        // 27 == sqrt of the top bits
+        // topBitsIndex/2 accounts for shifting
+        // 1 is for the carry when we average in-place
+        val xInitialBitLen = 27 + (topBitsIndex / 2) + 1
+        val xInitialLimbLen = (xInitialBitLen + 0x1F) ushr 5
+        val tmpLimbLen = max(xInitialLimbLen, meta.normLen - xInitialLimbLen + 1)
+
+        var x = IntArray(tmpLimbLen)
+        x[0] = topSqrt.toInt()
+        var xNormLen = Magia.setShiftLeft(x, x, 1, topBitsIndex shr 1)
+        val x2 = Magia.newWithUIntAtBitIndex(topSqrt.toUInt(), topBitsIndex shr 1)
+        check (Magia.EQ(x, x2))
+
+        var xPrev = IntArray(tmpLimbLen)
+        var xPrevNormLen: Int
         do {
-            xPrev = x
-            x = Magia.newDiv(this.magia, xPrev)
-            val carry = Magia.mutateAdd(x, x.size, xPrev, xPrev.size)
-            Magia.mutateShiftRight(x, x.size, 1)
-            x[x.size - 1] = x[x.size - 1] or (carry shl 31).toInt()
-        } while (Magia.compare(x, xPrev) < 0)
-        return BigInt(xPrev)
+            val t = xPrev; xPrev = x; x = t
+            xPrevNormLen = xNormLen
+
+            xNormLen = Magia.setDiv(x, this.magia, this.meta.normLen, xPrev, xPrevNormLen)
+            xNormLen = Magia.setAdd(x, x, xNormLen, xPrev, xPrevNormLen)
+            xNormLen = Magia.setShiftRight(x, x, xNormLen, 1)
+
+        } while (Magia.compare(x, xNormLen, xPrev, xPrevNormLen) < 0)
+        val ret = BigInt(xPrev, xPrevNormLen)
+        return ret
     }
 
     /**
@@ -1971,7 +2007,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
     override operator fun compareTo(other: BigInt): Int {
         if (this.meta.signFlag != other.meta.signFlag)
             return this.meta.signMask or 1
-        val cmp = Magia.compare(this.magia, other.magia)
+        val cmp = Magia.compare(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
         return this.meta.negateIfNegative(cmp)
     }
 
@@ -2038,11 +2074,15 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      *
      * @return -1,0,1
      */
-    fun magnitudeCompareTo(other: BigInt) = Magia.compare(this.magia, other.magia)
-    fun magnitudeCompareTo(un: UInt) = Magia.compare(this.magia, this.meta.normLen, un.toULong())
-    fun magnitudeCompareTo(ul: ULong) = Magia.compare(this.magia, this.meta.normLen, ul)
+    fun magnitudeCompareTo(other: BigInt) =
+        Magia.compare(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
+    fun magnitudeCompareTo(un: UInt) =
+        Magia.compare(this.magia, this.meta.normLen, un.toULong())
+    fun magnitudeCompareTo(ul: ULong) =
+        Magia.compare(this.magia, this.meta.normLen, ul)
     fun magnitudeCompareTo(littleEndianIntArray: IntArray) =
-        Magia.compare(this.magia, littleEndianIntArray)
+        Magia.compare(this.magia, this.meta.normLen,
+            littleEndianIntArray, Magia.normLen(littleEndianIntArray))
 
     /**
      * Comparison predicate for numerical equality with another [BigInt].
@@ -2051,7 +2091,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
     infix fun EQ(other: BigInt): Boolean =
-        (this.meta.signFlag == other.meta.signFlag) && Magia.EQ(this.magia, other.magia)
+        (this.meta.meta == other.meta.meta) &&
+                Magia.compare(this.magia, meta.normLen, other.magia, other.meta.normLen) == 0
 
     /**
      * Comparison predicate for numerical equality with a signed 32-bit integer.
@@ -2140,11 +2181,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * @param other the object to compare against
      * @return `true` if [other] is a [BigInt] with the same value; `false` otherwise
      */
-    override fun equals(other: Any?): Boolean {
-        return (other is BigInt) &&
-                (this.meta.signFlag == other.meta.signFlag) &&
-                Magia.EQ(this.magia, other.magia)
-    }
+    override fun equals(other: Any?): Boolean = (other is BigInt) && (this EQ other)
 
     /**
      * Returns a hash code for this BigInt.

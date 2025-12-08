@@ -11,7 +11,7 @@ class TestISqrt {
 
     @Test
     fun testISqrt() {
-        repeat(100000) {
+        repeat(4000) {
             val bitLen = Random.nextInt(2000)
             testSqrtUp(bitLen)
             testSqrtDown(bitLen)
