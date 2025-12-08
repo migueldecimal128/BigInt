@@ -732,7 +732,7 @@ class BigIntAccumulator private constructor (
      */
     private fun mutateAddMagImpl(dw: ULong) {
         ensureCapacityCopy(normLen + 2)
-        val normLen = Magia.mutateAdd(magia, normLen, dw)
+        val normLen = Magia.setAdd(magia, magia, normLen, dw)
         meta = Meta(signBit, normLen)
         validate()
     }

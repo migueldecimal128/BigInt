@@ -387,38 +387,27 @@ object Magia {
         return z
     }
 
-    /**
-     * Adds the unsigned 64-bit value [dw] to the first [xLen] limbs of [x], modifying [x] in place.
-     *
-     * It is the caller's responsibility to ensure that [x] has sufficient
-     * space to ensure no overflow ... an additional two limbs for a DWORD ULong.
-     *
-     * @return the normalized length
-     * @throws IllegalArgumentException if [xLen] is out of range for [x].
-     */
-    fun mutateAdd(x: IntArray, xLen: Int, dw: ULong): Int {
-        if (xLen >= 0 && xLen <= x.size) {
+    fun setAdd(z: IntArray, x: IntArray, xNormLen: Int, dw: ULong): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
             var carry = dw
             var i = 0
-            while (carry != 0uL && i < xLen) {
+            while (carry != 0uL && i < xNormLen) {
                 val s = dw32(x[i]) + (carry and 0xFFFF_FFFFuL)
-                x[i] = s.toInt()
+                z[i] = s.toInt()
                 carry = (carry shr 32) + (s shr 32)
                 ++i
             }
-            if (carry == 0uL)
-                return normLen(x, xLen)
-            if (i < x.size) {
-                x[i] = carry.toInt()
-                carry = carry shr 32
+            if (carry == 0uL) {
+                if (i < xNormLen && z !== x)
+                    x.copyInto(z, i, i, xNormLen)
+                return xNormLen
+            }
+            while (i < z.size) {
+                z[i] = carry.toInt()
                 ++i
+                carry = carry shr 32
                 if (carry == 0uL)
-                    return normLen(x, i)
-                if (i < x.size) {
-                    x[i] = carry.toInt()
-                    ++i
-                    return normLen(x, i)
-                }
+                    return i
             }
             throw ArithmeticException(ERROR_ADD_OVERFLOW)
         }
