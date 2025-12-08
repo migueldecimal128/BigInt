@@ -149,6 +149,18 @@ object Magia {
         }
     }
 
+    fun setULong(z: IntArray, dw: ULong): Int {
+        val lo = dw.toInt()
+        val hi = (dw shr 32).toInt()
+        if (dw == 0uL)
+            return 0
+        z[0] = lo
+        if (hi == 0)
+            return 1
+        z[1] = hi
+        return 2
+    }
+
     /**
      * Returns the number of nonzero limbs in [x], excluding any leading zeros.
      */
@@ -1862,6 +1874,22 @@ object Magia {
         return ZERO
     }
 
+    fun setRem(z: IntArray, x: IntArray, xNormLen: Int, w: UInt): Int {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen > 0) {
+            val rem =
+                if (xNormLen <= 2)
+                    (toRawULong(x, xNormLen) % w.toULong()).toUInt()
+                else
+                    calcRem(x, xNormLen, w)
+            if (rem > 0u) {
+                z[0] = 1
+                return 1
+            }
+        }
+        return 0
+    }
+
     fun newRem(x: IntArray, dw: ULong): IntArray {
         val lo = dw.toUInt()
         val hi = (dw shr 32).toUInt()
@@ -1893,6 +1921,33 @@ object Magia {
         check (rNormLen == normLen(r))
         check (rNormLen <= n)
         return if (rNormLen > 0) r else ZERO
+    }
+
+    fun setRem(z: IntArray, x: IntArray, y: IntArray): Int {
+        val xNormLen = normLen(x)
+        val yNormLen = normLen(y)
+        when {
+            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 1 -> return setRem(z, x, xNormLen, y[0].toUInt())
+            yNormLen == 2 && xNormLen <= 2 ->
+                return setULong(z, toRawULong(x, xNormLen) % toRawULong(y, yNormLen))
+            xNormLen < yNormLen -> {
+                x.copyInto(z, 0, 0, xNormLen)
+                return xNormLen
+            }
+        }
+        val n = yNormLen
+        val m = xNormLen
+        val u = x
+        val v = y
+        val q = null
+        if (z.size < yNormLen)
+            throw IllegalArgumentException()
+        val r = z
+        val rNormLen = knuthDivide(q, r, u, v, m, n)
+        check (rNormLen == normLen(r))
+        check (rNormLen <= n)
+        return rNormLen
     }
 
     /**
