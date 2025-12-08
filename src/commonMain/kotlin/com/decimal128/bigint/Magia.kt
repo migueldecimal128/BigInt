@@ -519,34 +519,38 @@ object Magia {
      *
      * If the result is zero or the subtraction underflows, returns [ZERO].
      */
-    fun newSub(x: IntArray, dw: ULong): IntArray {
-        val z = IntArray(normLen(x))
-        var orAccumulator = 0
-        var borrow = 0uL
-        if (z.isNotEmpty()) {
-            val t0 = dw32(x[0]) - (dw and 0xFFFF_FFFFuL)
-            val z0 = t0.toInt()
-            z[0] = z0
-            orAccumulator = z0
-            if (z.size > 1) {
-                borrow = t0 shr 63
-                val t1 = dw32(x[1]) - (dw shr 32) - borrow
-                val z1 = t1.toInt()
-                z[1] = z1
-                orAccumulator = orAccumulator or z1
-                borrow = t1 shr 63
-                var i = 2
-                while (i < z.size) {
-                    val t = dw32(x[i]) - borrow
-                    val zi = t.toInt()
-                    z[i] = zi
-                    orAccumulator = orAccumulator or zi
-                    borrow = t shr 63
-                    ++i
+    fun newSub(x: IntArray, xNormLen: Int, dw: ULong): IntArray {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            val z = IntArray(xNormLen)
+            var orAccumulator = 0
+            var borrow = 0uL
+            if (z.isNotEmpty()) {
+                val t0 = dw32(x[0]) - (dw and 0xFFFF_FFFFuL)
+                val z0 = t0.toInt()
+                z[0] = z0
+                orAccumulator = z0
+                if (z.size > 1) {
+                    borrow = t0 shr 63
+                    val t1 = dw32(x[1]) - (dw shr 32) - borrow
+                    val z1 = t1.toInt()
+                    z[1] = z1
+                    orAccumulator = orAccumulator or z1
+                    borrow = t1 shr 63
+                    var i = 2
+                    while (i < z.size) {
+                        val t = dw32(x[i]) - borrow
+                        val zi = t.toInt()
+                        z[i] = zi
+                        orAccumulator = orAccumulator or zi
+                        borrow = t shr 63
+                        ++i
+                    }
                 }
             }
+            return if (orAccumulator == 0 || borrow != 0uL) ZERO else z
         }
-        return if (orAccumulator == 0 || borrow != 0uL) ZERO else z
+        throw IllegalArgumentException()
     }
 
     /**

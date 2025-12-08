@@ -2395,7 +2395,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             return BigInt(thisSign, Magia.newAdd(this.magia, this.meta.normLen, w.toULong()))
         val cmp = this.magnitudeCompareTo(w)
         val ret = when {
-            cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, w.toULong()))
+            cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, this.meta.normLen, w.toULong()))
             cmp < 0 -> BigInt(otherSign, intArrayOf(w.toInt() - this.magia[0]))
             else -> ZERO
         }
@@ -2436,7 +2436,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             return BigInt(thisSign, Magia.newAdd(this.magia, this.meta.normLen, dw))
         val cmp = this.magnitudeCompareTo(dw)
         val ret = when {
-            cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, dw))
+            cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, this.meta.normLen, dw))
             cmp < 0 -> {
                 val thisMag = this.toULongMagnitude()
                 val diff = dw - thisMag
