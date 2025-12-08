@@ -86,16 +86,20 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         }
 
         internal operator fun invoke(sign: Boolean, magia: IntArray): BigInt {
-            if (magia.isEmpty())
+            if (magia.isEmpty()) {
+                check(magia === Magia.ZERO)
                 return ZERO
+            }
             val signBit = if (sign) 1 else 0
             val meta = Meta(signBit, magia)
             return BigInt(meta, magia)
         }
 
         internal operator fun invoke(magia: IntArray): BigInt {
-            if (magia.isEmpty())
+            if (magia.isEmpty()) {
+                check (magia === Magia.ZERO)
                 return ZERO
+            }
             val signBit = 0
             val meta = Meta(signBit, magia)
             return BigInt(meta, magia)
