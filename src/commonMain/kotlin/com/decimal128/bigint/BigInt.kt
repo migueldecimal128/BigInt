@@ -469,21 +469,15 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
          * Parse a BigInt thru a standard iterator for different text
          * representations.
          */
-        private fun from(src: Latin1Iterator): BigInt {
-            val isNegative = src.peek() == '-'
-            val magia = Magia.from(src)
-            return if (magia.isNotEmpty()) BigInt(isNegative, magia) else ZERO
-        }
+        private fun from(src: Latin1Iterator): BigInt =
+            BigInt(src.peek() == '-', Magia.from(src))
 
         /**
          * Parse a BigInt thru a standard iterator for different text
          * representations.
          */
-        private fun fromHex(src: Latin1Iterator): BigInt {
-            val isNegative = src.peek() == '-'
-            val magia = Magia.fromHex(src)
-            return if (magia.isNotEmpty()) BigInt(isNegative, magia) else ZERO
-        }
+        private fun fromHex(src: Latin1Iterator): BigInt =
+            BigInt(src.peek() == '-', Magia.fromHex(src))
 
         /**
          * Generates a random `BigInt` whose magnitude is uniformly sampled from
