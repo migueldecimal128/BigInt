@@ -79,6 +79,8 @@ private const val ERROR_SHL_OVERFLOW = "shl overflow ... destination too small"
  */
 object Magia {
 
+    private inline fun bitLen(n: Int) = 32 - n.countLeadingZeroBits()
+
     /**
      * The one true zero-length array that is usually used to represent
      * the value ZERO.
@@ -1788,24 +1790,62 @@ object Magia {
         return if (normLen(q) > 0) q else ZERO
     }
 
-    fun newDiv(x: IntArray, y: IntArray): IntArray =
-        newDiv(x, normLen(x), y, normLen(y))
-
-    fun newDiv(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
-        val n = yNormLen
-        if (n < 2)
-            return newDiv(x, y[0].toUInt())
+    fun newDiv(x: IntArray, y: IntArray): IntArray {
+        val xNormLen = normLen(x)
+        val yNormLen = normLen(y)
+        when {
+            yNormLen < 2 -> return newDiv(x, y[0].toUInt())
+            xNormLen < yNormLen -> return ZERO
+            xNormLen == yNormLen -> {
+                val xMswBitLen = bitLen(x[xNormLen-1])
+                val yMswBitLen = bitLen(y[yNormLen-1])
+                if (xMswBitLen < yMswBitLen)
+                    return ZERO
+                if (xMswBitLen == yMswBitLen) {
+                    if (compare(x, xNormLen, y, yNormLen) < 0) ZERO else intArrayOf(1)
+                }
+            }
+        }
         val m = xNormLen
-        if (m < n)
-            return ZERO
+        val n = yNormLen
         val u = x
         val v = y
         val q = IntArray(m - n + 1)
         val r = null
-        knuthDivide(q, r, u, v, m, n)
-        return if (normLen(q) > 0) q else ZERO
+        val qNormLen = knuthDivide(q, r, u, v, m, n)
+        return if (qNormLen > 0) q else ZERO
+    }
+
+    fun setDiv(z: IntArray, x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
+        when {
+            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 1 -> return setDiv(z, x, xNormLen, y[0].toUInt())
+            xNormLen < yNormLen -> return 0
+            xNormLen == yNormLen -> {
+                val xMswBitLen = bitLen(x[xNormLen - 1])
+                val yMswBitLen = bitLen(y[yNormLen - 1])
+                if (xMswBitLen < yMswBitLen)
+                    return 0
+                if (xMswBitLen == yMswBitLen) {
+                    if (compare(x, xNormLen, y, yNormLen) < 0)
+                        return 0
+                    z[0] = 1
+                    return 1
+                }
+            }
+        }
+        val m = xNormLen
+        val n = yNormLen
+        val u = x
+        val v = y
+        if (z.size < m - n + 1)
+            throw IllegalArgumentException()
+        val q = z
+        val r = null
+        val qNormLen = knuthDivide(q, r, u, v, m, n)
+        return qNormLen
     }
 
     fun newRem(x: IntArray, w: UInt): IntArray {
