@@ -1463,7 +1463,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
         if (other.isZero())
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magia.newMod(this.magia, other.magia)
+            val rem = Magia.newRem(this.magia, other.magia)
             if (rem.isNotEmpty())
                 return BigInt(this.sign, rem)
         }
@@ -1478,7 +1478,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
         if (w == 0u)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magia.newMod(this.magia, w)
+            val rem = Magia.newRem(this.magia, w)
             if (rem.isNotEmpty())
                 return BigInt(this.sign, rem)
         }
@@ -1491,7 +1491,7 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
         if (dw == 0uL)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magia.newMod(this.magia, dw)
+            val rem = Magia.newRem(this.magia, dw)
             if (rem.isNotEmpty())
                 return BigInt(this.sign, rem)
         }

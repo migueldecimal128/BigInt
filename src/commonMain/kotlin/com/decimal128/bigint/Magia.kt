@@ -1751,6 +1751,50 @@ object Magia {
     }
 
     /**
+     *
+     * @return normLen(z)
+     */
+    fun setDiv(z: IntArray, x: IntArray, xNormLen: Int, w: UInt): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
+            check (isNormalized(x, xNormLen))
+            if (w == 0u)
+                throw ArithmeticException("div by zero")
+            if (xNormLen == 0)
+                return 0
+            val dw = w.toULong()
+            var carry = 0uL
+            for (i in xNormLen - 1 downTo 0) {
+                val t = (carry shl 32) + dw32(x[i])
+                val q = t / dw
+                val r = t % dw
+                z[i] = q.toInt()
+                carry = r
+            }
+            val zNormLen = xNormLen - if (z[xNormLen-1] == 0) 1 else 0
+            check (isNormalized(z, zNormLen))
+            return zNormLen
+        }
+        throw IllegalArgumentException()
+    }
+
+    fun calcRem(x: IntArray, xNormLen: Int, w: UInt): UInt {
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            check (isNormalized(x, xNormLen))
+            if (w == 0u)
+                throw ArithmeticException("div by zero")
+            val dw = w.toULong()
+            var carry = 0uL
+            for (i in xNormLen - 1 downTo 0) {
+                val t = (carry shl 32) + dw32(x[i])
+                val r = t % dw
+                carry = r
+            }
+            return carry.toUInt()
+        }
+        throw IllegalArgumentException()
+    }
+
+    /**
      * Returns a new integer array representing [x] divided by the 32-bit unsigned integer [w].
      *
      * This operation does not mutate the input [x]. The quotient is computed and returned as a
@@ -1762,9 +1806,14 @@ object Magia {
      * @throws ArithmeticException if [w] is zero.
      */
     fun newDiv(x: IntArray, w: UInt): IntArray {
-        val q = newNormalizedCopy(x)
-        mutateDivMod(q, w)
-        return if (normLen(q) > 0) q else ZERO
+        val xNormLen = normLen(x)
+        if (xNormLen > 0) {
+            val z = IntArray(xNormLen)
+            val zNormLen = setDiv(z, x, xNormLen, w)
+            if (zNormLen > 0)
+                return z
+        }
+        return ZERO
     }
 
     fun newDiv(x: IntArray, dw: ULong): IntArray {
@@ -1805,24 +1854,28 @@ object Magia {
         return if (normLen(q) > 0) q else ZERO
     }
 
-    fun newMod(x: IntArray, w: UInt): IntArray {
-        val q = newNormalizedCopy(x)
-        val rem = mutateDivMod(q, w)
-        return if (rem == 0u) ZERO else intArrayOf(rem.toInt())
+    fun newRem(x: IntArray, w: UInt): IntArray {
+        val xNormLen = normLen(x)
+        if (xNormLen > 0) {
+            val rem = calcRem(x, xNormLen, w)
+            if (rem > 0u)
+                return intArrayOf(rem.toInt())
+        }
+        return ZERO
     }
 
-    fun newMod(x: IntArray, dw: ULong): IntArray {
+    fun newRem(x: IntArray, dw: ULong): IntArray {
         val lo = dw.toUInt()
         val hi = (dw shr 32).toUInt()
-        return if (hi == 0u) newMod(x, lo) else newMod(x, intArrayOf(lo.toInt(), hi.toInt()))
+        return if (hi == 0u) newRem(x, lo) else newRem(x, intArrayOf(lo.toInt(), hi.toInt()))
     }
 
-    fun newMod(x: IntArray, y: IntArray): IntArray {
+    fun newRem(x: IntArray, y: IntArray): IntArray {
         val n = normLen(y)
         if (n <= 1) {
             if (n == 0)
                 throw ArithmeticException("div by zero")
-            return newMod(x, y[0].toUInt())
+            return newRem(x, y[0].toUInt())
         }
         val m = normLen(x)
         if (m == 0)
