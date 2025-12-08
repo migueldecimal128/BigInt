@@ -607,39 +607,6 @@ object Magia {
     }
 
     /**
-     * Subtracts the unsigned 64-bit value [dw] from the first [xLen] limbs of [x], mutating [x] in place.
-     *
-     * @throws IllegalArgumentException if [xLen] is out of range for [x].
-     */
-    fun mutateSub(x: IntArray, xLen: Int, dw: ULong) {
-        if (xLen >= 0 && xLen <= x.size) {
-
-            val lo = dw and 0xFFFF_FFFFuL
-            val hi = dw shr 32
-
-            var borrow = 0uL
-
-            val t0 = dw32(x[0]) - lo
-            x[0] = t0.toInt()
-            borrow = t0 shr 63
-
-            val t1 = dw32(x[1]) - hi - borrow
-            x[1] = t1.toInt()
-            borrow = t1 shr 63
-
-            var i = 2
-            while (borrow != 0uL && i < xLen) {
-                borrow = dw32(x[i]) - borrow
-                x[i] = borrow.toInt()
-                borrow = borrow shr 63
-                ++i
-            }
-        } else {
-            throw IllegalArgumentException()
-        }
-    }
-
-    /**
      * Computes `z = x - y` using the low-order [xLen] and [yLen] limbs and returns
      * the normalized limb length of the result.
      *

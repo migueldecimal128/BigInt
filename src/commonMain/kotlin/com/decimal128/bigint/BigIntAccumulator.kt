@@ -665,8 +665,9 @@ class BigIntAccumulator private constructor (
             meta.signFlag == otherSign -> mutateAddMagImpl(dw)
             meta.normLen == 0 -> set(otherSign, dw)
             meta.normLen > 2 || rawULong > dw -> {
-                Magia.mutateSub(magia, meta.normLen, dw)
-                val normLen = Magia.normLen(magia, meta.normLen)
+                //Magia.mutateSub(magia, meta.normLen, dw)
+                //val normLen = Magia.normLen(magia, meta.normLen)
+                val normLen = Magia.setSub(magia, magia, meta.normLen, dw)
                 meta = Meta(signFlag, normLen)
             }
             rawULong < dw -> set(otherSign, dw - rawULong)
