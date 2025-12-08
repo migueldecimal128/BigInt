@@ -61,8 +61,10 @@ import kotlin.text.HexFormat
  * accumulator designed for repeated summation and similar in-place operations,
  * significantly reducing heap churn in accumulation-heavy workloads.
  */
-class BigInt private constructor(internal val sign: Sign, internal val meta: Meta, internal val magia: IntArray) : Comparable<BigInt> {
+class BigInt private constructor(internal val meta: Meta, internal val magia: IntArray) : Comparable<BigInt> {
 
+    val sign: Sign
+        get() = Sign(meta.signMask)
     companion object {
         /**
          * The canonical zero value for [BigInt].
@@ -71,19 +73,20 @@ class BigInt private constructor(internal val sign: Sign, internal val meta: Met
          * This ensures that identity comparisons and optimizations relying on
          * reference equality (`===`) for zero values are valid.
          */
-        val ZERO = BigInt(POSITIVE, Meta(0), Magia.ZERO)
+        val ZERO = BigInt(Meta(0), Magia.ZERO)
 
-        val ONE = BigInt(POSITIVE, Meta(1), Magia.ONE)
+        val ONE = BigInt(Meta(1), Magia.ONE)
 
-        val NEG_ONE = BigInt(NEGATIVE, Meta(1, 1), Magia.ONE) // share magia .. but no mutation allowed
+        val NEG_ONE = BigInt(Meta(1, 1), Magia.ONE) // share magia .. but no mutation allowed
 
-        val TEN = BigInt(POSITIVE, Meta(4), intArrayOf(10))
+        val TEN = BigInt(Meta(4), intArrayOf(10))
 
         internal operator fun invoke(sign: Sign, magia: IntArray): BigInt {
-            if (magia === Magia.ZERO)
+            if (magia.isEmpty())
                 return ZERO
-            check (magia.size != 0)
-            return BigInt(sign, Meta(sign.bit, magia), magia)
+            val signBit = sign.bit
+            val meta = Meta(signBit, magia)
+            return BigInt(meta, magia)
         }
 
         /**

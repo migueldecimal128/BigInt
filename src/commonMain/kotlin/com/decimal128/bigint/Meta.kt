@@ -73,6 +73,8 @@ value class Meta internal constructor(val meta: Int) {
             return Meta(signBit, normLen)
         }
 
+        operator fun invoke(x: IntArray): Meta = invoke(0, x)
+
     }
 
     /** Returns `true` if the sign bit is set (i.e., the value is negative). */

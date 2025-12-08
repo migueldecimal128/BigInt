@@ -90,6 +90,21 @@ class TestAdd32 {
     }
 
     @Test
+    fun testProblemChild3a() {
+        //val hi = BigInt.from("-1044467618609941889539867")
+        val hi = BigInt.from("10")
+        val bi = hi.toBigInteger()
+        //val n = -818208931
+        val n = -1
+        val biNeg1 = BigInt.from(n)
+        val sum0 = hi + biNeg1
+        val sum1 = hi + n
+        val sum2 = n + hi
+        assertEquals(sum0, sum1)
+        assertEquals(sum0, sum2)
+    }
+
+    @Test
     fun testProblem3() {
         val kbi = BigInt.from("35689796992407102546798857499")
         val jbi = kbi.toBigInteger()
