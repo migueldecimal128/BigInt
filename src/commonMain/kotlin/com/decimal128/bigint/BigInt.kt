@@ -464,7 +464,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         private fun from(src: Latin1Iterator): BigInt {
             val isNegative = src.peek() == '-'
             val magia = Magia.from(src)
-            return if (magia.isNotEmpty()) BigInt(Sign(isNegative), magia) else ZERO
+            return if (magia.isNotEmpty()) BigInt(isNegative, magia) else ZERO
         }
 
         /**
@@ -474,7 +474,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         private fun fromHex(src: Latin1Iterator): BigInt {
             val isNegative = src.peek() == '-'
             val magia = Magia.fromHex(src)
-            return if (magia.isNotEmpty()) BigInt(Sign(isNegative), magia) else ZERO
+            return if (magia.isNotEmpty()) BigInt(isNegative, magia) else ZERO
         }
 
         /**
@@ -811,7 +811,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                     length
                 )
                 if (magia !== Magia.ZERO)
-                    return BigInt(Sign(isNegative), magia)
+                    return BigInt(isNegative, magia)
             }
             return ZERO
         }
