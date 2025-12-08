@@ -1499,25 +1499,6 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
     }
 
     /**
-     * Perform an integer division, returning quotient and remainder.
-     *
-     * @return Pair<quotient: BigInt, remainder: BigInt>
-     */
-    fun divRem(other: BigInt): Pair<BigInt, BigInt> {
-        return when {
-            other.isZero() -> throw ArithmeticException("div by zero")
-            this.isNotZero() -> divModHelper(other.sign, other.magia)
-            else -> ZERO to other
-        }
-    }
-
-    /** @see divRem(BigInt) */
-    fun divRem(n: Int): Pair<BigInt, BigInt> = divModUIntHelper(n < 0, n.absoluteValue.toUInt())
-    fun divRem(w: UInt): Pair<BigInt, BigInt> = divModUIntHelper(false, w)
-    fun divRem(l: Long): Pair<BigInt, BigInt> = divModULongHelper(l < 0, l.absoluteValue.toULong())
-    fun divRem(dw: ULong): Pair<BigInt, BigInt> = divModULongHelper(false, dw)
-
-    /**
      * Divides the given [numerator] (primitive type) by this BigInt and returns the quotient.
      *
      * This is used for expressions like `5 / hugeInt`, where the primitive is the numerator
@@ -2442,66 +2423,6 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
             else -> ZERO
         }
         return ret
-    }
-
-    /**
-     * Performs division and modulo with another BigInt.
-     *
-     * @param otherSign sign of the divisor
-     * @param otherMagia magnitude of the divisor
-     * @return a Pair of BigInts: quotient first, remainder second
-     * @throws ArithmeticException if divisor is zero (handled at caller level)
-     */
-    private fun divModHelper(otherSign: Sign, otherMagia: IntArray): Pair<BigInt, BigInt> {
-        val (magiaQuot, magiaRem) = Magia.newDivMod(this.magia, otherMagia)
-        val hiQuot = if (magiaQuot.isNotEmpty()) BigInt(this.sign xor otherSign, magiaQuot) else ZERO
-        val hiRem = if (magiaRem.isNotEmpty()) BigInt(this.sign, magiaRem) else ZERO
-        return hiQuot to hiRem
-    }
-
-    /**
-     * Performs division and modulo with a 32-bit unsigned integer.
-     *
-     * @param wSign sign of the divisor
-     * @param wMag absolute value of the divisor
-     * @return a Pair of BigInts: quotient first, remainder second
-     * @throws ArithmeticException if divisor is zero
-     */
-    private fun divModUIntHelper(wSign: Boolean, wMag: UInt): Pair<BigInt, BigInt> {
-        return when {
-            wMag == 0u -> throw ArithmeticException("div by zero")
-            this.isNotZero() -> {
-                val quot = Magia.newNormalizedCopy(this.magia)
-                val remN = Magia.mutateDivMod(quot, wMag)
-                val hiQuot =
-                    if (Magia.normLen(quot) > 0) BigInt(this.sign xor wSign, quot) else ZERO
-                val hiRem = if (remN != 0u) BigInt(this.sign, intArrayOf(remN.toInt())) else ZERO
-                hiQuot to hiRem
-            }
-
-            else -> ZERO to BigInt(Sign(wSign), intArrayOf(wMag.toInt()))
-        }
-    }
-
-    /**
-     * Performs division and modulo with a 64-bit unsigned long integer.
-     *
-     * Delegates to [divModUIntHelper] if the high 32 bits are zero; otherwise
-     * constructs a temporary IntArray to perform the operation via [divModHelper].
-     *
-     * @param dwSign sign of the divisor
-     * @param dwMag absolute value of the divisor
-     * @return a Pair of BigInts: quotient first, remainder second
-     * @throws ArithmeticException if divisor is zero
-     */
-    private fun divModULongHelper(dwSign: Boolean, dwMag: ULong): Pair<BigInt, BigInt> {
-        val lo = dwMag.toUInt()
-        val bi = (dwMag shr 32).toUInt()
-        return when {
-            dwMag == 0uL -> throw ArithmeticException("div by zero")
-            bi == 0u -> divModUIntHelper(dwSign, lo)
-            else -> divModHelper(Sign(dwSign), intArrayOf(lo.toInt(), bi.toInt()))
-        }
     }
 
     /**

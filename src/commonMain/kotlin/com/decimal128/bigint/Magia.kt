@@ -126,14 +126,13 @@ object Magia {
      * @param x the array of 32-bit limbs representing the magnitude (not necessarily normalized).
      * @return the unsigned 64-bit value represented by the first one or two limbs of [x].
      */
-    fun toRawULong(x: IntArray): ULong {
-        return when (x.size) {
+    fun toRawULong(x: IntArray, xLen: Int = x.size): ULong {
+        return when (xLen) {
             0 -> 0uL
             1 -> dw32(x[0])
             else -> (dw32(x[1]) shl 32) or dw32(x[0])
         }
     }
-
 
     /**
      * Returns a new limb array representing the given [ULong] value.
@@ -554,7 +553,7 @@ object Magia {
         if (xLen >= 0 && xLen <= x.size) {
             val xNormLen = normLen(x, xLen)
             if (z.size >= xNormLen) {
-                if (xNormLen < 3 && toRawULong(x) < dw)
+                if (xNormLen <= 2 && toRawULong(x, xNormLen) < dw)
                     throw ArithmeticException(ERROR_SUB_UNDERFLOW)
                 var lastNonZeroIndex = -1
                 var borrow = dw
@@ -1699,52 +1698,7 @@ object Magia {
     fun compare(x: IntArray, xLen: Int, dw: ULong): Int {
         if (xLen >= 0 && xLen <= x.size) {
             val xNormLen = normLen(x, xLen)
-            return if (xNormLen > 2) 1 else toRawULong(x).compareTo(dw)
-        } else {
-            throw IllegalArgumentException()
-        }
-    }
-
-    /**
-     * Divides the arbitrary-precision integer [x] by the 32-bit unsigned integer [w] in-place.
-     *
-     * Updates [x] with the quotient and returns the remainder.
-     *
-     * @param x the integer array (least significant limb first) to be divided; mutated with the quotient.
-     * @param w the 32-bit unsigned divisor.
-     * @return the remainder after division.
-     * @throws ArithmeticException if [w] is zero.
-     */
-    fun mutateDivMod(x: IntArray, w: UInt): UInt =
-        mutateDivMod(x, x.size, w)
-
-    /**
-     * Divides the first [xLen] limbs of [x] by the 32-bit unsigned integer [w] in-place.
-     *
-     * Updates [x] with the quotient and returns the remainder.
-     * Only the lower [xLen] limbs are considered; higher limbs, if any, are ignored.
-     *
-     * @param x the integer array (least significant limb first) to be divided; mutated with the quotient.
-     * @param xLen the number of significant limbs in [x] to include in the division; must be within `0..x.size`.
-     * @param w the 32-bit unsigned divisor.
-     * @return the remainder after division.
-     * @throws ArithmeticException if [w] is zero.
-     * @throws IllegalArgumentException if [xLen] is out of range.
-     */
-    fun mutateDivMod(x: IntArray, xLen: Int, w: UInt): UInt {
-        if (xLen >= 0 && xLen <= x.size) {
-            if (w == 0u)
-                throw ArithmeticException("div by zero")
-            val dw = w.toULong()
-            var carry = 0uL
-            for (i in xLen - 1 downTo 0) {
-                val t = (carry shl 32) + dw32(x[i])
-                val q = t / dw
-                val r = t % dw
-                x[i] = q.toInt()
-                carry = r
-            }
-            return carry.toUInt()
+            return if (xNormLen > 2) 1 else toRawULong(x, xNormLen).compareTo(dw)
         } else {
             throw IllegalArgumentException()
         }
@@ -1857,7 +1811,11 @@ object Magia {
     fun newRem(x: IntArray, w: UInt): IntArray {
         val xNormLen = normLen(x)
         if (xNormLen > 0) {
-            val rem = calcRem(x, xNormLen, w)
+            val rem =
+                if (xNormLen <= 2)
+                    (toRawULong(x, xNormLen) % w.toULong()).toUInt()
+                else
+                    calcRem(x, xNormLen, w)
             if (rem > 0u)
                 return intArrayOf(rem.toInt())
         }
@@ -1867,53 +1825,34 @@ object Magia {
     fun newRem(x: IntArray, dw: ULong): IntArray {
         val lo = dw.toUInt()
         val hi = (dw shr 32).toUInt()
-        return if (hi == 0u) newRem(x, lo) else newRem(x, intArrayOf(lo.toInt(), hi.toInt()))
+        if (hi == 0u)
+            return newRem(x, lo)
+        val xNormLen = normLen(x)
+        if (xNormLen <= 2)
+            return newFromULong(toRawULong(x, xNormLen) % dw)
+        return newRem(x, intArrayOf(lo.toInt(), hi.toInt()))
     }
 
     fun newRem(x: IntArray, y: IntArray): IntArray {
-        val n = normLen(y)
-        if (n <= 1) {
-            if (n == 0)
-                throw ArithmeticException("div by zero")
-            return newRem(x, y[0].toUInt())
+        val xNormLen = normLen(x)
+        val yNormLen = normLen(y)
+        when {
+            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 1 -> return newRem(x, y[0].toUInt())
+            yNormLen == 2 && xNormLen <= 2 ->
+                return newFromULong(toRawULong(x, xNormLen) % toRawULong(y, yNormLen))
+            xNormLen < yNormLen -> return newCopyWithExactLimbLen(x, xNormLen)
         }
-        val m = normLen(x)
-        if (m == 0)
-            return ZERO
-        if (m < n)
-            return newNormalizedCopy(x)
+        val n = yNormLen
+        val m = xNormLen
         val u = x
         val v = y
         val q = null
-        val r = IntArray(y.size)
-        knuthDivide(q, r, u, v, m, n)
-        check (normLen(r) <= n)
-        return if (normLen(r) > 0) r else ZERO
-    }
-
-    fun newDivMod(x: IntArray, y: IntArray): Array<IntArray> {
-        val n = normLen(y)
-        if (n <= 1) {
-            if (n == 0)
-                throw ArithmeticException("div by zero")
-            var div = newNormalizedCopy(x)
-            val rem = mutateDivMod(div, y[0].toUInt())
-            if (normLen(div) == 0)
-                div = ZERO
-            return arrayOf(div, if (rem != 0u) intArrayOf(rem.toInt()) else ZERO)
-        }
-        val m = normLen(x)
-        if (m < n)
-            return arrayOf(ZERO, newNormalizedCopy(x))
-        val u = x
-        val v = y
-        val q = IntArray(m - n + 1)
-        val r = IntArray(n)
-        knuthDivide(q, r, u, v, m, n)
-        check (normLen(r) <= n)
-        return arrayOf(
-            if (normLen(q) > 0) q else ZERO, if (normLen(r) > 0) r else ZERO
-        )
+        val r = IntArray(yNormLen)
+        val rNormLen = knuthDivide(q, r, u, v, m, n)
+        check (rNormLen == normLen(r))
+        check (rNormLen <= n)
+        return if (rNormLen > 0) r else ZERO
     }
 
     /**
