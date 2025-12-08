@@ -1121,20 +1121,17 @@ object Magia {
     fun mutateShiftLeft(x: IntArray, xLen: Int, bitCount: Int): Int =
         setShiftLeft(x, x, xLen, bitCount)
 
+    /**
+     * @return normLen
+     */
     fun setShiftLeft(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
         require(xLen in 0..x.size && bitCount >= 0)
 
-        val xBitLen = bitLen(x, xLen)
-        if (xBitLen == 0) {
-            // x == 0 → result is 0 regardless of shift
-            // normalize as zero
-            // (you may want to special-case this according to your ZERO handling)
-            z.fill(0)
-            check(isNormalized(z, 0))
+        val xNormLen = normLen(x, xLen)
+        if (xNormLen == 0)
             return 0
-        }
 
-        val xNormLen = normalizedLenFromBitLen(xBitLen)
+        val xBitLen = bitLen(x, xNormLen)
 
         val wordShift = bitCount ushr 5
         val innerShift = bitCount and 31
@@ -3007,10 +3004,10 @@ object Magia {
      * @return a hash code consistent with numeric equality of magnitudes
      */
     fun normalizedHashCode(x: IntArray): Int {
-        val xLen = normLen(x)
+        val xNormLen = normLen(x)
         var h = 0
         var i = 0
-        while (i + 3 < xLen) {
+        while (i + 3 < xNormLen) {
             h = 31 * 31 * 31 * 31 * h +
                     31 * 31 * 31 * x[i] +
                     31 * 31 * x[i + 1] +
@@ -3018,7 +3015,7 @@ object Magia {
                     x[i + 3]
             i += 4
         }
-        while (i < xLen) {
+        while (i < xNormLen) {
             h = 31 * h + x[i]
             ++i
         }
@@ -3029,53 +3026,42 @@ object Magia {
         var u = newNormalizedCopy(x)
         var v = newNormalizedCopy(y)
 
-        var uLen = u.size
-        var vLen = v.size
-        if (uLen <= 0 || vLen <= 0)
+        var uNormLen = u.size
+        var vNormLen = v.size
+        if (uNormLen <= 0 || vNormLen <= 0)
             throw IllegalArgumentException()
 
-        val ntzU = ntz(u, uLen)
-        val ntzV = ntz(v, vLen)
+        val ntzU = ntz(u, uNormLen)
+        val ntzV = ntz(v, vNormLen)
         val initialShift = min(ntzU, ntzV)
-        if (ntzU > 0) {
-            mutateShiftRight(u, uLen, ntzU)
-            uLen = normLen(u, uLen)
-        }
-        if (ntzV > 0) {
-            mutateShiftRight(v, vLen, ntzV)
-            vLen = normLen(v, vLen)
-        }
+        if (ntzU > 0)
+            uNormLen = setShiftRight(u, u, uNormLen, ntzU)
+        if (ntzV > 0)
+            vNormLen = setShiftRight(v, v, vNormLen, ntzV)
 
         // Now both u and v are odd
-        while (vLen != 0) {
+        while (vNormLen != 0) {
             // Remove factors of 2 from v
-            val tz = ntz(v, vLen)
-            if (tz > 0) {
-                mutateShiftRight(v, vLen, tz)
-                vLen = normLen(v)
-            }
+            val tz = ntz(v, vNormLen)
+            if (tz > 0)
+                vNormLen = setShiftRight(v, v, vNormLen, tz)
             // Ensure u <= v
-            val cmp = compare(u, uLen, v, vLen)
+            val cmp = compare(u, uNormLen, v, vNormLen)
             if (cmp > 0) {
                 // swap pointers and lengths
                 val tmpA = u; u = v; v = tmpA
-                val tmpL = uLen; uLen = vLen; vLen = tmpL
+                val tmpL = uNormLen; uNormLen = vNormLen; vNormLen = tmpL
             }
             // v = v - u
             //mutateSub(v, vLen, u, uLen)
             //vLen = normLen(v, vLen)
-            vLen = setSub(v, v, vLen, u, uLen)
+            vNormLen = setSub(v, v, vNormLen, u, uNormLen)
         }
         // Final result = u * 2^shift
-        if (initialShift > 0) {
-            val shiftedBitLen = bitLen(u, uLen) + initialShift
-            val shiftedLimbLen = normalizedLenFromBitLen(shiftedBitLen)
-            for (i in uLen..<shiftedLimbLen)
-                u[i] = 0
-            uLen = shiftedLimbLen
-            mutateShiftLeft(u, uLen, initialShift)
-        }
-        return newCopyWithExactLimbLen(u, uLen)
+        if (initialShift > 0)
+            uNormLen = setShiftLeft(u, u, uNormLen, initialShift)
+
+        return newCopyWithExactLimbLen(u, uNormLen)
     }
 
 }
