@@ -4,10 +4,8 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Sign.Companion.POSITIVE
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
-import kotlin.math.max
 
 /**
  * A mutable arbitrary-precision integer accumulator for efficient series operations.
@@ -142,10 +140,10 @@ class BigIntAccumulator private constructor (
      * The accumulator adopts the sign and magnitude of the given [BigInt].
      * Internal storage is reused where possible.
      *
-     * @param hi the source [BigInt].
+     * @param bi the source [BigInt].
      * @return this accumulator instance, for call chaining.
      */
-    fun set(hi: BigInt): BigIntAccumulator = set(Meta(hi.sign.isNegative, hi.magia), hi.magia)
+    fun set(bi: BigInt): BigIntAccumulator = set(Meta(bi.meta.isNegative, bi.magia), bi.magia)
 
     /**
      * Sets this accumulator’s value from another [BigIntAccumulator].
@@ -330,11 +328,11 @@ class BigIntAccumulator private constructor (
     /**
      * Adds the given BigInt value to this accumulator.
      *
-     * @param hi the value to add.
+     * @param bi the value to add.
      * @see plusAssign(Long)
      */
-    operator fun plusAssign(hi: BigInt) =
-        mutateAddImpl(Meta(hi.sign.isNegative, hi.magia), hi.magia)
+    operator fun plusAssign(bi: BigInt) =
+        mutateAddImpl(Meta(bi.meta.isNegative, bi.magia), bi.magia)
 
     /**
      * Adds the given BigIntAccumulator value to this accumulator.
@@ -389,11 +387,11 @@ class BigIntAccumulator private constructor (
     /**
      * Subtracts the given BigInt value from this accumulator.
      *
-     * @param hi the value to subtract.
+     * @param bi the value to subtract.
      * @see minusAssign(Long)
      */
-    operator fun minusAssign(hi: BigInt) =
-        mutateAddImpl(Meta(hi.sign.isPositive, hi.magia), hi.magia)
+    operator fun minusAssign(bi: BigInt) =
+        mutateAddImpl(Meta(bi.meta.isPositive, bi.magia), bi.magia)
 
     /**
      * Subtracts the given BigIntAccumulator value from this accumulator.
@@ -470,11 +468,11 @@ class BigIntAccumulator private constructor (
     /**
      * Multiplies this accumulator by the given BigInt value.
      *
-     * @param hi the value to multiply by.
+     * @param bi the value to multiply by.
      * @see timesAssign(Long)
      */
-    operator fun timesAssign(hi: BigInt) =
-        mutateMulImpl(Meta(hi.sign.isNegative, hi.magia), hi.magia)
+    operator fun timesAssign(bi: BigInt) =
+        mutateMulImpl(Meta(bi.meta.isNegative, bi.magia), bi.magia)
 
     /**
      * Multiplies this accumulator by the given BigIntAccumulator value.
