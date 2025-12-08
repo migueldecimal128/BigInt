@@ -1188,10 +1188,11 @@ object Magia {
      * @param xLen the number of valid limbs to examine.
      * @return true if the value is a power of two; false otherwise.
      */
-    fun isPowerOfTwo(x: IntArray, xLen: Int): Boolean {
-        if (xLen >= 0 && xLen <= x.size) {
+    fun isPowerOfTwo(x: IntArray, xNormLen: Int): Boolean {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size) {
             var bitSeen = false
-            for (i in 0..<xLen) {
+            for (i in 0..<xNormLen) {
                 val w = x[i]
                 if (w != 0) {
                     if (bitSeen || (w and (w - 1)) != 0)
@@ -1266,7 +1267,8 @@ object Magia {
      * @param x the array of 32-bit limbs representing the magnitude.
      * @return the bit length following BigInteger’s definition.
      */
-    fun bitLengthBigIntegerStyle(sign: Boolean, x: IntArray): Int = bitLengthBigIntegerStyle(sign, x, x.size)
+    fun bitLengthBigIntegerStyle(sign: Boolean, x: IntArray): Int =
+        bitLengthBigIntegerStyle(sign, x, normLen(x))
 
     /**
      * Returns the bit length using Java's BigInteger-style semantics.
@@ -1284,10 +1286,11 @@ object Magia {
      * @param xLen the number of significant limbs to consider; must be normalized.
      * @return the bit length following BigInteger’s definition.
      */
-    fun bitLengthBigIntegerStyle(sign: Boolean, x: IntArray, xLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size) {
-            val bitLen = bitLen(x, xLen)
-            val isNegPowerOfTwo = sign && isPowerOfTwo(x, xLen)
+    fun bitLengthBigIntegerStyle(sign: Boolean, x: IntArray, xNormLen: Int): Int {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            val bitLen = bitLen(x, xNormLen)
+            val isNegPowerOfTwo = sign && isPowerOfTwo(x, xNormLen)
             val bitLengthBigIntegerStyle = bitLen - if (isNegPowerOfTwo) 1 else 0
             return bitLengthBigIntegerStyle
         } else {

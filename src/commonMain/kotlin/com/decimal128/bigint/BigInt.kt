@@ -1093,7 +1093,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * Returns `true` if the magnitude of this BigInt is a power of two
      * (exactly one bit set).
      */
-    fun isMagnitudePowerOfTwo(): Boolean = Magia.isPowerOfTwo(this.magia, this.magia.size)
+    fun isMagnitudePowerOfTwo(): Boolean = Magia.isPowerOfTwo(this.magia, this.meta.normLen)
 
     /**
      * Returns `true` if this value is exactly representable as a 32-bit
