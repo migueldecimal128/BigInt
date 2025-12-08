@@ -829,7 +829,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
          */
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray, len: Int): BigInt {
             val magia = Magia.newNormalizedCopy(littleEndianIntArray, len)
-            return if (magia.isNotEmpty()) BigInt(sign, magia) else ZERO
+            return BigInt(sign, magia)
         }
 
         /**
@@ -844,6 +844,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 throw IllegalArgumentException("negative bitIndex:$bitIndex")
             if (bitIndex == 0)
                 return ONE
+            // FIXME - pick one of these
             val magia = Magia.newWithBitLen(bitIndex + 1)
             magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
             val magia2 = Magia.newWithSetBit(bitIndex)
@@ -983,12 +984,10 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             val twentyBang = 2_432_902_008_176_640_000
             f[0] = twentyBang.toInt()
             f[1] = (twentyBang ushr 32).toInt()
-            var fLen = 2
-            for (i in 21u..w) {
-                Magia.setMul(f, f, fLen, i)
-                fLen += if (fLen < f.size && f[fLen] != 0) 1 else 0
-            }
-            return BigInt(f)
+            var fNormLen = 2
+            for (i in 21u..w)
+                fNormLen = Magia.setMul(f, f, fNormLen, i)
+            return BigInt(Meta(fNormLen), f)
         }
 
         private fun estimateFactorialLimbLen(w: UInt): Int {
@@ -1036,7 +1035,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 return b.abs()
             if (b.isZero())
                 return a.abs()
-            val magia = Magia.gcd(a.magia, b.magia)
+            val magia = Magia.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
             check(magia !== Magia.ZERO)
             return BigInt(magia)
         }
@@ -1053,7 +1052,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         fun lcm(a: BigInt, b: BigInt): BigInt {
             if (a.isZero() || b.isZero())
                 return ZERO
-            val gcd = Magia.gcd(a.magia, b.magia)
+            val gcd = Magia.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
             val lcm = if (Magia.bitLen(a.magia) < Magia.bitLen(b.magia))
                 Magia.newMul(Magia.newDiv(a.magia, gcd), b.magia)
             else

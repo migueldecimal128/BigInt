@@ -3083,9 +3083,9 @@ object Magia {
         return h
     }
 
-    fun gcd(x: IntArray, y: IntArray): IntArray {
-        var u = newNormalizedCopy(x)
-        var v = newNormalizedCopy(y)
+    fun gcd(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
+        var u = newCopyWithExactLimbLen(x, xNormLen)
+        var v = newCopyWithExactLimbLen(y, yNormLen)
 
         var uNormLen = u.size
         var vNormLen = v.size
