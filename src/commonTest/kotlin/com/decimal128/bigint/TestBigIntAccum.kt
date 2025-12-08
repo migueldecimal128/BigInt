@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class TestBigIntAccum {
 
-    val verbose = true
+    val verbose = false
 
     @Test
     fun testBigIntAccum() {
@@ -27,14 +27,20 @@ class TestBigIntAccum {
         return false
     }
 
+    @Test
     fun testAddSub() {
         val hia = BigIntAccumulator()
         var hi = BigInt.ZERO
 
         repeat(rng.nextInt(1000)) {
             val n = randomInt()
-            hia += n
+            if (verbose)
+                println("before: hi:$hi hia:$hia n:$n")
             hi += n
+            hia += n
+            hia.toStringX()
+            if (verbose)
+                println(" after: hi:$hi hia:$hia n:$n")
             assertTrue(hi EQ hia.toBigInt())
         }
         assertTrue(hi EQ hia.toBigInt())
@@ -123,16 +129,22 @@ class TestBigIntAccum {
         assertTrue(testEQ(hi, hia))
     }
 
+    @Test
     fun testMul() {
         val hia = BigIntAccumulator().set(1)
         var hi = BigInt.ONE
 
-        for (i in 0..<rng.nextInt(10)) {
+        for (i in 0..<200) {
             val rand = randomInt()
+            if (verbose)
+                println("$i before: hia:$hia hi:$hi rand:$rand")
             if (rand == 0)
                 continue
-            hia *= rand
             hi *= rand
+            hia *= rand
+            if (verbose)
+                println("$i after: hia:$hia hi:$hi rand:$rand")
+            assertTrue(hi EQ hia.toBigInt())
         }
         assertTrue(hi EQ hia.toBigInt())
 
@@ -154,21 +166,27 @@ class TestBigIntAccum {
         }
         assertTrue(hi EQ hia.toBigInt())
 
-        for (i in 0..<rng.nextInt(10)) {
+        for (i in 0..<rng.nextInt(1000)) {
             val rand = randomULong()
             if (rand == 0uL)
                 continue
-            hia *= rand
             hi *= rand
+            hia *= rand
+            assertTrue(hi EQ hia.toBigInt())
         }
         assertTrue(hi EQ hia.toBigInt())
 
-        for (i in 0..<rng.nextInt(10)) {
-            val rand = randomBigInt(200)
-            if (rand.isZero())
+        for (i in 0..<10) {
+            val rand = randomBigInt(400)
+            if (verbose)
+                println("before: hia:$hia hi:$hi rand:$rand")
+            if (rand < 2)
                 continue
-            hia *= rand
             hi *= rand
+            hia *= rand
+            if (verbose)
+                println(" after: hia:$hia hi:$hi rand:$rand")
+            assertTrue(hi EQ hia.toBigInt())
         }
         assertTrue(hi EQ hia.toBigInt())
 
@@ -179,38 +197,75 @@ class TestBigIntAccum {
         assertTrue(hi EQ hia.toBigInt())
     }
 
+    @Test
+    fun testProblem() {
+        val bia1 = BigIntAccumulator().set(3)
+        val bia2 = BigIntAccumulator().set(2)
+        bia1 *= bia2
+        if (verbose)
+            println("bia1:$bia1")
+        bia1 *= bia2
+        if (verbose)
+            println("bia1:$bia1")
+        assertTrue(testEQ(12.toBigInt(), bia1))
+    }
+
+    @Test
     fun testAddAbsValue() {
         val hia = BigIntAccumulator()
         var hi = BigInt.ZERO
 
-        for (i in 0..<rng.nextInt(10)) {
+        for (i in 0..<10) {
             val rand = randomInt()
+            if (verbose)
+                println("before: hia:$hia hi:$hi rand:$rand")
             hia.addAbsValueOf(rand)
             hi += rand.absoluteValue
+            if (verbose)
+                println(" after: hia:$hia hi:$hi rand:$rand")
+            assertTrue(hi EQ hia.toBigInt())
         }
         assertTrue(hi EQ hia.toBigInt())
 
         for (i in 0..<rng.nextInt(10)) {
             val rand = randomLong()
+            if (verbose)
+                println("before: hia:$hia hi:$hi rand:$rand")
             hia.addAbsValueOf(rand)
             hi += rand.absoluteValue
+            if (verbose)
+                println(" after: hia:$hia hi:$hi rand:$rand")
+            assertTrue(hi EQ hia.toBigInt())
         }
         assertTrue(hi EQ hia.toBigInt())
 
         for (i in 0..<rng.nextInt(10)) {
             val rand = randomBigInt(200)
-            hia.addAbsValueOf(rand)
+            if (verbose)
+                println("before: hia:$hia hi:$hi rand:$rand")
             hi += rand.abs()
+            hia.addAbsValueOf(rand)
+            if (verbose)
+                println(" after: hia:$hia hi:$hi rand:$rand")
+            assertTrue(hi EQ hia.toBigInt())
         }
         assertTrue(hi EQ hia.toBigInt())
+
+        hia.set(3)
+        hi = 3.toBigInt()
 
         for (i in 0..<3) {
-            hia.addAbsValueOf(hia)
+            if (verbose)
+                println("before: hia:$hia hi:$hi")
             hi += hi.absoluteValue
+            hia.addAbsValueOf(hia)
+            if (verbose)
+                println(" after: hia:$hia hi:$hi")
+            assertTrue(hi EQ hia.toBigInt())
         }
-        assertTrue(hi EQ hia.toBigInt())
     }
 
+    @Test
     fun testAddSquareOf() {
         val hia = BigIntAccumulator()
         var hi = BigInt.ZERO

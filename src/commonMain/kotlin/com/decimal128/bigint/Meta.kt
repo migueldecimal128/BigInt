@@ -29,7 +29,7 @@ import kotlin.jvm.JvmInline
  *
  */
 @JvmInline
-value class Meta private constructor(val meta: Int) {
+value class Meta internal constructor(val meta: Int) {
     companion object {
 
         /**
@@ -41,7 +41,7 @@ value class Meta private constructor(val meta: Int) {
         operator fun invoke(signBit: Int, normLen: Int): Meta {
             check ((signBit shr 1) == 0)
             check (normLen >= 0)
-            return Meta((signBit shl 31) or normLen)
+            return Meta(((signBit shl 31) or normLen) and (-normLen shr 31))
         }
 
         /**
@@ -63,6 +63,14 @@ value class Meta private constructor(val meta: Int) {
             while (normLen > 0 && x[normLen-1] == 0)
                 --normLen
             return Meta(signFlag, normLen)
+        }
+
+        operator fun invoke(signBit: Int, x: IntArray): Meta {
+            check ((signBit ushr 1) == 0)
+            var normLen = x.size
+            while (normLen > 0 && x[normLen-1] == 0)
+                --normLen
+            return Meta(signBit, normLen)
         }
 
     }
@@ -102,6 +110,11 @@ value class Meta private constructor(val meta: Int) {
     fun negate() = Meta(meta xor Int.MIN_VALUE)
 
     /**
+     * Returns a meta with non-negative sign and the same normLen magnitude.
+     */
+    fun abs() = Meta(meta and Int.MAX_VALUE)
+
+    /**
      * Negates the parameter x if this `Meta` is negative.
      * Used in comparison operations.
      */
@@ -116,6 +129,6 @@ value class Meta private constructor(val meta: Int) {
         get() = signMask or 1
 
     val normLen: Int
-        get() = meta and Int.MIN_VALUE
+        get() = meta and Int.MAX_VALUE
 
 }

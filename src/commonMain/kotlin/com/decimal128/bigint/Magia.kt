@@ -164,7 +164,7 @@ object Magia {
      *
      * @throws IllegalArgumentException if [xLen] is out of range for [x].
      */
-    inline fun normLen(x: IntArray, xLen: Int): Int {
+    fun normLen(x: IntArray, xLen: Int): Int {
         if (xLen >= 0 && xLen <= x.size) {
             for (i in xLen - 1 downTo 0)
                 if (x[i] != 0)
@@ -872,7 +872,6 @@ object Magia {
      * Requirements:
      * - [z] must be of sufficient size to hold the product
      *   `bitLen(x) + bitLen(y)`, at least [xLen] + [yLen] - 1.
-     * - The first [yLen] entries of [z] must be zeroed by the caller.
      * - [xLen] and [yLen] must be greater than zero and within the array bounds.
      * - For efficiency, if one array is longer, it is preferable to use it as [y].
      *
@@ -888,6 +887,7 @@ object Magia {
             val cortoLen = if (xNormLen < yNormLen) xNormLen else yNormLen
             val largoLen = if (xNormLen < yNormLen) yNormLen else xNormLen
 
+            z.fill(0, 0, largoLen) // zero out the product
             for (i in 0..<cortoLen) {
                 val cortoLimb = dw32(corto[i])
                 var carry = 0uL
