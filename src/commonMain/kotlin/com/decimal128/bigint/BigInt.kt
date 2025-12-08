@@ -2039,8 +2039,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * @return -1,0,1
      */
     fun magnitudeCompareTo(other: BigInt) = Magia.compare(this.magia, other.magia)
-    fun magnitudeCompareTo(un: UInt) = Magia.compare(this.magia, un.toULong())
-    fun magnitudeCompareTo(ul: ULong) = Magia.compare(this.magia, ul)
+    fun magnitudeCompareTo(un: UInt) = Magia.compare(this.magia, this.meta.normLen, un.toULong())
+    fun magnitudeCompareTo(ul: ULong) = Magia.compare(this.magia, this.meta.normLen, ul)
     fun magnitudeCompareTo(littleEndianIntArray: IntArray) =
         Magia.compare(this.magia, littleEndianIntArray)
 
@@ -2458,7 +2458,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
     fun compareToHelper(ulSign: Boolean, ulMag: ULong): Int {
         if (this.meta.isNegative != ulSign)
             return this.meta.signMask or 1
-        val cmp = Magia.compare(this.magia, ulMag)
+        val cmp = Magia.compare(this.magia, this.meta.normLen, ulMag)
         return if (!ulSign) cmp else -cmp
     }
 

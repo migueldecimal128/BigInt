@@ -1714,11 +1714,9 @@ object Magia {
         }
     }
 
-    fun compare(x: IntArray, dw: ULong): Int = compare(x, x.size, dw)
-
-    fun compare(x: IntArray, xLen: Int, dw: ULong): Int {
-        if (xLen >= 0 && xLen <= x.size) {
-            val xNormLen = normLen(x, xLen)
+    fun compare(x: IntArray, xNormLen: Int, dw: ULong): Int {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size) {
             return if (xNormLen > 2) 1 else toRawULong(x, xNormLen).compareTo(dw)
         } else {
             throw IllegalArgumentException()
