@@ -228,16 +228,23 @@ class BigIntAccumulator private constructor (
     fun toBigInt(): BigInt =
         BigInt.fromLittleEndianIntArray(signFlag, magia, normLen)
 
+
     /*
 
     fun setAdd(x: BigInt, y: BigInt) =
-        setAddImpl(x.sign, x.magia, y.sign, y.magia)
+        setAddImpl(Meta(x.sign.bit, x.magia), x.magia, Meta(y.sign.bit, y.magia), y.magia)
     fun setAdd(x: BigInt, y: BigIntAccumulator) =
-        setAddImpl(x.sign, x.magia, y.sign, y.magia)
+        setAddImpl(Meta(x.sign.bit, x.magia), x.magia, y.meta, y.magia)
     fun setAdd(x: BigIntAccumulator, y: BigInt) =
-        setAddImpl(x.sign, x.magia, y.sign, y.magia)
+        setAddImpl(x.meta, x.magia, Meta(y.sign.bit, y.magia), y.magia)
     fun setAdd(x: BigIntAccumulator, y: BigIntAccumulator) =
-        setAddImpl(x.sign, x.magia, y.sign, y.magia)
+        setAddImpl(x.meta, x.magia, y.meta, y.magia)
+
+    private fun setAddImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+
+    }
+
+
 
     fun setSub(x: BigInt, y: BigInt) =
         setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)

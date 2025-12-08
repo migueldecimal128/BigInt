@@ -61,7 +61,7 @@ import kotlin.text.HexFormat
  * accumulator designed for repeated summation and similar in-place operations,
  * significantly reducing heap churn in accumulation-heavy workloads.
  */
-class BigInt private constructor(internal val sign: Sign, internal val magia: IntArray) : Comparable<BigInt> {
+class BigInt private constructor(internal val sign: Sign, internal val meta: Meta, internal val magia: IntArray) : Comparable<BigInt> {
 
     companion object {
         /**
@@ -71,13 +71,20 @@ class BigInt private constructor(internal val sign: Sign, internal val magia: In
          * This ensures that identity comparisons and optimizations relying on
          * reference equality (`===`) for zero values are valid.
          */
-        val ZERO = BigInt(POSITIVE, Magia.ZERO)
+        val ZERO = BigInt(POSITIVE, Meta(0), Magia.ZERO)
 
-        val ONE = BigInt(POSITIVE, Magia.ONE)
+        val ONE = BigInt(POSITIVE, Meta(1), Magia.ONE)
 
-        val NEG_ONE = BigInt(NEGATIVE, Magia.ONE) // share magia .. but no mutation allowed
+        val NEG_ONE = BigInt(NEGATIVE, Meta(1, 1), Magia.ONE) // share magia .. but no mutation allowed
 
-        val TEN = BigInt(POSITIVE, intArrayOf(10))
+        val TEN = BigInt(POSITIVE, Meta(4), intArrayOf(10))
+
+        internal operator fun invoke(sign: Sign, magia: IntArray): BigInt {
+            if (magia === Magia.ZERO)
+                return ZERO
+            check (magia.size != 0)
+            return BigInt(sign, Meta(sign.bit, magia), magia)
+        }
 
         /**
          * Converts a 32-bit signed [Int] into a signed [BigInt].
