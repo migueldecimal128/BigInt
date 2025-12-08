@@ -4,8 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Sign.Companion.NEGATIVE
-import com.decimal128.bigint.Sign.Companion.POSITIVE
 import kotlin.math.absoluteValue
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -117,7 +115,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
          */
         fun from(n: Int): BigInt = when {
             n > 0 -> BigInt(intArrayOf(n))
-            n < 0 -> BigInt(NEGATIVE, intArrayOf(-n))
+            n < 0 -> BigInt(sign=true, intArrayOf(-n))
             else -> ZERO
         }
 
@@ -1571,12 +1569,12 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         if (this.isZero())
             throw ArithmeticException("div by zero")
         if (this.magnitudeCompareTo(numerator) > 0)
-            return BigInt(Sign(signNumerator), Magia.newFromULong(numerator))
+            return BigInt(signNumerator, Magia.newFromULong(numerator))
         val remainder = numerator % this.toULongMagnitude()
         if (remainder == 0uL)
             return ZERO
         else
-            return BigInt(Sign(signNumerator), Magia.newFromULong(remainder))
+            return BigInt(signNumerator, Magia.newFromULong(remainder))
     }
 
     /**
@@ -1614,7 +1612,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             n == 1 -> this
             this.isZero() -> ZERO
             Magia.EQ(this.magia, 1) -> if (resultSign) NEG_ONE else ONE
-            Magia.EQ(this.magia, 2) -> BigInt(Sign(resultSign), Magia.newWithSetBit(n))
+            Magia.EQ(this.magia, 2) -> BigInt(resultSign, Magia.newWithSetBit(n))
             n == 2 -> sqr()
             else -> {
                 val maxBitLen = Magia.bitLen(this.magia) * n
@@ -1644,7 +1642,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                     tmpMag = baseMag
                     baseMag = t
                 }
-                BigInt(Sign(resultSign), resultMag)
+                BigInt(resultSign, resultMag)
             }
         }
     }
@@ -2358,7 +2356,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         val cmp = this.magnitudeCompareTo(other)
         val ret = when {
             cmp > 0 -> BigInt(sign, Magia.newSub(this.magia, other.magia))
-            cmp < 0 -> BigInt(Sign(otherSign), Magia.newSub(other.magia, this.magia))
+            cmp < 0 -> BigInt(otherSign, Magia.newSub(other.magia, this.magia))
             else -> ZERO
         }
         return ret
@@ -2391,7 +2389,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             return if (signFlipThis) this.negate() else this
         if (isZero()) {
             val magia = intArrayOf(w.toInt())
-            return BigInt(Sign(otherSign), magia)
+            return BigInt(otherSign, magia)
         }
         val thisSign = this.sign xor signFlipThis
         if (thisSign.isNegative == otherSign)
@@ -2399,7 +2397,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         val cmp = this.magnitudeCompareTo(w)
         val ret = when {
             cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, w.toULong()))
-            cmp < 0 -> BigInt(Sign(otherSign), intArrayOf(w.toInt() - this.magia[0]))
+            cmp < 0 -> BigInt(otherSign, intArrayOf(w.toInt() - this.magia[0]))
             else -> ZERO
         }
         return ret
@@ -2432,7 +2430,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             return addSubImpl(signFlipThis, otherSign, dw.toUInt())
         if (isZero()) {
             val magia = intArrayOf(dw.toInt(), (dw shr 32).toInt())
-            return BigInt(Sign(otherSign), magia)
+            return BigInt(otherSign, magia)
         }
         val thisSign = this.sign xor signFlipThis
         if (thisSign.isNegative == otherSign)
@@ -2443,7 +2441,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             cmp < 0 -> {
                 val thisMag = this.toULongMagnitude()
                 val diff = dw - thisMag
-                BigInt(Sign(otherSign), Magia.newFromULong(diff))
+                BigInt(otherSign, Magia.newFromULong(diff))
             }
 
             else -> ZERO
