@@ -2168,7 +2168,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      *
      * @return a decimal string representing the value of this BigInt
      */
-    override fun toString() = Magia.toString(meta.isNegative, magia)
+    override fun toString() = Magia.toString(meta.isNegative, magia, meta.normLen)
 
     /**
      * Returns the hexadecimal string representation of this BigInt.
@@ -2206,7 +2206,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             utf8[ich] = b
             ++ich
         }
-        Magia.toHexUtf8(magia, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
+        Magia.toHexUtf8(magia, meta.normLen, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
         ich += nybbleCount
         for (b in suffixUtf8) {
             utf8[ich] = b
@@ -2289,7 +2289,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      *
      * @return a new IntArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianIntArray(): IntArray = Magia.newNormalizedCopy(magia)
+    fun magnitudeToLittleEndianIntArray(): IntArray = Magia.newNormalizedCopy(magia, meta.normLen)
 
     /**
      * Returns a copy of the magnitude as a little-endian LongArray.
@@ -2301,7 +2301,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * @return a new LongArray containing the magnitude in little-endian order
      */
     fun magnitudeToLittleEndianLongArray(): LongArray {
-        val intLen = Magia.normLen(magia)
+        val intLen = meta.normLen
         val longLen = (intLen + 1) ushr 1
         val z = LongArray(longLen)
         var iw = 0
@@ -2332,7 +2332,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
     fun isNormalized() = magia.isEmpty() || magia[magia.lastIndex] != 0
 
     fun normalize(): BigInt =
-        if (isNormalized()) this else BigInt(meta.signFlag, Magia.newNormalizedCopy(magia))
+        if (isNormalized()) this else BigInt(meta.signFlag, Magia.newNormalizedCopy(magia, meta.normLen))
 
     /**
      * Internal helper for addition or subtraction between two BigInts.
@@ -2348,11 +2348,14 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             return if (isSub) other.negate() else other
         val otherSign = isSub xor other.meta.isNegative
         if (this.meta.isNegative == otherSign)
-            return BigInt(this.meta.signFlag, Magia.newAdd(this.magia, other.magia))
+            return BigInt(this.meta.signFlag,
+                Magia.newAdd(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
         val cmp = this.magnitudeCompareTo(other)
         val ret = when {
-            cmp > 0 -> BigInt(meta.signFlag, Magia.newSub(this.magia, other.magia))
-            cmp < 0 -> BigInt(otherSign, Magia.newSub(other.magia, this.magia))
+            cmp > 0 -> BigInt(this.meta.signFlag,
+                Magia.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+            cmp < 0 -> BigInt(otherSign,
+                Magia.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
             else -> ZERO
         }
         return ret
@@ -2389,7 +2392,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         }
         val thisSign = this.meta.signFlag xor signFlipThis
         if (thisSign == otherSign)
-            return BigInt(thisSign, Magia.newAdd(this.magia, w.toULong()))
+            return BigInt(thisSign, Magia.newAdd(this.magia, this.meta.normLen, w.toULong()))
         val cmp = this.magnitudeCompareTo(w)
         val ret = when {
             cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, w.toULong()))
@@ -2430,7 +2433,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         }
         val thisSign = this.meta.signFlag xor signFlipThis
         if (thisSign == otherSign)
-            return BigInt(thisSign, Magia.newAdd(this.magia, dw))
+            return BigInt(thisSign, Magia.newAdd(this.magia, this.meta.normLen, dw))
         val cmp = this.magnitudeCompareTo(dw)
         val ret = when {
             cmp > 0 -> BigInt(thisSign, Magia.newSub(this.magia, dw))

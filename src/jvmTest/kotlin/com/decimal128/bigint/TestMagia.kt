@@ -112,7 +112,7 @@ class TestMagia {
     fun testAdd(jjbiA: BigInteger, jjbiB: BigInteger) {
         val magiaA = MagiaTransducer.magiaFromBi(jjbiA)
         val magiaB = MagiaTransducer.magiaFromBi(jjbiB)
-        val magiaSum = Magia.newAdd(magiaA, magiaB)
+        val magiaSum = Magia.newAdd(magiaA, Magia.normLen(magiaA), magiaB, Magia.normLen(magiaB))
 
         val jbiSum = jjbiA.add(jjbiB)
 
@@ -128,7 +128,7 @@ class TestMagia {
         }
         val magiaX = MagiaTransducer.magiaFromBi(jbiX)
         val magiaY = MagiaTransducer.magiaFromBi(jbiY)
-        val magiaDiff = Magia.newSub(magiaX, magiaY)
+        val magiaDiff = Magia.newSub(magiaX, Magia.normLen(magiaX), magiaY, Magia.normLen(magiaY))
 
         val jbiDiff = jbiX.subtract(jbiY)
 

@@ -347,20 +347,20 @@ object Magia {
      *
      * The result is extended as needed to hold any carry or sign extension from the addition.
      */
-    fun newAdd(x: IntArray, dw: ULong): IntArray {
-        val newBitLen = max(bitLen(x), (64 - dw.countLeadingZeroBits())) + 1
+    fun newAdd(x: IntArray, xNormLen: Int, dw: ULong): IntArray {
+        check (isNormalized(x, xNormLen))
+        val newBitLen = max(bitLen(x, xNormLen), (64 - dw.countLeadingZeroBits())) + 1
         val z = newWithBitLen(newBitLen)
         var carry = dw
-        val indexLimit = min(x.size, z.size)
-        for (i in 0..<indexLimit) {
+        for (i in 0..<xNormLen) {
             val t = dw32(x[i]) + (carry and 0xFFFF_FFFFuL)
             z[i] = t.toInt()
             carry = (t shr 32) + (carry shr 32)
         }
         if (carry != 0uL)
-            z[indexLimit] = carry.toInt()
+            z[xNormLen] = carry.toInt()
         if (carry shr 32 != 0uL)
-            z[indexLimit + 1] = (carry shr 32).toInt()
+            z[xNormLen + 1] = (carry shr 32).toInt()
         return z
     }
 
@@ -369,9 +369,9 @@ object Magia {
      *
      * The result will sometimes be not normalized.
      */
-    fun newAdd(x: IntArray, y: IntArray): IntArray {
-        val xNormLen = normLen(x)
-        val yNormLen = normLen(y)
+    fun newAdd(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
         val newBitLen = max(bitLen(x, xNormLen), bitLen(y, yNormLen)) + 1
         val z = newWithBitLen(newBitLen)
         setAdd(z, x, xNormLen, y, yNormLen)
@@ -477,10 +477,10 @@ object Magia {
      * @return the normalized limb count of the sum
      * @throws ArithmeticException if the result does not fit in [z]
      */
-    fun setAdd(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            val xNormLen = normLen(x, xLen)
-            val yNormLen = normLen(y, yLen)
+    fun setAdd(z: IntArray, x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
             val maxNormLen = max(xNormLen, yNormLen)
             val minNormLen = min(xNormLen, yNormLen)
             if (z.size >= maxNormLen) {
@@ -599,9 +599,9 @@ object Magia {
      * Requires that [x] is greater than or equal to [y].
      * If the result is zero, returns [ZERO].
      */
-    fun newSub(x: IntArray, y: IntArray): IntArray {
-        val xNormLen = normLen(x)
-        val yNormLen = normLen(y)
+    fun newSub(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
         val z = IntArray(xNormLen)
         val zNormLen = setSub(z, x, xNormLen, y, yNormLen)
         check (isNormalized(z, zNormLen))
@@ -2486,9 +2486,10 @@ object Magia {
     }
 
     fun toHexUtf8(x: IntArray, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) =
-        toHexUtf8(x, x.size, utf8, off, digitCount, useUpperCase)
+        toHexUtf8(x, normLen(x), utf8, off, digitCount, useUpperCase)
 
-    fun toHexUtf8(x: IntArray, xLen: Int, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
+    fun toHexUtf8(x: IntArray, xNormLen: Int, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
+        check (isNormalized(x, xNormLen))
         val alfaBase = if (useUpperCase) 'A' else 'a'
         var ichMax = off + digitCount
         var limbIndex = 0
@@ -2496,7 +2497,7 @@ object Magia {
         var w = 0
         while (ichMax > off) {
             if (nybblesRemaining == 0) {
-                if (limbIndex == xLen) {
+                if (limbIndex == xNormLen) {
                     // if there are no limbs left then take as
                     // many zero nybbles as you want
                     nybblesRemaining = Int.MAX_VALUE
