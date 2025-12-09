@@ -4,6 +4,8 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
 
@@ -227,60 +229,114 @@ class BigIntAccumulator private constructor (
         BigInt.fromLittleEndianIntArray(signFlag, magia, normLen)
 
 
-    /*
-
     fun setAdd(x: BigInt, y: BigInt) =
-        setAddImpl(Meta(x.sign.bit, x.magia), x.magia, Meta(y.sign.bit, y.magia), y.magia)
+        setAddImpl(x.meta, x.magia, y.meta, y.magia)
     fun setAdd(x: BigInt, y: BigIntAccumulator) =
-        setAddImpl(Meta(x.sign.bit, x.magia), x.magia, y.meta, y.magia)
+        setAddImpl(x.meta, x.magia, y.meta, y.magia)
     fun setAdd(x: BigIntAccumulator, y: BigInt) =
-        setAddImpl(x.meta, x.magia, Meta(y.sign.bit, y.magia), y.magia)
+        setAddImpl(x.meta, x.magia, y.meta, y.magia)
     fun setAdd(x: BigIntAccumulator, y: BigIntAccumulator) =
         setAddImpl(x.meta, x.magia, y.meta, y.magia)
 
-    private fun setAddImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+    fun setSub(x: BigInt, y: BigInt) =
+        setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
+    fun setSub(x: BigInt, y: BigIntAccumulator) =
+        setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
+    fun setSub(x: BigIntAccumulator, y: BigInt) =
+        setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
+    fun setSub(x: BigIntAccumulator, y: BigIntAccumulator) =
+        setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
 
+    private fun setAddImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+        when {
+            yMeta.isZero -> set(xMeta, x)
+            xMeta.isZero -> set(yMeta, y)
+            xMeta.signBit == yMeta.signBit -> {
+                ensureCapacityDiscard(xMeta.normLen + yMeta.normLen + 1)
+                meta = Meta(xMeta.signBit,
+                    Magia.setAdd(magia, x, xMeta.normLen, y, yMeta.normLen))
+            }
+            else -> {
+                val cmp: Int = Magia.compare(x, xMeta.normLen, y, yMeta.normLen)
+                when {
+                    cmp > 0 -> {
+                        ensureCapacityDiscard(xMeta.normLen)
+                        meta = Meta(xMeta.signBit,
+                            Magia.setSub(magia, x, xMeta.normLen, y, yMeta.normLen))
+                    }
+                    cmp < 0 -> {
+                        ensureCapacityDiscard(yMeta.normLen)
+                        meta = Meta(yMeta.signBit,
+                            Magia.setSub(magia, y, yMeta.normLen, x, xMeta.normLen))
+                    }
+                    else -> setZero()
+                }
+            }
+        }
+        return this
     }
 
-
-
-    fun setSub(x: BigInt, y: BigInt) =
-        setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)
-    fun setSub(x: BigInt, y: BigIntAccumulator) =
-        setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)
-    fun setSub(x: BigIntAccumulator, y: BigInt) =
-        setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)
-    fun setSub(x: BigIntAccumulator, y: BigIntAccumulator) =
-        setAddImpl(x.sign, x.magia, y.sign.negate(), y.magia)
-
     fun setMul(x: BigInt, y: BigInt) =
-        setMulImpl(x.sign, x.magia, y.sign, y.magia)
+        setMulImpl(x.meta, x.magia, y.meta, y.magia)
     fun setMul(x: BigInt, y: BigIntAccumulator) =
-        setMulImpl(x.sign, x.magia, y.sign, y.magia)
+        setMulImpl(x.meta, x.magia, y.meta, y.magia)
     fun setMul(x: BigIntAccumulator, y: BigInt) =
-        setMulImpl(x.sign, x.magia, y.sign, y.magia)
+        setMulImpl(x.meta, x.magia, y.meta, y.magia)
     fun setMul(x: BigIntAccumulator, y: BigIntAccumulator) =
-        setMulImpl(x.sign, x.magia, y.sign, y.magia)
+        setMulImpl(x.meta, x.magia, y.meta, y.magia)
+
+    private fun setMulImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+        swapTmp1()
+        val xNormLen = xMeta.normLen
+        val yNormLen = yMeta.normLen
+        ensureCapacityDiscard(xNormLen + yNormLen)
+        meta = Meta(xMeta.signBit xor yMeta.signBit,
+            Magia.setMul(magia, x, xNormLen, y, yNormLen))
+        return this
+    }
 
     fun setDiv(x: BigInt, y: BigInt) =
-        setDivImpl(x.sign, x.magia, y.sign, y.magia)
+        setDivImpl(x.meta, x.magia, y.meta, y.magia)
     fun setDiv(x: BigInt, y: BigIntAccumulator) =
-        setDivImpl(x.sign, x.magia, y.sign, y.magia)
+        setDivImpl(x.meta, x.magia, y.meta, y.magia)
     fun setDiv(x: BigIntAccumulator, y: BigInt) =
-        setDivImpl(x.sign, x.magia, y.sign, y.magia)
+        setDivImpl(x.meta, x.magia, y.meta, y.magia)
     fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator) =
-        setDivImpl(x.sign, x.magia, y.sign, y.magia)
+        setDivImpl(x.meta, x.magia, y.meta, y.magia)
+
+    private fun setDivImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+        val xNormLen = xMeta.normLen
+        val yNormLen = yMeta.normLen
+        if (yNormLen == 0)
+            throw ArithmeticException("div by zero")
+        swapTmp1()
+        ensureCapacityDiscard(xNormLen)
+        meta = Meta(xMeta.signBit xor yMeta.signBit,
+            Magia.setDiv(magia, x, xNormLen, y, yNormLen))
+        return this
+    }
 
     fun setRem(x: BigInt, y: BigInt) =
-        setRemImpl(x.sign, x.magia, y.sign, y.magia)
+        setRemImpl(x.meta, x.magia, y.meta, y.magia)
     fun setRem(x: BigInt, y: BigIntAccumulator) =
-        setRemImpl(x.sign, x.magia, y.sign, y.magia)
+        setRemImpl(x.meta, x.magia, y.meta, y.magia)
     fun setRem(x: BigIntAccumulator, y: BigInt) =
-        setRemImpl(x.sign, x.magia, y.sign, y.magia)
+        setRemImpl(x.meta, x.magia, y.meta, y.magia)
     fun setRem(x: BigIntAccumulator, y: BigIntAccumulator) =
-        setRemImpl(x.sign, x.magia, y.sign, y.magia)
+        setRemImpl(x.meta, x.magia, y.meta, y.magia)
 
-     */
+    private fun setRemImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+        val xNormLen = xMeta.normLen
+        val yNormLen = yMeta.normLen
+        if (yNormLen == 0)
+            throw ArithmeticException("div by zero")
+        swapTmp1()
+        ensureCapacityDiscard(xNormLen)
+        meta = Meta(xMeta.signBit,
+            Magia.setRem(magia, x, xNormLen, y, yNormLen))
+        return this
+    }
+
 
     /**
      * Adds the given Int value to this accumulator.

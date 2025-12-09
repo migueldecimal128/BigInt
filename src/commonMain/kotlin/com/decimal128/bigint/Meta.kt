@@ -106,6 +106,9 @@ value class Meta internal constructor(val meta: Int) {
     val isPositive: Boolean
         get() = meta >= 0
 
+    val isZero: Boolean
+        get() = meta == 0
+
     /**
      * Returns the negation of the sign with the same normLen magnitude.
      */

@@ -1876,7 +1876,7 @@ object Magia {
                 else
                     calcRem(x, xNormLen, w)
             if (rem > 0u) {
-                z[0] = 1
+                z[0] = rem.toInt()
                 return 1
             }
         }
@@ -1916,9 +1916,9 @@ object Magia {
         return if (rNormLen > 0) r else ZERO
     }
 
-    fun setRem(z: IntArray, x: IntArray, y: IntArray): Int {
-        val xNormLen = normLen(x)
-        val yNormLen = normLen(y)
+    fun setRem(z: IntArray, x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
         when {
             yNormLen == 0 -> throw ArithmeticException("div by zero")
             yNormLen == 1 -> return setRem(z, x, xNormLen, y[0].toUInt())
