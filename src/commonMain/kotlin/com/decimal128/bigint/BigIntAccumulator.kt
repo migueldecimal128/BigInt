@@ -5,6 +5,7 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.BigInt.Companion.NEG_ONE
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
@@ -187,6 +188,12 @@ class BigIntAccumulator private constructor (
         if (magia.size < minLimbLen)
             magia = Magia.newCopyWithFloorLen(magia, minLimbLen)
     }
+
+    private inline fun ensureBitCapacityDiscard(minBitLen: Int) =
+        ensureCapacityDiscard((minBitLen + 0x1F) ushr 5)
+
+    private inline fun ensureBitCapacityCopy(minBitLen: Int) =
+        ensureCapacityCopy((minBitLen + 0x1F) ushr 5)
 
     private inline fun swapTmp1() {
         val t = tmp1; tmp1 = magia; magia = t
@@ -544,6 +551,122 @@ class BigIntAccumulator private constructor (
             mutateSquare()  // prevent aliasing problems & improve performance
         else
             mutateMulImpl(acc.meta, acc.magia)
+    }
+
+    /**
+     * Sets this accumulator to `x << bitCount`. Allocates space for the
+     * resulting bit length. Throws if [bitCount] is negative.
+     */
+    fun setShl(x: BigInt, bitCount: Int): BigIntAccumulator =
+        setShlImpl(x.meta, x.magia, bitCount)
+
+    /**
+     * Sets this accumulator to `x << bitCount`. Allocates space for the
+     * resulting bit length. Throws if [bitCount] is negative.
+     */
+    fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
+        setShlImpl(x.meta, x.magia, bitCount)
+
+    private fun setShlImpl(xMeta: Meta, x: IntArray, bitCount: Int): BigIntAccumulator {
+        return when {
+            bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
+            bitCount == 0 -> set(xMeta, x)
+            xMeta.isZero -> setZero()
+            else -> {
+                val xBitLen = Magia.bitLen(x, xMeta.normLen)
+                val zBitLen = xBitLen + bitCount
+                ensureBitCapacityDiscard(zBitLen)
+                meta = Meta(meta.signBit,
+                    Magia.setShiftLeft(magia, x, xMeta.normLen, bitCount)
+                    )
+                return this
+            }
+        }
+    }
+
+    /**
+     * Sets this accumulator to `x >>> bitCount`.
+     *
+     * The sign of `x` is ignored and the resulting value is the
+     * non-negative magnitude.
+     *
+     * Throws if [bitCount] is negative.
+     */
+    fun setUshr(x: BigInt, bitCount: Int): BigIntAccumulator =
+        setUshrImpl(x.meta, x.magia, bitCount)
+
+    /**
+     * Sets this accumulator to `x >>> bitCount`.
+     *
+     * The sign of `x` is ignored and the resulting value is the
+     * non-negative magnitude.
+     *
+     * Throws if [bitCount] is negative.
+     */
+    fun setUshr(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
+        setUshrImpl(x.meta, x.magia, bitCount)
+
+    private fun setUshrImpl(xMeta: Meta, x: IntArray, bitCount: Int): BigIntAccumulator {
+        val xBitLen = Magia.bitLen(x, xMeta.normLen)
+        val zBitLen = xBitLen - bitCount
+        return when {
+            bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
+            bitCount == 0 -> set(xMeta, x)
+            zBitLen <= 0 -> setZero()
+            else -> {
+                ensureBitCapacityDiscard(zBitLen)
+                meta = Meta(0,
+                    Magia.setShiftRight(magia, x, xMeta.normLen, bitCount))
+                this
+            }
+        }
+    }
+
+    /**
+     * Sets this accumulator to `x >> bitCount`.
+     *
+     * Follows arithmetic shift right semantics if `x` is negative,
+     * effectively treating the resulting value as if it were
+     * stored in twos-complement.
+     *
+     * Throws if [bitCount] is negative.
+     */
+    fun setShr(x: BigInt, bitCount: Int): BigIntAccumulator =
+        setShrImpl(x.meta, x.magia, bitCount)
+
+    /**
+     * Sets this accumulator to `x >> bitCount`.
+     *
+     * Follows arithmetic shift right semantics if `x` is negative,
+     * effectively treating the resulting value as if it were
+     * stored in twos-complement.
+     *
+     * Throws if [bitCount] is negative.
+     */
+    fun setShr(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
+        setShrImpl(x.meta, x.magia, bitCount)
+
+    private fun setShrImpl(xMeta: Meta, x: IntArray, bitCount: Int): BigIntAccumulator {
+        when {
+            bitCount > 0 -> {
+                val bitLen = Magia.bitLen(x, xMeta.normLen)
+                val zBitLen = bitLen - bitCount
+                if (zBitLen <= 0)
+                    return if (xMeta.isNegative) set (-1) else setZero()
+                val needsIncrement = xMeta.isNegative && Magia.testAnyBitInLowerN(x, bitCount)
+                ensureBitCapacityDiscard(zBitLen)
+                var normLen = Magia.setShiftRight(magia, x, xMeta.normLen, bitCount)
+                check (normLen > 0)
+                if (needsIncrement) {
+                    ensureBitCapacityCopy(zBitLen + 1)
+                    normLen = Magia.setAdd(magia, magia, normLen, 1u)
+                }
+                meta = Meta(xMeta.signFlag, normLen)
+            }
+            bitCount == 0 -> {}
+            else -> throw IllegalArgumentException("bitCount < 0")
+        }
+        return this
     }
 
     /**

@@ -1549,7 +1549,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      *
      * Equivalent to the number of bits required to represent the absolute value.
      */
-    fun magnitudeBitLen() = Magia.bitLen(magia)
+    fun magnitudeBitLen() = Magia.bitLen(magia, meta.normLen)
 
     /**
      * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
@@ -1690,18 +1690,15 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
     infix fun shr(bitCount: Int): BigInt {
         return when {
             bitCount > 0 -> {
+                val bitLen = magnitudeBitLen()
+                if (bitLen <= bitCount)
+                    return if (meta.isPositive) ZERO else NEG_ONE
+                val needsIncrement = meta.isNegative && Magia.testAnyBitInLowerN(magia, bitCount)
                 var magia = Magia.newShiftRight(this.magia, bitCount)
-                when {
-                    magia !== Magia.ZERO -> {
-                        // Mimic twos-complement rounding down for negative numbers
-                        if (meta.isNegative && Magia.testAnyBitInLowerN(this.magia, bitCount))
-                            magia = Magia.newOrMutateAdd(magia, 1u)
-                        BigInt(this.meta.signFlag, magia)
-                    }
-
-                    meta.isNegative -> NEG_ONE
-                    else -> ZERO
-                }
+                check (Magia.normLen(magia) > 0)
+                if (needsIncrement)
+                    magia = Magia.newOrMutateAdd(magia, 1u)
+                return BigInt(meta.signFlag, magia)
             }
 
             bitCount == 0 -> this
@@ -2488,10 +2485,9 @@ fun Random.nextBigInt(bitCount: Int, withRandomSign: Boolean = false) =
  */
 
 /**
- * Computes `this^exp` using fast binary exponentiation.
+ * Computes `this**exp` using fast binary exponentiation.
  *
- * Handles common special cases (0, 1, ±1, ±2) efficiently.
- * Delegates to [BigIntAlgorithms.pow] for the full implementation.
+ * Delegates to [BigIntAlgorithms.pow].
  *
  * @throws IllegalArgumentException if [exp] is negative
  * @see BigIntAlgorithms.pow
