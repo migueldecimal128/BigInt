@@ -16,8 +16,8 @@ class TestBigInt {
 
     val random = Random()
 
-    fun randBi() : BigInteger {
-        val bitLength = random.nextInt(0, 500)
+    fun randBi(maxBitLen: Int = 500) : BigInteger {
+        val bitLength = random.nextInt(0, maxBitLen)
         val bi = BigInteger(bitLength, random)
         return if (random.nextBoolean()) bi.negate() else bi
     }
@@ -371,9 +371,24 @@ class TestBigInt {
         assert(hiOr EQ biOr)
     }
 
+    @Test
+    fun testXor() {
+        for (i in 0..<100) {
+            val biA = randBi(200).abs()
+            val absA = biA.abs()
+            val biB = randBi(200).abs()
+            val absB = biB.abs()
+
+            if (verbose)
+                println("biaA:$biA biB:$biB")
+
+            testXor(absA, absB)
+        }
+    }
+
     fun testXor(biA: BigInteger, biB: BigInteger) {
         if (verbose)
-            println("testXora(biA:$biA biB:$biB)")
+            println("testXor(biA:$biA biB:$biB)")
         val hiA = biA.toBigInt()
         val hiB = biB.toBigInt()
 

@@ -1495,7 +1495,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         if (other.isZero())
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magia.newRem(this.magia, other.magia)
+            val rem = Magia.newRem(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
             if (rem.isNotEmpty())
                 return BigInt(this.meta.signFlag, rem)
         }
@@ -1510,7 +1510,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         if (w == 0u)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magia.newRem(this.magia, w)
+            val rem = Magia.newRem(this.magia, this.meta.normLen, w)
             if (rem.isNotEmpty())
                 return BigInt(this.meta.signFlag, rem)
         }
@@ -1523,7 +1523,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
         if (dw == 0uL)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magia.newRem(this.magia, dw)
+            val rem = Magia.newRem(this.magia, this.meta.normLen, dw)
             if (rem.isNotEmpty())
                 return BigInt(this.meta.signFlag, rem)
         }
@@ -1897,7 +1897,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * The result is always non-negative.
      */
     infix fun and(other: BigInt): BigInt {
-        val magiaAnd = Magia.newAnd(this.magia, other.magia)
+        val magiaAnd = Magia.newAnd(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
         return if (magiaAnd.isNotEmpty()) BigInt(magiaAnd) else ZERO
     }
 
@@ -1908,7 +1908,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * The result is always non-negative.
      */
     infix fun or(other: BigInt): BigInt {
-        val magiaOr = Magia.newOr(this.magia, other.magia)
+        val magiaOr =
+            Magia.newOr(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
         return if (magiaOr.isNotEmpty()) BigInt(magiaOr) else ZERO
     }
 
@@ -1919,7 +1920,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * The result is always non-negative.
      */
     infix fun xor(other: BigInt): BigInt {
-        val magiaXor = Magia.newXor(this.magia, other.magia)
+        val magiaXor = Magia.newXor(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
         return if (magiaXor.isNotEmpty()) BigInt(magiaXor) else ZERO
     }
 
@@ -1959,7 +1960,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                     magia !== Magia.ZERO -> {
                         // Mimic twos-complement rounding down for negative numbers
                         if (meta.isNegative && Magia.testAnyBitInLowerN(this.magia, bitCount))
-                            magia = Magia.newOrMutateIncrement(magia)
+                            magia = Magia.newOrMutateAdd(magia, 1u)
                         BigInt(this.meta.signFlag, magia)
                     }
 

@@ -41,7 +41,7 @@ private const val ERROR_SHL_OVERFLOW = "shl overflow ... destination too small"
  *
  * Unsigned magnitudes are represented in **little-endian** form, using 32-bit limbs
  * stored in a raw [IntArray]. Although the limbs represent unsigned values, an
- * [IntArray] is used instead of [UIntArray] because the latter is merely a wrapper
+ * [IntArray] is used instead of Kotlin [UIntArray] because the latter is merely a wrapper
  * around [IntArray] and is inappropriate for high-performance internal arithmetic.
  * Kotlin unsigned primitives ([UInt], [ULong]) are used for temporary scalar values.
  *
@@ -52,13 +52,17 @@ private const val ERROR_SHL_OVERFLOW = "shl overflow ... destination too small"
  *   represent an integer with approximately **6.46×10⁸ decimal digits**. In practice,
  *   performance and memory constraints will be reached long before this theoretical
  *   upper bound.
- * - `new*` functions construct **immutable** limb arrays and are used by [BigInt].
- * - `mutate*` functions operate **in place** on an existing destination array and are
- *   used by [BigIntAccumulator].
+ * - `new*` functions construct generally construct values to be used by [BigInt]
+ *   and are generally **immutable** limb arrays.
+ * - `set*` functions store the result in the user-supplied first parameter and
+ *   return the normalized length. The caller must ensure that there is sufficient
+ *   space in the destination for operator and operands. Operators are implemented
+ *   to allow aliased operands and result ... `x *= x`. The `set*` functions are used
+ *   exclusively by [BigIntAccumulator].
  *
  * ### Available Functionality
  * - Magia acts as a complete arbitrary-length integer **ALU** (Arithmetic Logic Unit).
- * - **Arithmetic:** `add`, `sub`, `mul`, `div`, `rem`, `sqr`
+ * - **Arithmetic:** `add`, `sub`, `mul`, `div`, `rem`, `sqr`, `gcd`
  * - **Bitwise:** `and`, `or`, `xor`, `shl`, `shr`
  * - **Bit-operations:** `bitLen`, `nlz`, `bitPopulation`, `testBit`, `setBit`,
  *   and utility bit-mask construction routines.
@@ -94,6 +98,9 @@ object Magia {
      */
     internal val ONE = intArrayOf(1)
 
+    /**
+     * Returns the 32-bit limb `n` zero-extended to a 64-bit `ULong`.
+     */
     private inline fun dw32(n: Int) = n.toUInt().toULong()
 
     /**
@@ -149,6 +156,10 @@ object Magia {
         }
     }
 
+    /**
+     * Stores the 64-bit unsigned value `dw` into `z` as 32-bit limbs (little-endian)
+     * and returns the resulting limb length (0–2).
+     */
     fun setULong(z: IntArray, dw: ULong): Int {
         val lo = dw.toInt()
         val hi = (dw shr 32).toInt()
@@ -162,7 +173,8 @@ object Magia {
     }
 
     /**
-     * Returns the number of nonzero limbs in [x], excluding any leading zeros.
+     * Returns the normalized limb length of **x**—the index of the highest
+     * non-zero limb plus one. If all limbs are zero, returns `0`.
      */
     inline fun normLen(x: IntArray): Int {
         for (i in x.size - 1 downTo 0)
@@ -204,6 +216,9 @@ object Magia {
      */
     fun isNormalized(x: IntArray) = x.isEmpty() || x[x.lastIndex] != 0
 
+    /**
+     * Same as above, but checks only the first `xLen` limbs.
+     */
     fun isNormalized(x: IntArray, xLen: Int): Boolean {
         check (xLen >= 0 && xLen <= x.size)
         return xLen == 0 || x[xLen - 1] != 0
@@ -243,7 +258,7 @@ object Magia {
     fun newWithBitLen(bitLen: Int): IntArray {
         return when {
             bitLen in 1..(MAX_ALLOC_SIZE*32) ->
-                IntArray(normalizedLenFromBitLen(bitLen))
+                IntArray(normLenFromBitLen(bitLen))
             bitLen == 0 -> ZERO
             else ->
                 throw IllegalArgumentException("invalid allocation bitLen:$bitLen")
@@ -378,11 +393,15 @@ object Magia {
         return z
     }
 
-    fun newOrMutateIncrement(x: IntArray): IntArray {
-        // FIXME - change this to dw: ULong
-        //  only called from 1 spot with argument 1u
-        //  perhaps make a dedicated newOrMutateIncrement
-        var carry = 1uL
+    /**
+     * Adds the 32-bit unsigned value `w` to the limb array `x` in place and returns
+     * the resulting array.
+     *
+     * If the addition overflows all limbs a new array with one
+     * extra limb is returned.
+     */
+    fun newOrMutateAdd(x: IntArray, w: UInt): IntArray {
+        var carry = w.toULong()
         var i = 0
         while (carry != 0uL && i < x.size) {
             val t = dw32(x[i]) + carry
@@ -400,6 +419,13 @@ object Magia {
         return z
     }
 
+    /**
+     * Adds the unsigned 64-bit value `dw` to `x[0‥xNormLen)` and writes the result
+     * into `z` (which may be the same array for in-place mutation).
+     *
+     * Returns the resulting normalized limb length.
+     * Throws `ArithmeticException` if the sum overflows `z`.
+     */
     fun setAdd(z: IntArray, x: IntArray, xNormLen: Int, dw: ULong): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
             var carry = dw
@@ -425,47 +451,6 @@ object Magia {
             throw ArithmeticException(ERROR_ADD_OVERFLOW)
         }
         throw IllegalArgumentException()
-    }
-
-    /**
-     * Adds the first [yLen] limbs of [y] to the first [xLen] limbs of [x],
-     * writing the result **in place** into [x].
-     *
-     * Carries propagate across limbs. Only the lower [yLen] limbs of [x]
-     * are added to; if the addition produces a carry beyond [yLen], it
-     * continues through the remaining `[xLen - yLen]` limbs of [x].
-     *
-     * The returned carry represents the carry-out beyond limb [xLen − 1].
-     * The caller is responsible for handling this (e.g., by extending [x]
-     * when needed).
-     *
-     * **Requirements**
-     * - `0 ≤ yLen ≤ y.size`
-     * - `0 ≤ xLen ≤ x.size`
-     * - `xLen ≥ yLen`
-     *
-     * @return the final carry as a 32-bit unsigned value (`0u` or `1u`).
-     * @throws IllegalArgumentException if any bounds requirement is violated.
-     */
-    fun mutateAdd(x: IntArray, xLen: Int, y: IntArray, yLen: Int): UInt {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size && xLen >= yLen) {
-            var carry = 0uL
-            for (i in 0..<yLen) {
-                carry = dw32(x[i]) + dw32(y[i]) + carry
-                x[i] = carry.toInt()
-                carry = carry shr 32
-            }
-            var i = yLen
-            while (carry != 0uL && i < xLen) {
-                carry = dw32(x[i]) + carry
-                x[i] = carry.toInt()
-                carry = carry shr 32
-                ++i
-            }
-            return carry.toUInt()
-        } else {
-            throw IllegalArgumentException()
-        }
     }
 
     /**
@@ -675,7 +660,7 @@ object Magia {
         val xBitLen = bitLen(x)
         if (xBitLen == 0 || w == 0u)
             return ZERO
-        val xNormLen = normalizedLenFromBitLen(xBitLen)
+        val xNormLen = normLenFromBitLen(xBitLen)
         val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul(z, x, xNormLen, w)
@@ -725,7 +710,7 @@ object Magia {
         val xBitLen = bitLen(x)
         if (xBitLen == 0 || dw == 0uL)
             return ZERO
-        val xNormLen = normalizedLenFromBitLen(xBitLen)
+        val xNormLen = normLenFromBitLen(xBitLen)
         val zBitLen = xBitLen + 64 - dw.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul(z, x, xNormLen, dw)
@@ -795,7 +780,7 @@ object Magia {
         if (xBitLen == 0 || yBitLen == 0)
             return ZERO
         val z = newWithBitLen(xBitLen + yBitLen)
-        val zNormLen = setMul(z, x, normalizedLenFromBitLen(xBitLen), y, normalizedLenFromBitLen(yBitLen))
+        val zNormLen = setMul(z, x, normLenFromBitLen(xBitLen), y, normLenFromBitLen(yBitLen))
         check (isNormalized(z, zNormLen))
         return z
     }
@@ -908,7 +893,7 @@ object Magia {
         val bitLen = bitLen(x)
         if (bitLen == 0)
             return ZERO
-        val xNormLen = normalizedLenFromBitLen(bitLen)
+        val xNormLen = normLenFromBitLen(bitLen)
         val sqrBitLen = 2 * bitLen
         val z = newWithBitLen(sqrBitLen)
         val zNormLen = setSqr(z, x, xNormLen)
@@ -1100,7 +1085,7 @@ object Magia {
         if (bitCount == 0)
             return newNormalizedCopy(x)
         val zBitLen = bitLen(x) + bitCount
-        val zNormLen = normalizedLenFromBitLen(zBitLen)
+        val zNormLen = normLenFromBitLen(zBitLen)
         val z = IntArray(zNormLen)
         val zNormLen2 = setShiftLeft(z, x, x.size, bitCount)
         check (zNormLen == zNormLen2)
@@ -1109,7 +1094,11 @@ object Magia {
     }
 
     /**
-     * @return normLen
+     * Shifts `x[0‥xLen)` left by `bitCount` bits and writes the result into `z`
+     * (supports in-place use when `z === x`).
+     *
+     * Returns the resulting normalized limb length, or throws
+     * `ArithmeticException` if the result does not fit in `z`.
      */
     fun setShiftLeft(z: IntArray, x: IntArray, xLen: Int, bitCount: Int): Int {
         require(xLen in 0..x.size && bitCount >= 0)
@@ -1127,7 +1116,7 @@ object Magia {
         // 1. Compute required bit length and limb length from *math*
         // ------------------------------------------------------------
         val zBitLen = xBitLen + bitCount
-        val zNormLen = normalizedLenFromBitLen(zBitLen)
+        val zNormLen = normLenFromBitLen(zBitLen)
 
         if (zNormLen > z.size)
             throw ArithmeticException(ERROR_SHL_OVERFLOW)
@@ -1245,13 +1234,6 @@ object Magia {
         }
     }
 
-    fun normBitLen(x: IntArray, xNormLen: Int): Int {
-        if (xNormLen == 0)
-            return 0
-        check (x[xNormLen-1] != 0)
-        return (xNormLen shl 5) - x[xNormLen-1].countLeadingZeroBits()
-    }
-
     /**
      * Returns the number of 32-bit limbs required to represent a value with the given [bitLen].
      *
@@ -1260,7 +1242,7 @@ object Magia {
      * @param bitLen the number of significant bits.
      * @return the minimum number of 32-bit limbs needed to hold that many bits.
      */
-    inline fun normalizedLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
+    inline fun normLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
 
     /**
      * Overload of [bitLengthBigIntegerStyle] that considers all limbs in [x].
@@ -1303,19 +1285,12 @@ object Magia {
     }
 
     /**
-     * Returns a new normalized array representing the bitwise AND of [x] and [y].
-     *
-     * The result contains only the significant limbs (no trailing zeros). The last limb
-     * is determined by the highest index where `x[i] and y[i]` is non-zero. If the
-     * result is entirely zero, [ZERO] is returned.
-     *
-     * @param x the first operand, represented as an array of 32-bit limbs.
-     * @param y the second operand, represented as an array of 32-bit limbs.
-     * @return a new [IntArray] containing the normalized bitwise AND result,
-     *         or [ZERO] if the result is zero.
+     * Returns a new normalized array holding `x AND y` over their normalized
+     * ranges. The result is trimmed to its highest non-zero limb, or [ZERO] if the
+     * AND is entirely zero.
      */
-    fun newAnd(x: IntArray, y: IntArray): IntArray {
-        var iLast = min(x.size, y.size)
+    fun newAnd(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
+        var iLast = min(xNormLen, yNormLen)
         do {
             --iLast
             if (iLast < 0)
@@ -1329,9 +1304,16 @@ object Magia {
         return z
     }
 
-    fun setAnd(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            val minLen = min(xLen, yLen)
+    /**
+     * Computes `z = x AND y` over the normalized ranges `x[0‥xNormLen)` and
+     * `y[0‥yNormLen)`, returning the normalized limb length of the result.
+     * Supports in-place mutation when `z` aliases `x` or `y`.
+     */
+    fun setAnd(z: IntArray, x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
+            check (isNormalized(x, xNormLen))
+            check (isNormalized(y, yNormLen))
+            val minLen = min(xNormLen, yNormLen)
             if (minLen <= z.size) {
                 var i = minLen
                 do {
@@ -1351,45 +1333,31 @@ object Magia {
     }
 
     /**
-     * Returns a new normalized array representing the bitwise OR of [x] and [y].
-     *
-     * The resulting array contains only the significant limbs (no trailing zeros).
-     * If the result is entirely zero, [ZERO] is returned.
-     *
-     * The operation first computes the OR for the overlapping portion of [x] and [y],
-     * then copies any remaining limbs from the longer array.
-     *
-     * @param x the first operand, represented as an array of 32-bit limbs.
-     * @param y the second operand, represented as an array of 32-bit limbs.
-     * @return a new [IntArray] containing the normalized bitwise OR result,
-     *         or [ZERO] if the result is zero.
+     * Returns a new normalized array holding `x OR y` over their normalized ranges.
+     * If the OR is zero, returns [ZERO].
      */
-    fun newOr(x: IntArray, y: IntArray): IntArray {
-        val xLen = normLen(x)
-        val yLen = normLen(y)
-        val maxLen = max(xLen, yLen)
-        val minLen = min(xLen, yLen)
-        if (maxLen == 0)
-            return ZERO
-        val z = IntArray(maxLen)
-        var i = 0
-        while (i < minLen) {
-            z[i] = x[i] or y[i]
-            ++i
+    fun newOr(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
+        val maxLen = max(xNormLen, yNormLen)
+        if (maxLen != 0) {
+            val z = IntArray(maxLen)
+            setOr(z, x, xNormLen, y, yNormLen)
+            return z
         }
-        when {
-            i < xLen ->
-                x.copyInto(z, i, i, xLen) // System.arraycopy(x, i, z, i, xLen - i)
-            i < yLen ->
-                y.copyInto(z, i, i, yLen) //System.arraycopy(y, i, z, i, yLen - i)
-        }
-        return z
+        return ZERO
     }
 
-    fun setOr(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            val xNormLen = normLen(x, xLen)
-            val yNormLen = normLen(y, yLen)
+    /**
+     * Computes `z = x OR y` over the normalized ranges `x[0‥xNormLen)` and
+     * `y[0‥yNormLen)`.
+     * The result length is the larger of the two operand lengths, and the write
+     * supports in-place mutation when `z` aliases either operand.
+     *
+     * @return the normalized limb length of the OR result.
+     */
+    fun setOr(z: IntArray, x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
+            check (isNormalized(x, xNormLen))
+            check (isNormalized(y, yNormLen))
             val maxLen = max(xNormLen, yNormLen)
             if (maxLen <= z.size) {
                 val minLen = min(xNormLen, yNormLen)
@@ -1409,57 +1377,32 @@ object Magia {
     }
 
     /**
-     * Returns a new IntArray representing the bitwise XOR of [x] and [y].
-     *
-     * The operation is performed limb-wise up to the lengths of the inputs' non-zero limbs.
-     * Any extra limbs from the longer array are copied as-is.
-     * The resulting array may contain trailing zero limbs and is **not guaranteed to be normalized**.
-     *
-     * @param x the first operand array of 32-bit limbs.
-     * @param y the second operand array of 32-bit limbs.
-     * @return an IntArray containing the XOR of [x] and [y], possibly with trailing zero limbs.
+     * Returns a new normalized array holding `x XOR y` over their normalized
+     * ranges. Uses `setXor` to compute the result into a temporary array and
+     * trims the array to the returned normalized length. Returns [ZERO] if the
+     * XOR result is zero.
      */
-    fun newXor(x: IntArray, y: IntArray): IntArray {
-        val xLen = normLen(x)
-        val yLen = normLen(y)
-        val maxLen = max(xLen, yLen)
-        val minLen = min(xLen, yLen)
-        if (maxLen == 0)
-            return ZERO
+    fun newXor(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
+        val maxLen = max(xNormLen, yNormLen)
         val z = IntArray(maxLen)
-        var nonZeroAccumulator = 0
-        var i = 0
-        while (i < minLen) {
-            val t = x[i] xor y[i]
-            z[i] = t
-            nonZeroAccumulator = nonZeroAccumulator or t
-            ++i
-        }
-        when {
-            i < xLen ->
-                x.copyInto(z, i, i, xLen) // System.arraycopy(x, i, z, i, xLen - i)
-            i < yLen ->
-                y.copyInto(z, i, i, yLen) // System.arraycopy(y, i, z, i, yLen - i)
-            else -> if (nonZeroAccumulator == 0) return ZERO
-        }
-        return z
+        val zNormLen = setXor(z, x, xNormLen, y, yNormLen)
+        return if (zNormLen == 0) ZERO else z.copyOf(zNormLen)
     }
 
-    fun setXor(z: IntArray, x: IntArray, xLen: Int, y: IntArray, yLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size && yLen >= 0 && yLen <= y.size) {
-            val xNormLen = normLen(x, xLen)
-            val yNormLen = normLen(y, yLen)
+    /**
+     * Computes `z = x XOR y` over the normalized ranges `x[0‥xNormLen)` and
+     * `y[0‥yNormLen)`, returning the normalized limb length of the result.
+     * Supports in-place mutation when `z` aliases either operand.
+     */
+    fun setXor(z: IntArray, x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
+            check (isNormalized(x, xNormLen))
+            check (isNormalized(y, yNormLen))
             val maxLen = max(xNormLen, yNormLen)
             if (maxLen <= z.size) {
                 val minLen = min(xNormLen, yNormLen)
-                var i = minLen
-                do {
-                    --i
-                    if (i < 0)
-                        return 0
-                    val zi = x[i] xor y[i]
-                    z[i] = zi
-                } while (zi == 0)
+                for (i in 0..<minLen)
+                    z[i] = x[i] xor y[i]
                 val zNormLen = when {
                     minLen < xNormLen -> {
                         x.copyInto(z, minLen, minLen, xNormLen)
@@ -1469,7 +1412,7 @@ object Magia {
                         y.copyInto(z, minLen, minLen, yNormLen)
                         yNormLen
                     }
-                    else -> i + 1
+                    else -> normLen(z, minLen)
                 }
                 return zNormLen
             }
@@ -1712,8 +1655,11 @@ object Magia {
     }
 
     /**
+     * Divides the normalized limb array `x[0‥xNormLen)` by the 32-bit unsigned
+     * value `w`, writing the quotient into `z` (supports in-place use).
      *
-     * @return normLen(z)
+     * Returns the normalized limb length of the quotient, or throws
+     * `ArithmeticException` if `w == 0u`.
      */
     fun setDiv(z: IntArray, x: IntArray, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
@@ -1738,6 +1684,10 @@ object Magia {
         throw IllegalArgumentException()
     }
 
+    /**
+     * Computes `x mod w` for the normalized limb array `x[0‥xNormLen)`, returning
+     * the remainder as a `UInt`. Throws `ArithmeticException` if `w == 0u`.
+     */
     fun calcRem(x: IntArray, xNormLen: Int, w: UInt): UInt {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
@@ -1777,6 +1727,16 @@ object Magia {
         return ZERO
     }
 
+    /**
+     * Divides the normalized limb array `x` by the 64-bit unsigned divisor `dw`
+     * (which may exceed 32 bits) and returns a new normalized quotient array.
+     *
+     * Uses a specialized Knuth division routine for 64-bit divisors.
+     * Returns:
+     * - [ZERO] if `x < dw`
+     * - [ONE]  if `x == dw`
+     * - the normalized quotient otherwise.
+     */
     fun newDiv(x: IntArray, dw: ULong): IntArray {
         if ((dw shr 32) == 0uL)
             return newDiv(x, dw.toUInt())
@@ -1795,6 +1755,18 @@ object Magia {
         return if (normLen(q) > 0) q else ZERO
     }
 
+    /**
+     * Divides the normalized limb array `x` by the normalized limb array `y` and
+     * returns a new normalized quotient array.
+     *
+     * Handles all size relations:
+     * - If `y` fits in one limb, delegates to the 32-bit divisor path.
+     * - If `x < y`, returns [ZERO].
+     * - If `x == y`, returns `[1]`.
+     * - Otherwise performs full Knuth division on `x` by `y`.
+     *
+     * @return the normalized quotient, or [ZERO] if the quotient is zero.
+     */
     fun newDiv(x: IntArray, y: IntArray): IntArray {
         val xNormLen = normLen(x)
         val yNormLen = normLen(y)
@@ -1821,6 +1793,21 @@ object Magia {
         return if (qNormLen > 0) q else ZERO
     }
 
+    /**
+     * Divides the normalized limb array `x[0‥xNormLen)` by `y[0‥yNormLen)` and
+     * writes the quotient into `z` (supports in-place use when `z === x` or
+     * `z === y`).
+     *
+     * Handles all structured cases:
+     * - If `y` fits in one limb, dispatches to the single-limb division routine.
+     * - If `x < y`, the quotient is zero.
+     * - If `x == y`, the quotient is 1.
+     * - Otherwise performs full Knuth division.
+     *
+     * @return the normalized limb length of the quotient.
+     * @throws ArithmeticException if `yNormLen == 0` (division by zero)
+     * @throws IllegalArgumentException if `z` is too small to hold the quotient
+     */
     fun setDiv(z: IntArray, x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
         check (isNormalized(x, xNormLen))
         check (isNormalized(y, yNormLen))
@@ -1853,8 +1840,14 @@ object Magia {
         return qNormLen
     }
 
-    fun newRem(x: IntArray, w: UInt): IntArray {
-        val xNormLen = normLen(x)
+    /**
+     * Computes `x mod w` for the normalized range `x[0‥xNormLen)` and returns the
+     * remainder as a new normalized single-limb array. Uses a fast path for values
+     * fitting in one or two limbs, otherwise delegates to `calcRem`. Returns [ZERO]
+     * if the remainder is zero.
+     */
+    fun newRem(x: IntArray, xNormLen: Int, w: UInt): IntArray {
+        check (isNormalized(x, xNormLen))
         if (xNormLen > 0) {
             val rem =
                 if (xNormLen <= 2)
@@ -1867,6 +1860,13 @@ object Magia {
         return ZERO
     }
 
+    /**
+     * Computes `x mod w` for the normalized range `x[0‥xNormLen)` and stores the
+     * remainder into `z[0]` if it is non-zero.
+     *
+     * Returns `1` if a non-zero remainder was written, or `0` if the remainder is
+     * zero. Uses a fast path for 1–2 limb values, otherwise delegates to `calcRem`.
+     */
     fun setRem(z: IntArray, x: IntArray, xNormLen: Int, w: UInt): Int {
         check (isNormalized(x, xNormLen))
         if (xNormLen > 0) {
@@ -1883,39 +1883,60 @@ object Magia {
         return 0
     }
 
-    fun newRem(x: IntArray, dw: ULong): IntArray {
+    /**
+     * Computes `x mod dw` for the normalized range `x[0‥xNormLen)` where `dw` is a
+     * 64-bit unsigned divisor.
+     *
+     * Uses a fast path when `dw` fits in 32 bits, another fast path when `x`
+     * fits in one or two limbs, and otherwise falls back to the general
+     * multi-limb remainder routine using the 2-limb array representation of `dw`.
+     *
+     * @return a new normalized array holding the remainder, or [ZERO] if the
+     *         remainder is zero.
+     */
+    fun newRem(x: IntArray, xNormLen: Int, dw: ULong): IntArray {
         val lo = dw.toUInt()
         val hi = (dw shr 32).toUInt()
         if (hi == 0u)
-            return newRem(x, lo)
-        val xNormLen = normLen(x)
+            return newRem(x, xNormLen, lo)
         if (xNormLen <= 2)
             return newFromULong(toRawULong(x, xNormLen) % dw)
-        return newRem(x, intArrayOf(lo.toInt(), hi.toInt()))
+        return newRem(x, xNormLen, intArrayOf(lo.toInt(), hi.toInt()), 2)
     }
 
-    fun newRem(x: IntArray, y: IntArray): IntArray {
-        val xNormLen = normLen(x)
-        val yNormLen = normLen(y)
-        when {
-            yNormLen == 0 -> throw ArithmeticException("div by zero")
-            yNormLen == 1 -> return newRem(x, y[0].toUInt())
-            yNormLen == 2 && xNormLen <= 2 ->
-                return newFromULong(toRawULong(x, xNormLen) % toRawULong(y, yNormLen))
-            xNormLen < yNormLen -> return newCopyWithExactLimbLen(x, xNormLen)
+    /**
+     * Returns a new normalized array holding `x mod y`.
+     * Handles 1-limb divisors directly, otherwise delegates to `setRem`
+     * and trims the result. Returns [ZERO] if the remainder is zero.
+     */
+    fun newRem(x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): IntArray {
+        check(isNormalized(y, yNormLen))
+        if (yNormLen <= 1) {
+            if (yNormLen == 0)
+                throw ArithmeticException("div by zero")
+            return newRem(x, xNormLen, y[0].toUInt())
         }
-        val n = yNormLen
-        val m = xNormLen
-        val u = x
-        val v = y
-        val q = null
-        val r = IntArray(yNormLen)
-        val rNormLen = knuthDivide(q, r, u, v, m, n)
-        check (rNormLen == normLen(r))
-        check (rNormLen <= n)
-        return if (rNormLen > 0) r else ZERO
+        val z = IntArray(yNormLen)
+        val zNormLen = setRem(z, x, xNormLen, y, yNormLen)
+        return if (zNormLen == 0) ZERO else z.copyOf(zNormLen)
     }
 
+    /**
+     * Computes `x mod y` over the normalized ranges `x[0‥xNormLen)` and
+     * `y[0‥yNormLen)`, writing the remainder into `z`.
+     *
+     * Fast paths:
+     * - If `y` fits in one limb, delegates to the single-limb remainder routine.
+     * - If both operands fit in at most two limbs, performs a 64-bit remainder.
+     * - If `x < y`, the remainder is just `x`.
+     *
+     * Otherwise performs full Knuth division with the quotient discarded and the
+     * remainder written into `z`. The returned value is the normalized limb length
+     * of the remainder.
+     *
+     * @throws ArithmeticException if `yNormLen == 0` (division by zero)
+     * @throws IllegalArgumentException if `z` is too small to hold the remainder
+     */
     fun setRem(z: IntArray, x: IntArray, xNormLen: Int, y: IntArray, yNormLen: Int): Int {
         check (isNormalized(x, xNormLen))
         check (isNormalized(y, yNormLen))
