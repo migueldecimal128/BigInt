@@ -1176,7 +1176,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * Equivalent to the number of bits required to represent the absolute value.
      */
-    fun magnitudeBitLen() = Magus.bitLen(magia, meta.normLen)
+    fun magnitudeBitLen() = Zoro.magnitudeBitLen(meta, magia)
 
     /**
      * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
@@ -1188,17 +1188,44 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * Example: `BigInteger("-1").bitLength() == 0` ... think about ie :)
      */
-    fun bitLengthBigIntegerStyle(): Int = Magus.bitLengthBigIntegerStyle(meta.isNegative, magia)
+    fun bitLengthBigIntegerStyle(): Int =
+        Zoro.bitLengthBigIntegerStyle(meta, magia)
 
     /**
      * Returns the number of 32-bit integers required to store the binary magnitude.
      */
-    fun magnitudeIntArrayLen() = (Magus.bitLen(magia) + 31) ushr 5
+    fun magnitudeIntArrayLen() =
+        Zoro.magnitudeIntArrayLen(meta, magia)
 
     /**
      * Returns the number of 64-bit longs required to store the binary magnitude.
      */
-    fun magnitudeLongArrayLen() = (Magus.bitLen(magia) + 63) ushr 6
+    fun magnitudeLongArrayLen() =
+        Zoro.magnitudeLongArrayLen(meta, magia)
+
+    /**
+     * Returns the index of the rightmost set bit (number of trailing zeros).
+     *
+     * If this BigInt is ZERO (no bits set), returns -1.
+     *
+     * Equivalent to `java.math.BigInteger.getLowestSetBit()`.
+     *
+     * @return bit index of the lowest set bit, or -1 if ZERO
+     */
+    fun countTrailingZeroBits(): Int = Magus.ntz(this.magia)
+
+    /**
+     * Returns the number of bits set in the magnitude, ignoring the sign.
+     */
+    fun magnitudeCountOneBits(): Int = Magus.bitPopulationCount(this.magia)
+
+    /**
+     * Tests whether the magnitude bit at [bitIndex] is set.
+     *
+     * @param bitIndex 0-based, starting from the least-significant bit
+     * @return true if the bit is set, false otherwise
+     */
+    fun testBit(bitIndex: Int): Boolean = Magus.testBit(this.magia, this.meta.normLen, bitIndex)
 
     /**
      * Compares this [BigInt] with another [BigInt] for order.
@@ -1677,14 +1704,6 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         return byteLength
     }
 
-    /**
-     * Tests whether the magnitude bit at [bitIndex] is set.
-     *
-     * @param bitIndex 0-based, starting from the least-significant bit
-     * @return true if the bit is set, false otherwise
-     */
-    fun testBit(bitIndex: Int): Boolean = Magus.testBit(this.magia, this.meta.normLen, bitIndex)
-
     fun withSetBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = true)
 
     fun withClearBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = false)
@@ -1707,22 +1726,6 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         }
         throw IllegalArgumentException()
     }
-
-    /**
-     * Returns the index of the rightmost set bit (number of trailing zeros).
-     *
-     * If this BigInt is ZERO (no bits set), returns -1.
-     *
-     * Equivalent to `java.math.BigInteger.getLowestSetBit()`.
-     *
-     * @return bit index of the lowest set bit, or -1 if ZERO
-     */
-    fun countTrailingZeroBits(): Int = Magus.ntz(this.magia)
-
-    /**
-     * Returns the number of bits set in the magnitude, ignoring the sign.
-     */
-    fun magnitudeCountOneBits(): Int = Magus.bitPopulationCount(this.magia)
 
     /**
      * Returns a new BigInt representing the bitwise AND of the magnitudes,
