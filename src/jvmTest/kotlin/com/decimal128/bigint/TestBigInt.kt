@@ -416,7 +416,7 @@ class TestBigInt {
             println("bitIndex:$bitIndex bitWidth:$bitWidth")
         val bi = ((BigInteger.ONE shl bitWidth) - BigInteger.ONE) shl bitIndex
         val hi1 = ((BigInt.ONE shl bitWidth) - 1) shl bitIndex
-        val hi2 = BigInt.withIndexedBitMask(bitIndex, bitWidth)
+        val hi2 = BigInt.withBitMask(bitWidth, bitIndex)
         if (hi1 NE bi) {
             println("bitIndex:$bitIndex bitWidth:$bitWidth")
             println("bi:$bi hi1:$hi1")

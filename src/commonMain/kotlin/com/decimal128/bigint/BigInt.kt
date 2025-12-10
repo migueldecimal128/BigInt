@@ -865,78 +865,43 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 throw IllegalArgumentException("negative bitIndex:$bitIndex")
             if (bitIndex == 0)
                 return ONE
-            // FIXME - pick one of these
-            val magia = Magia.newWithBitLen(bitIndex + 1)
-            magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
-            val magia2 = Magia.newWithSetBit(bitIndex)
-            check (Magia.EQ(magia, magia2))
+            val magia = Magia.newWithSetBit(bitIndex)
             return BigInt(magia)
         }
 
         /**
-         * Constructs a non-negative BigInt with `bitWidth` bits set to 1.
+         * Returns a non-negative `BigInt` whose value is a bit mask of `bitWidth`
+         * consecutive 1-bits starting at bit position `bitIndex`.
          *
-         * The returned value is `2^bitWidth - 1`.
+         * Formally, this returns:
          *
-         * @throws IllegalArgumentException if `bitWidth` is negative.
+         *     (2^bitWidth - 1) << bitIndex
+         *
+         * which is a run of `bitWidth` ones shifted left by `bitIndex` bits.
+         *
+         * @param bitWidth number of consecutive 1-bits in the mask.
+         * @param bitIndex index (0-based) of the least significant bit of the mask.
+         *
+         * @throws IllegalArgumentException if either argument is negative.
          */
-        fun withBitMask(bitWidth: Int): BigInt {
-            return when {
-                bitWidth > 1 -> {
-                    val magia = Magia.newWithBitLen(bitWidth)
-                    magia.fill(-1)
-                    val leadingZeroCount = (magia.size * 32) - bitWidth
-                    magia[magia.lastIndex] = -1 ushr leadingZeroCount
-                    BigInt(magia)
-                }
-
-                bitWidth == 1 -> ONE
-                bitWidth == 0 -> ZERO
-                else -> throw IllegalArgumentException("negative bitWidth:$bitWidth")
+        fun withBitMask(bitWidth: Int, bitIndex: Int = 0): BigInt {
+            when {
+                bitIndex < 0 || bitWidth < 0 ->
+                    throw IllegalArgumentException(
+                        "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
+                bitWidth == 0 -> return ZERO
+                bitWidth == 1 -> return withSetBit(bitIndex)
             }
-        }
-
-        /**
-         * Constructs a non-negative BigInt with `bitWidth` bits set to 1, starting at
-         * the specified `bitIndex`.
-         *
-         * The returned value is `(2^bitWidth - 1) << bitIndex`, which is equivalent
-         * to `(2^bitWidth - 1) * 2^bitIndex`.
-         *
-         * @param bitIndex 0-based index of the least significant bit to start from.
-         * @param bitWidth number of consecutive bits to set.
-         *
-         * @throws IllegalArgumentException if `bitIndex` or `bitWidth` is negative.
-         */
-        fun withIndexedBitMask(bitIndex: Int, bitWidth: Int): BigInt = when {
-            bitIndex > 0 && bitWidth > 1 -> {
-                val bitLen = bitIndex + bitWidth
-                val magia = Magia.newWithBitLen(bitLen)
-                var wordIndex = bitIndex ushr 5
-                val initialInnerIndex = bitIndex and 0x1F
-                val initialBitCount = min(bitWidth, 32 - initialInnerIndex)
-                val initialMask = (((1L shl initialBitCount) - 1) shl initialInnerIndex).toInt()
-                magia[wordIndex++] = initialMask
-                var remainingBitCount = bitWidth - initialBitCount
-                if (remainingBitCount > 0) {
-                    while (remainingBitCount > 32) {
-                        magia[wordIndex++] = -1
-                        remainingBitCount -= 32
-                    }
-                    if (remainingBitCount > 0)
-                        magia[wordIndex] = (1 shl remainingBitCount) - 1
-                }
-                BigInt(magia)
-            }
-
-            bitIndex < 0 || bitWidth < 0 ->
-                throw IllegalArgumentException(
-                    "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth"
-                )
-
-            bitIndex == 0 -> withBitMask(bitWidth)
-            bitWidth == 1 -> withSetBit(bitIndex)
-            else -> ZERO
+            // non-zero and more than 1 bit wide
+            val bitLen = bitWidth + bitIndex
+            val magia = Magia.newWithBitLen(bitLen)
+            val loIndex = bitIndex ushr 5
+            magia.fill(-1, loIndex)
+            val nlz = (magia.size shl 5) - bitLen
+            magia[magia.lastIndex] = -1 ushr nlz
+            val ctz = bitIndex and 0x1F
+            magia[loIndex] = magia[loIndex] and (-1 shl ctz)
+            return BigInt(magia)
         }
 
         fun fromULongShiftLeft(dw: ULong, shiftLeftCount: Int, sign: Boolean = false): BigInt {
