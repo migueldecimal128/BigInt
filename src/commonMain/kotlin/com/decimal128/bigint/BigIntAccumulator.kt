@@ -4,12 +4,8 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.BigInt.Companion.NEG_ONE
-import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
-import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -68,9 +64,9 @@ import kotlin.math.min
  */
 class BigIntAccumulator private constructor (
     var meta: Meta,
-    var magia: IntArray,
-    var tmp1: IntArray) {
-    constructor() : this(Meta(0), IntArray(4), Magia.ZERO)
+    var magia: Magia,
+    var tmp1: Magia) {
+    constructor() : this(Meta(0), Magia(4), Magian.ZERO)
 
     val normLen: Int
         get() = meta.normLen
@@ -98,7 +94,7 @@ class BigIntAccumulator private constructor (
      *
      * Equivalent to the number of bits required to represent the absolute value.
      */
-    fun magnitudeBitLen() = Magia.bitLen(magia, meta.normLen)
+    fun magnitudeBitLen() = Magian.bitLen(magia, meta.normLen)
 
 
     /**
@@ -203,7 +199,7 @@ class BigIntAccumulator private constructor (
      */
     private inline fun ensureCapacityDiscard(minLimbLen: Int) {
         if (magia.size < minLimbLen)
-            magia = Magia.newWithFloorLen(minLimbLen)
+            magia = Magian.newWithFloorLen(minLimbLen)
     }
 
     /**
@@ -214,7 +210,7 @@ class BigIntAccumulator private constructor (
      */
     private inline fun ensureCapacityCopy(minLimbLen: Int) {
         if (magia.size < minLimbLen)
-            magia = Magia.newCopyWithFloorLen(magia, minLimbLen)
+            magia = Magian.newCopyWithFloorLen(magia, minLimbLen)
     }
 
     /**
@@ -254,7 +250,7 @@ class BigIntAccumulator private constructor (
             magia.fill(0, meta.normLen, newLimbLen)
             return
         }
-        magia = Magia.newCopyWithFloorLen(magia, meta.normLen, newLimbLen)
+        magia = Magian.newCopyWithFloorLen(magia, meta.normLen, newLimbLen)
     }
 
     /**
@@ -282,7 +278,7 @@ class BigIntAccumulator private constructor (
      * @param yLen the number of significant limbs in [y] to copy.
      * @return this accumulator instance, for call chaining.
      */
-    private fun set(yMeta: Meta, y: IntArray): BigIntAccumulator {
+    private fun set(yMeta: Meta, y: Magia): BigIntAccumulator {
         ensureCapacityDiscard(yMeta.normLen)
         meta = yMeta
         y.copyInto(magia)
@@ -323,27 +319,27 @@ class BigIntAccumulator private constructor (
     fun setSub(x: BigIntAccumulator, y: BigIntAccumulator) =
         setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
 
-    private fun setAddImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+    private fun setAddImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
         when {
             yMeta.isZero -> set(xMeta, x)
             xMeta.isZero -> set(yMeta, y)
             xMeta.signBit == yMeta.signBit -> {
                 ensureCapacityDiscard(xMeta.normLen + yMeta.normLen + 1)
                 meta = Meta(xMeta.signBit,
-                    Magia.setAdd(magia, x, xMeta.normLen, y, yMeta.normLen))
+                    Magian.setAdd(magia, x, xMeta.normLen, y, yMeta.normLen))
             }
             else -> {
-                val cmp: Int = Magia.compare(x, xMeta.normLen, y, yMeta.normLen)
+                val cmp: Int = Magian.compare(x, xMeta.normLen, y, yMeta.normLen)
                 when {
                     cmp > 0 -> {
                         ensureCapacityDiscard(xMeta.normLen)
                         meta = Meta(xMeta.signBit,
-                            Magia.setSub(magia, x, xMeta.normLen, y, yMeta.normLen))
+                            Magian.setSub(magia, x, xMeta.normLen, y, yMeta.normLen))
                     }
                     cmp < 0 -> {
                         ensureCapacityDiscard(yMeta.normLen)
                         meta = Meta(yMeta.signBit,
-                            Magia.setSub(magia, y, yMeta.normLen, x, xMeta.normLen))
+                            Magian.setSub(magia, y, yMeta.normLen, x, xMeta.normLen))
                     }
                     else -> setZero()
                 }
@@ -361,13 +357,13 @@ class BigIntAccumulator private constructor (
     fun setMul(x: BigIntAccumulator, y: BigIntAccumulator) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
 
-    private fun setMulImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+    private fun setMulImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
         swapTmp1()
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
         ensureCapacityDiscard(xNormLen + yNormLen)
         meta = Meta(xMeta.signBit xor yMeta.signBit,
-            Magia.setMul(magia, x, xNormLen, y, yNormLen))
+            Magian.setMul(magia, x, xNormLen, y, yNormLen))
         return this
     }
 
@@ -380,7 +376,7 @@ class BigIntAccumulator private constructor (
     fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator) =
         setDivImpl(x.meta, x.magia, y.meta, y.magia)
 
-    private fun setDivImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+    private fun setDivImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
         if (yNormLen == 0)
@@ -388,7 +384,7 @@ class BigIntAccumulator private constructor (
         swapTmp1()
         ensureCapacityDiscard(xNormLen)
         meta = Meta(xMeta.signBit xor yMeta.signBit,
-            Magia.setDiv(magia, x, xNormLen, y, yNormLen))
+            Magian.setDiv(magia, x, xNormLen, y, yNormLen))
         return this
     }
 
@@ -401,7 +397,7 @@ class BigIntAccumulator private constructor (
     fun setRem(x: BigIntAccumulator, y: BigIntAccumulator) =
         setRemImpl(x.meta, x.magia, y.meta, y.magia)
 
-    private fun setRemImpl(xMeta: Meta, x: IntArray, yMeta: Meta, y: IntArray): BigIntAccumulator {
+    private fun setRemImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
         if (yNormLen == 0)
@@ -409,7 +405,7 @@ class BigIntAccumulator private constructor (
         swapTmp1()
         ensureCapacityDiscard(xNormLen)
         meta = Meta(xMeta.signBit,
-            Magia.setRem(magia, x, xNormLen, y, yNormLen))
+            Magian.setRem(magia, x, xNormLen, y, yNormLen))
         return this
     }
 
@@ -636,17 +632,17 @@ class BigIntAccumulator private constructor (
     fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
         setShlImpl(x.meta, x.magia, bitCount)
 
-    private fun setShlImpl(xMeta: Meta, x: IntArray, bitCount: Int): BigIntAccumulator {
+    private fun setShlImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
         return when {
             bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
             bitCount == 0 -> set(xMeta, x)
             xMeta.isZero -> setZero()
             else -> {
-                val xBitLen = Magia.bitLen(x, xMeta.normLen)
+                val xBitLen = Magian.bitLen(x, xMeta.normLen)
                 val zBitLen = xBitLen + bitCount
                 ensureBitCapacityDiscard(zBitLen)
                 meta = Meta(meta.signBit,
-                    Magia.setShiftLeft(magia, x, xMeta.normLen, bitCount)
+                    Magian.setShiftLeft(magia, x, xMeta.normLen, bitCount)
                     )
                 return this
             }
@@ -675,8 +671,8 @@ class BigIntAccumulator private constructor (
     fun setUshr(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
         setUshrImpl(x.meta, x.magia, bitCount)
 
-    private fun setUshrImpl(xMeta: Meta, x: IntArray, bitCount: Int): BigIntAccumulator {
-        val xBitLen = Magia.bitLen(x, xMeta.normLen)
+    private fun setUshrImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
+        val xBitLen = Magian.bitLen(x, xMeta.normLen)
         val zBitLen = xBitLen - bitCount
         return when {
             bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
@@ -685,7 +681,7 @@ class BigIntAccumulator private constructor (
             else -> {
                 ensureBitCapacityDiscard(zBitLen)
                 meta = Meta(0,
-                    Magia.setShiftRight(magia, x, xMeta.normLen, bitCount))
+                    Magian.setShiftRight(magia, x, xMeta.normLen, bitCount))
                 this
             }
         }
@@ -715,20 +711,20 @@ class BigIntAccumulator private constructor (
     fun setShr(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
         setShrImpl(x.meta, x.magia, bitCount)
 
-    private fun setShrImpl(xMeta: Meta, x: IntArray, bitCount: Int): BigIntAccumulator {
+    private fun setShrImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
         when {
             bitCount > 0 -> {
-                val bitLen = Magia.bitLen(x, xMeta.normLen)
+                val bitLen = Magian.bitLen(x, xMeta.normLen)
                 val zBitLen = bitLen - bitCount
                 if (zBitLen <= 0)
                     return if (xMeta.isNegative) set (-1) else setZero()
-                val needsIncrement = xMeta.isNegative && Magia.testAnyBitInLowerN(x, bitCount)
+                val needsIncrement = xMeta.isNegative && Magian.testAnyBitInLowerN(x, bitCount)
                 ensureBitCapacityDiscard(zBitLen)
-                var normLen = Magia.setShiftRight(magia, x, xMeta.normLen, bitCount)
+                var normLen = Magian.setShiftRight(magia, x, xMeta.normLen, bitCount)
                 check (normLen > 0)
                 if (needsIncrement) {
                     ensureBitCapacityCopy(zBitLen + 1)
-                    normLen = Magia.setAdd(magia, magia, normLen, 1u)
+                    normLen = Magian.setAdd(magia, magia, normLen, 1u)
                 }
                 meta = Meta(xMeta.signFlag, normLen)
             }
@@ -744,7 +740,7 @@ class BigIntAccumulator private constructor (
      * @param bitIndex 0-based, starting from the least-significant bit
      * @return true if the bit is set, false otherwise
      */
-    fun testBit(bitIndex: Int): Boolean = Magia.testBit(this.magia, this.meta.normLen, bitIndex)
+    fun testBit(bitIndex: Int): Boolean = Magian.testBit(this.magia, this.meta.normLen, bitIndex)
 
     /**
      * Sets the bit at [bitIndex] in the magnitude, growing the limb array if needed.
@@ -782,7 +778,7 @@ class BigIntAccumulator private constructor (
             if (wordIndex < meta.normLen) {
                 val isolatedBitMask = (1 shl (bitIndex and 0x1F)).inv()
                 magia[wordIndex] = magia[wordIndex] and isolatedBitMask
-                meta = Meta(meta.signBit, Magia.normLen(magia, meta.normLen))
+                meta = Meta(meta.signBit, Magian.normLen(magia, meta.normLen))
             }
             return this
         }
@@ -891,12 +887,12 @@ class BigIntAccumulator private constructor (
         }
         val hi64 = unsignedMulHi(dw, dw)
         if (tmp1.size < 4)
-            tmp1 = IntArray(4)
+            tmp1 = Magia(4)
         tmp1[0] = lo64.toInt()
         tmp1[1] = (lo64 shr 32).toInt()
         tmp1[2] = hi64.toInt()
         tmp1[3] = (hi64 shr 32).toInt()
-        val normLen = Magia.normLen(tmp1, 4)
+        val normLen = Magian.normLen(tmp1, 4)
         mutateAddMagImpl(Meta(0, normLen), tmp1)
     }
 
@@ -906,7 +902,7 @@ class BigIntAccumulator private constructor (
      * @param hi the value to square and add.
      * @see addSquareOf(ULong)
      */
-    fun addSquareOf(hi: BigInt) = addSquareOfImpl(hi.magia, Magia.normLen(hi.magia))
+    fun addSquareOf(hi: BigInt) = addSquareOfImpl(hi.magia, Magian.normLen(hi.magia))
 
     /**
      * Adds the square of the given BigIntAccumulator value to this accumulator.
@@ -1012,7 +1008,7 @@ class BigIntAccumulator private constructor (
             meta.normLen > 2 || rawULong > dw -> {
                 //Magia.mutateSub(magia, meta.normLen, dw)
                 //val normLen = Magia.normLen(magia, meta.normLen)
-                val normLen = Magia.setSub(magia, magia, meta.normLen, dw)
+                val normLen = Magian.setSub(magia, magia, meta.normLen, dw)
                 meta = Meta(signFlag, normLen)
             }
             rawULong < dw -> set(otherSign, dw - rawULong)
@@ -1034,7 +1030,7 @@ class BigIntAccumulator private constructor (
      * @param y the array of limbs representing the operand's magnitude.
      * @param yLen the number of active limbs in [y] to consider.
      */
-    private fun mutateAddImpl(yMeta: Meta, y: IntArray) {
+    private fun mutateAddImpl(yMeta: Meta, y: Magia) {
         validate()
         when {
             yMeta.normLen <= 2 -> {
@@ -1049,14 +1045,14 @@ class BigIntAccumulator private constructor (
             normLen == 0 -> { set(yMeta, y); validate(); return }
             signBit == yMeta.signBit -> { mutateAddMagImpl(yMeta, y); validate(); return }
         }
-        val cmp = Magia.compare(magia, normLen, y, yMeta.normLen)
+        val cmp = Magian.compare(magia, normLen, y, yMeta.normLen)
         when {
             cmp > 0 -> meta = Meta(signBit,
-                Magia.setSub(magia, magia, normLen, y, yMeta.normLen))
+                Magian.setSub(magia, magia, normLen, y, yMeta.normLen))
             cmp < 0 -> {
                 ensureCapacityCopy(yMeta.normLen)
                 meta = Meta(yMeta.signBit,
-                    Magia.setSub(magia, y, yMeta.normLen, magia, normLen))
+                    Magian.setSub(magia, y, yMeta.normLen, magia, normLen))
             }
             else -> setZero()
         }
@@ -1077,7 +1073,7 @@ class BigIntAccumulator private constructor (
      */
     private fun mutateAddMagImpl(dw: ULong) {
         ensureCapacityCopy(normLen + 2)
-        val normLen = Magia.setAdd(magia, magia, normLen, dw)
+        val normLen = Magian.setAdd(magia, magia, normLen, dw)
         meta = Meta(signBit, normLen)
         validate()
     }
@@ -1095,10 +1091,10 @@ class BigIntAccumulator private constructor (
      * @param y the array of limbs representing the operand's magnitude.
      * @param yLen the number of active limbs in [y] to add.
      */
-    private fun mutateAddMagImpl(yMeta: Meta, y: IntArray) {
+    private fun mutateAddMagImpl(yMeta: Meta, y: Magia) {
         ensureCapacityCopy(yMeta.normLen + 1)
         meta = Meta(signBit,
-            Magia.setAdd(magia, magia, normLen, y, yMeta.normLen))
+            Magian.setAdd(magia, magia, normLen, y, yMeta.normLen))
         validate()
     }
 
@@ -1116,13 +1112,13 @@ class BigIntAccumulator private constructor (
      * @param y the array of limbs representing the operand's magnitude.
      * @param yNormLen the number of active limbs in [y] to square and add.
      */
-    private inline fun addSquareOfImpl(y: IntArray, yNormLen: Int) {
+    private inline fun addSquareOfImpl(y: Magia, yNormLen: Int) {
         val sqrLenMax = yNormLen * 2
         if (tmp1.size < sqrLenMax)
-            tmp1 = Magia.newWithFloorLen(sqrLenMax)
+            tmp1 = Magian.newWithFloorLen(sqrLenMax)
         else
             tmp1.fill(0, 0, sqrLenMax)
-        val normLenSqr = Magia.setSqr(tmp1, y, yNormLen)
+        val normLenSqr = Magian.setSqr(tmp1, y, yNormLen)
         mutateAddMagImpl(Meta(0, normLenSqr), tmp1)
         validate()
     }
@@ -1147,7 +1143,7 @@ class BigIntAccumulator private constructor (
             return
         }
         ensureCapacityCopy(normLen + 1)
-        meta = Meta(signFlag xor wSign, Magia.setMul(magia, magia, normLen, w))
+        meta = Meta(signFlag xor wSign, Magian.setMul(magia, magia, normLen, w))
         validate()
     }
 
@@ -1173,7 +1169,7 @@ class BigIntAccumulator private constructor (
         if (normLen == 0)
             return
         ensureCapacityCopy(normLen + 2)
-        meta = Meta(signFlag xor dwSign, Magia.setMul(magia, magia, normLen, dw))
+        meta = Meta(signFlag xor dwSign, Magian.setMul(magia, magia, normLen, dw))
         validate()
     }
 
@@ -1192,7 +1188,7 @@ class BigIntAccumulator private constructor (
      * @param y the array of limbs representing the operand's magnitude.
      * @param yLen the number of active limbs in [y] to multiply by.
      */
-    private fun mutateMulImpl(yMeta: Meta, y: IntArray) {
+    private fun mutateMulImpl(yMeta: Meta, y: Magia) {
         validate()
         if (normLen == 0 || yMeta.normLen == 0) {
             setZero()
@@ -1200,7 +1196,7 @@ class BigIntAccumulator private constructor (
         }
         swapTmp1()
         ensureCapacityCopy(normLen + yMeta.normLen + 1)
-        val normLen = Magia.setMul(magia, tmp1, normLen, y, yMeta.normLen)
+        val normLen = Magian.setMul(magia, tmp1, normLen, y, yMeta.normLen)
         meta = Meta(signBit xor yMeta.signBit, normLen)
         validate()
     }
@@ -1218,12 +1214,12 @@ class BigIntAccumulator private constructor (
         if (normLen > 0) {
             val newLimbLenMax = normLen * 2
             if (tmp1.size < newLimbLenMax)
-                tmp1 = Magia.newWithFloorLen(newLimbLenMax)
+                tmp1 = Magian.newWithFloorLen(newLimbLenMax)
             else
                 tmp1.fill(0, 0, newLimbLenMax)
             swapTmp1()
             meta = Meta(0,
-                Magia.setSqr(magia, tmp1, normLen))
+                Magian.setSqr(magia, tmp1, normLen))
         }
     }
 
@@ -1236,9 +1232,9 @@ class BigIntAccumulator private constructor (
      *
      * @return the decimal string representation of this accumulator.
      */
-    override fun toString(): String = Magia.toString(meta.isNegative, magia, normLen)
+    override fun toString(): String = Magian.toString(meta.isNegative, magia, normLen)
 
-    fun toStringX(): String = Magia.toString(meta.isNegative, magia, normLen)
+    fun toStringX(): String = Magian.toString(meta.isNegative, magia, normLen)
 
 }
 
@@ -1247,8 +1243,8 @@ class BigIntAccumulator private constructor (
  *
  * This method treats the input [n] as an unsigned 32-bit value and
  * returns it as a [ULong] where the upper 32 bits are zero. In
- * this context it is used for consistently extracting 64-bit limbs
- * from signed [IntArray] elements.
+ * this context it is used for consistently extracting 64-bit
+ * zero-extended limbs from signed [IntArray] elements.
  *
  * @param n the 32-bit integer to convert.
  * @return the zero-extended 64-bit unsigned value.

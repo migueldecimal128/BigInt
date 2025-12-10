@@ -56,7 +56,7 @@ value class Meta internal constructor(val meta: Int) {
         }
 
         operator fun invoke(signFlag: Boolean, x: IntArray, xLen: Int): Meta =
-            Meta(signFlag, Magia.normLen(x, xLen))
+            Meta(signFlag, Magian.normLen(x, xLen))
 
         operator fun invoke(signFlag: Boolean, x: IntArray): Meta {
             var normLen = x.size

@@ -3,12 +3,11 @@
 package com.decimal128.bigint
 
 /**
- * Magus ... an ancient Latin magician who works with Magia
- *
  * These are operations that are layered above Magia and
  * below [BigInt] and [BigIntAccumulator].
  *
- * Magus takes Meta and Magia and works his magic.
+ * Magus ... an ancient Latin magician who works with Magia
+ * Magus works his magic on magia.
  */
 object Magus {
 
@@ -27,7 +26,7 @@ object Magus {
      * Only values whose magnitude fits in one 32-bit limb (or zero) pass
      * this check.
      */
-    fun fitsInt(meta: Meta, magia: IntArray): Boolean {
+    fun fitsInt(meta: Meta, magia: Magia): Boolean {
         if (meta.isZero)
             return true
         if (meta.normLen > 1)

@@ -32,7 +32,7 @@ object BigIntAlgorithms {
         f[1] = (twentyBang ushr 32).toInt()
         var fNormLen = 2
         for (i in 21u..w)
-            fNormLen = Magia.setMul(f, f, fNormLen, i)
+            fNormLen = Magian.setMul(f, f, fNormLen, i)
         return BigInt(f, fNormLen)
     }
 
@@ -81,8 +81,8 @@ object BigIntAlgorithms {
             return b.abs()
         if (b.isZero())
             return a.abs()
-        val magia = Magia.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
-        check(magia !== Magia.ZERO)
+        val magia = Magian.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
+        check(magia !== Magian.ZERO)
         return BigInt(magia)
     }
 
@@ -98,11 +98,11 @@ object BigIntAlgorithms {
     fun lcm(a: BigInt, b: BigInt): BigInt {
         if (a.isZero() || b.isZero())
             return ZERO
-        val gcd = Magia.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
-        val lcm = if (Magia.bitLen(a.magia) < Magia.bitLen(b.magia))
-            Magia.newMul(Magia.newDiv(a.magia, gcd), b.magia)
+        val gcd = Magian.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
+        val lcm = if (Magian.bitLen(a.magia) < Magian.bitLen(b.magia))
+            Magian.newMul(Magian.newDiv(a.magia, gcd), b.magia)
         else
-            Magia.newMul(Magia.newDiv(b.magia, gcd), a.magia)
+            Magian.newMul(Magian.newDiv(b.magia, gcd), a.magia)
         return BigInt(lcm)
     }
 
@@ -132,14 +132,14 @@ object BigIntAlgorithms {
             exp == 0 -> ONE
             exp == 1 -> base
             base.isZero() -> ZERO
-            Magia.EQ(base.magia, 1) -> if (resultSign) BigInt.Companion.NEG_ONE else ONE
-            Magia.EQ(base.magia, 2) -> BigInt(resultSign, Magia.newWithSetBit(exp))
+            Magian.EQ(base.magia, 1) -> if (resultSign) BigInt.Companion.NEG_ONE else ONE
+            Magian.EQ(base.magia, 2) -> BigInt(resultSign, Magian.newWithSetBit(exp))
             exp == 2 -> base.sqr()
             else -> {
-                val maxBitLen = Magia.bitLen(base.magia) * exp
+                val maxBitLen = Magian.bitLen(base.magia) * exp
                 val maxBitLimbLen = (maxBitLen + 0x1F) ushr 5
-                var baseMag = Magia.newCopyWithExactLimbLen(base.magia, maxBitLimbLen)
-                var baseLen = Magia.normLen(base.magia)
+                var baseMag = Magian.newCopyWithExactLimbLen(base.magia, maxBitLimbLen)
+                var baseLen = Magian.normLen(base.magia)
                 var resultMag = IntArray(maxBitLimbLen)
                 resultMag[0] = 1
                 var resultLen = 1
@@ -149,7 +149,7 @@ object BigIntAlgorithms {
                 while (true) {
                     if ((e and 1) != 0) {
                         tmpMag.fill(0, 0, baseLen)
-                        resultLen = Magia.setMul(tmpMag, resultMag, resultLen, baseMag, baseLen)
+                        resultLen = Magian.setMul(tmpMag, resultMag, resultLen, baseMag, baseLen)
                         val t = tmpMag
                         tmpMag = resultMag
                         resultMag = t
@@ -158,7 +158,7 @@ object BigIntAlgorithms {
                     if (e == 0)
                         break
                     tmpMag.fill(0, 0, min(tmpMag.size, 2 * baseLen))
-                    baseLen = Magia.setSqr(tmpMag, baseMag, baseLen)
+                    baseLen = Magian.setSqr(tmpMag, baseMag, baseLen)
                     val t = tmpMag
                     tmpMag = baseMag
                     baseMag = t
@@ -234,13 +234,13 @@ object BigIntAlgorithms {
     fun isqrt(radicand: BigInt): BigInt {
         if (radicand.meta.isNegative)
             throw ArithmeticException("Square root of a negative BigInt")
-        val bitLen = Magia.bitLen(radicand.magia)
+        val bitLen = Magian.bitLen(radicand.magia)
         if (bitLen <= 53) {
             return when {
                 bitLen == 0 -> ZERO
                 bitLen == 1 -> ONE
                 else -> {
-                    val dw = Magia.toRawULong(radicand.magia)
+                    val dw = Magian.toRawULong(radicand.magia)
                     val d = dw.toDouble()
                     val sqrt = sqrt(d)
                     var isqrt = sqrt.toULong()
@@ -280,7 +280,7 @@ object BigIntAlgorithms {
         // These two errors are independent, and each can reduce the estimate by 1.
         // Therefore we add +2 total, ensuring the initial estimate of sqrt()
         // (after a single correction pass) is never too small.
-        val top = Magia.extractULongAtBitIndex(radicand.magia, topBitsIndex) + 1uL + 1uL
+        val top = Magian.extractULongAtBitIndex(radicand.magia, topBitsIndex) + 1uL + 1uL
         // a single check to ensure that the initial isqrt estimate >= the actual isqrt
         var topSqrt = ceil(sqrt(top.toDouble())).toULong()
         val crossCheck = topSqrt * topSqrt
@@ -303,9 +303,9 @@ object BigIntAlgorithms {
 
         var x = IntArray(tmpLimbLen)
         x[0] = topSqrt.toInt()
-        var xNormLen = Magia.setShiftLeft(x, x, 1, topBitsIndex shr 1)
-        val x2 = Magia.newWithUIntAtBitIndex(topSqrt.toUInt(), topBitsIndex shr 1)
-        check (Magia.EQ(x, x2))
+        var xNormLen = Magian.setShiftLeft(x, x, 1, topBitsIndex shr 1)
+        val x2 = Magian.newWithUIntAtBitIndex(topSqrt.toUInt(), topBitsIndex shr 1)
+        check (Magian.EQ(x, x2))
 
         var xPrev = IntArray(tmpLimbLen)
         var xPrevNormLen: Int
@@ -313,11 +313,11 @@ object BigIntAlgorithms {
             val t = xPrev; xPrev = x; x = t
             xPrevNormLen = xNormLen
 
-            xNormLen = Magia.setDiv(x, radicand.magia, radicand.meta.normLen, xPrev, xPrevNormLen)
-            xNormLen = Magia.setAdd(x, x, xNormLen, xPrev, xPrevNormLen)
-            xNormLen = Magia.setShiftRight(x, x, xNormLen, 1)
+            xNormLen = Magian.setDiv(x, radicand.magia, radicand.meta.normLen, xPrev, xPrevNormLen)
+            xNormLen = Magian.setAdd(x, x, xNormLen, xPrev, xPrevNormLen)
+            xNormLen = Magian.setShiftRight(x, x, xNormLen, 1)
 
-        } while (Magia.compare(x, xNormLen, xPrev, xPrevNormLen) < 0)
+        } while (Magian.compare(x, xNormLen, xPrev, xPrevNormLen) < 0)
         val ret = BigInt(xPrev, xPrevNormLen)
         return ret
     }

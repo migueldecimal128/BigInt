@@ -57,9 +57,9 @@ class TestMagia {
         val str2 = MagiaTransducer.magiaToString(car)
         Assertions.assertEquals(str, str2)
 
-        val car3 = Magia.from(str)
-        assert(Magia.EQ(car, car3))
-        val str3 = Magia.toString(car3)
+        val car3 = Magian.from(str)
+        assert(Magian.EQ(car, car3))
+        val str3 = Magian.toString(car3)
         Assertions.assertEquals(str, str3)
     }
 
@@ -68,20 +68,20 @@ class TestMagia {
         val magia = MagiaTransducer.magiaFromBi(jbi)
 
         val jbiLeft = jbi.shiftLeft(shift)
-        val carLeft = Magia.newShiftLeft(magia, shift)
+        val carLeft = Magian.newShiftLeft(magia, shift)
         assert(MagiaTransducer.EQ(carLeft, jbiLeft))
 
-        Magia.mutateShiftRight(carLeft, carLeft.size, shift)
+        Magian.mutateShiftRight(carLeft, carLeft.size, shift)
         assert(MagiaTransducer.EQ(carLeft, jbi))
 
         val jbiRight = jbi.shiftRight(shift)
-        Magia.mutateShiftRight(magia, magia.size, shift)
+        Magian.mutateShiftRight(magia, magia.size, shift)
         assert(MagiaTransducer.EQ(magia, jbiRight))
     }
 
     fun testBitLen(jbi: BigInteger) {
         val magia = MagiaTransducer.magiaFromBi(jbi)
-        val bitLen = Magia.bitLen(magia)
+        val bitLen = Magian.bitLen(magia)
         Assertions.assertEquals(jbi.bitLength(), bitLen)
     }
 
@@ -112,7 +112,7 @@ class TestMagia {
     fun testAdd(jjbiA: BigInteger, jjbiB: BigInteger) {
         val magiaA = MagiaTransducer.magiaFromBi(jjbiA)
         val magiaB = MagiaTransducer.magiaFromBi(jjbiB)
-        val magiaSum = Magia.newAdd(magiaA, Magia.normLen(magiaA), magiaB, Magia.normLen(magiaB))
+        val magiaSum = Magian.newAdd(magiaA, Magian.normLen(magiaA), magiaB, Magian.normLen(magiaB))
 
         val jbiSum = jjbiA.add(jjbiB)
 
@@ -128,7 +128,7 @@ class TestMagia {
         }
         val magiaX = MagiaTransducer.magiaFromBi(jbiX)
         val magiaY = MagiaTransducer.magiaFromBi(jbiY)
-        val magiaDiff = Magia.newSub(magiaX, Magia.normLen(magiaX), magiaY, Magia.normLen(magiaY))
+        val magiaDiff = Magian.newSub(magiaX, Magian.normLen(magiaX), magiaY, Magian.normLen(magiaY))
 
         val jbiDiff = jbiX.subtract(jbiY)
 
@@ -138,7 +138,7 @@ class TestMagia {
     fun testMul(jbiA: BigInteger, jbiB: BigInteger) {
         val magiaA = MagiaTransducer.magiaFromBi(jbiA)
         val magiaB = MagiaTransducer.magiaFromBi(jbiB)
-        val magiaProd = Magia.newMul(magiaA, magiaB)
+        val magiaProd = Magian.newMul(magiaA, magiaB)
 
         val jbiProd = jbiA.multiply(jbiB)
 
@@ -150,7 +150,7 @@ class TestMagia {
             return
         val magiaA = MagiaTransducer.magiaFromBi(jbiA)
         val magiaB = MagiaTransducer.magiaFromBi(jbiB)
-        val magiaQuot = Magia.newDiv(magiaA, magiaB)
+        val magiaQuot = Magian.newDiv(magiaA, magiaB)
 
         val jbiQuot = jbiA.divide(jbiB)
 
