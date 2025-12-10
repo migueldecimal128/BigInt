@@ -6,8 +6,8 @@ package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import kotlin.math.absoluteValue
-import kotlin.math.min
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
 import kotlin.text.HexFormat
 
@@ -1708,6 +1708,43 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
 
             else -> throw IllegalArgumentException("bitCount < 0")
         }
+    }
+
+    /**
+     * Returns this value masked to the `bitWidth` consecutive bits starting at
+     * `bitIndex`. Bits outside the mask range are cleared. The sign of this value
+     * is preserved.
+     *
+     * This is equivalent to:
+     *
+     *     result = this & ((2^bitWidth - 1) << bitIndex)
+     *
+     * @throws IllegalArgumentException if `bitWidth` or `bitIndex` is negative.
+     */
+    fun withBitMask(bitWidth: Int, bitIndex: Int = 0): BigInt {
+        val myBitLen = magnitudeBitLen()
+        when {
+            bitIndex < 0 || bitWidth < 0 ->
+                throw IllegalArgumentException(
+                    "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
+            bitWidth == 0 -> return ZERO
+            bitIndex >= myBitLen -> return ZERO
+            bitWidth == 1 && !testBit(bitIndex) -> return ZERO
+            bitWidth == 1 -> {
+                val magia = Magia.newWithSetBit(bitIndex)
+                return BigInt(meta.signFlag, magia)
+            }
+        }
+        // more than 1 bit wide and some overlap
+        val clampedBitLen = min(bitWidth + bitIndex, myBitLen)
+        val ret = Magia.newCopyWithExactBitLen(magia, meta.normLen, clampedBitLen)
+        val nlz = (ret.size shl 5) - clampedBitLen
+        ret[ret.lastIndex] = ret[ret.lastIndex] and (-1 ushr nlz)
+        val loIndex = bitIndex ushr 5
+        ret.fill(0, 0, loIndex)
+        val ctz = bitIndex and 0x1F
+        ret[loIndex] = ret[loIndex] and (-1 shl ctz)
+        return BigInt(meta.signFlag, ret)
     }
 
     /**
