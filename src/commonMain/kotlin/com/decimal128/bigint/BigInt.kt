@@ -66,11 +66,11 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
          * This ensures that identity comparisons and optimizations relying on
          * reference equality (`===`) for zero values are valid.
          */
-        val ZERO = BigInt(Meta(0), Magian.ZERO)
+        val ZERO = BigInt(Meta(0), Magus.ZERO)
 
-        val ONE = BigInt(Meta(1), Magian.ONE)
+        val ONE = BigInt(Meta(1), Magus.ONE)
 
-        val NEG_ONE = BigInt(Meta(1, 1), Magian.ONE) // share magia .. but no mutation allowed
+        val NEG_ONE = BigInt(Meta(1, 1), Magus.ONE) // share magia .. but no mutation allowed
 
         val TEN = BigInt(Meta(4), intArrayOf(10))
 
@@ -84,7 +84,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
 
         internal operator fun invoke(sign: Boolean, magia: Magia): BigInt {
             if (magia.isEmpty()) {
-                check(magia === Magian.ZERO)
+                check(magia === Magus.ZERO)
                 return ZERO
             }
             val signBit = if (sign) 1 else 0
@@ -94,7 +94,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
 
         internal operator fun invoke(magia: Magia): BigInt {
             if (magia.isEmpty()) {
-                check (magia === Magian.ZERO)
+                check (magia === Magus.ZERO)
                 return ZERO
             }
             val signBit = 0
@@ -104,7 +104,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
 
         internal operator fun invoke(magia: Magia, normLen: Int): BigInt {
             if (magia.isEmpty()) {
-                check (magia === Magian.ZERO)
+                check (magia === Magus.ZERO)
                 return ZERO
             }
             val signBit = 0
@@ -116,7 +116,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
 
         internal operator fun invoke(sign: Boolean, magia: Magia, normLen: Int): BigInt {
             if (magia.isEmpty()) {
-                check (magia === Magian.ZERO)
+                check (magia === Magus.ZERO)
                 return ZERO
             }
             val signBit = if (sign) 1 else 0
@@ -491,14 +491,14 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
          * representations.
          */
         private fun from(src: Latin1Iterator): BigInt =
-            BigInt(src.peek() == '-', Magian.from(src))
+            BigInt(src.peek() == '-', Magus.from(src))
 
         /**
          * Parse a BigInt thru a standard iterator for different text
          * representations.
          */
         private fun fromHex(src: Latin1Iterator): BigInt =
-            BigInt(src.peek() == '-', Magian.fromHex(src))
+            BigInt(src.peek() == '-', Magus.fromHex(src))
 
         /**
          * Generates a random `BigInt` whose magnitude is uniformly sampled from
@@ -546,7 +546,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         ): BigInt {
             if (maxBitLen > 0) {
                 var zeroTest = 0
-                val magia = Magian.newWithBitLen(maxBitLen)
+                val magia = Magus.newWithBitLen(maxBitLen)
                 val topBits = maxBitLen and 0x1F
                 var mask = (if (topBits == 0) 0 else (1 shl topBits)) - 1
                 for (i in magia.lastIndex downTo 0) {
@@ -602,7 +602,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         ): BigInt {
             if (bitLen > 0) {
                 var zeroTest = 0
-                val magia = Magian.newWithBitLen(bitLen)
+                val magia = Magus.newWithBitLen(bitLen)
                 val topBits = bitLen and 0x1F
                 var mask = (if (topBits == 0) 0 else (1 shl topBits)) - 1
                 for (i in magia.lastIndex downTo 0) {
@@ -829,11 +829,11 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
             if (length > 0) {
                 val ibSign = offset - 1 + (if (isBigEndian) 1 else length)
                 val isNegative = isTwosComplement && bytes[ibSign] < 0
-                val magia = Magian.fromBinaryBytes(
+                val magia = Magus.fromBinaryBytes(
                     isNegative, isBigEndian, bytes, offset,
                     length
                 )
-                if (magia !== Magian.ZERO)
+                if (magia !== Magus.ZERO)
                     return BigInt(isNegative, magia)
             }
             return ZERO
@@ -849,7 +849,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
          * Converts a Little-Endian IntArray to a BigInt with the specified sign.
          */
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray, len: Int): BigInt {
-            val magia = Magian.newNormalizedCopy(littleEndianIntArray, len)
+            val magia = Magus.newNormalizedCopy(littleEndianIntArray, len)
             return BigInt(sign, magia)
         }
 
@@ -865,7 +865,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
                 throw IllegalArgumentException("negative bitIndex:$bitIndex")
             if (bitIndex == 0)
                 return ONE
-            val magia = Magian.newWithSetBit(bitIndex)
+            val magia = Magus.newWithSetBit(bitIndex)
             return BigInt(magia)
         }
 
@@ -894,7 +894,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
             }
             // non-zero and more than 1 bit wide
             val bitLen = bitWidth + bitIndex
-            val magia = Magian.newWithBitLen(bitLen)
+            val magia = Magus.newWithBitLen(bitLen)
             val loIndex = bitIndex ushr 5
             magia.fill(-1, loIndex)
             val nlz = (magia.size shl 5) - bitLen
@@ -913,7 +913,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
                     dwBitLen == 1 -> withSetBit(shiftLeftCount)
                     else -> {
                         val totalBitLen = dwBitLen + shiftLeftCount
-                        val magia = Magian.newWithBitLen(totalBitLen)
+                        val magia = Magus.newWithBitLen(totalBitLen)
                         val innerShift = shiftLeftCount and 0x1F
                         val lo = (dw shl innerShift).toInt()
                         if (innerShift == 0) {
@@ -1019,13 +1019,13 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * @return -1 if negative, 0 if zero, 1 if positive
      */
-    fun signum() = Magus.signum(meta)
+    fun signum() = Magian.signum(meta)
 
     /**
      * Returns `true` if the magnitude of this BigInt is a power of two
      * (exactly one bit set).
      */
-    fun isMagnitudePowerOfTwo(): Boolean = Magian.isPowerOfTwo(this.magia, this.meta.normLen)
+    fun isMagnitudePowerOfTwo(): Boolean = Magus.isPowerOfTwo(this.magia, this.meta.normLen)
 
     /**
      * Returns `true` if this value is exactly representable as a 32-bit
@@ -1034,20 +1034,20 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Only values whose magnitude fits in one 32-bit limb (or zero) pass
      * this check.
      */
-    fun fitsInt(): Boolean = Magus.fitsInt(meta, magia)
+    fun fitsInt(): Boolean = Magian.fitsInt(meta, magia)
 
     /**
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 32-bit integer (`0 .. UInt.MAX_VALUE`).
      */
-    fun fitsUInt() = meta.isPositive && Magian.normLen(magia) <= 1
+    fun fitsUInt() = meta.isPositive && Magus.normLen(magia) <= 1
 
     /**
      * Returns `true` if this value fits in a signed 64-bit integer
      * (`Long.MIN_VALUE .. Long.MAX_VALUE`).
      */
     fun fitsLong(): Boolean {
-        val limbLen = Magian.normLen(magia)
+        val limbLen = Magus.normLen(magia)
         return when {
             limbLen > 2 -> false
             limbLen < 2 -> true
@@ -1060,7 +1060,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 64-bit integer (`0 .. ULong.MAX_VALUE`).
      */
-    fun fitsULong() = meta.isPositive && Magian.normLen(magia) <= 2
+    fun fitsULong() = meta.isPositive && Magus.normLen(magia) <= 2
 
     /**
      * Returns the low 32 bits of this value, interpreted as a signed
@@ -1094,7 +1094,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Values less than `Int.MIN_VALUE` return `Int.MIN_VALUE`.
      */
     fun toIntClamped(): Int {
-        val bitLen = Magian.bitLen(magia)
+        val bitLen = Magus.bitLen(magia)
         if (bitLen == 0)
             return 0
         val mag = magia[0]
@@ -1130,7 +1130,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     fun toUIntClamped(): UInt {
         if (meta.isPositive) {
-            val bitLen = Magian.bitLen(magia)
+            val bitLen = Magus.bitLen(magia)
             if (bitLen > 0) {
                 val magnitude = magia[0]
                 return if (bitLen <= 32) magnitude.toUInt() else UInt.MAX_VALUE
@@ -1174,7 +1174,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Values less than `Long.MIN_VALUE` return `Long.MIN_VALUE`.
      */
     fun toLongClamped(): Long {
-        val bitLen = Magian.bitLen(magia)
+        val bitLen = Magus.bitLen(magia)
         val magnitude = when (magia.size) {
             0 -> 0L
             1 -> magia[0].toLong() and 0xFFFF_FFFFL
@@ -1212,7 +1212,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     fun toULongClamped(): ULong {
         if (meta.isPositive) {
-            val bitLen = Magian.bitLen(magia)
+            val bitLen = Magus.bitLen(magia)
             val magnitude = when (magia.size) {
                 0 -> 0L
                 1 -> magia[0].toLong() and 0xFFFF_FFFFL
@@ -1250,7 +1250,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     fun extractULongAtBitIndex(bitIndex: Int): ULong {
         if (bitIndex >= 0)
-            return Magian.extractULongAtBitIndex(magia, bitIndex)
+            return Magus.extractULongAtBitIndex(magia, bitIndex)
         throw IllegalArgumentException("invalid bitIndex:$bitIndex")
     }
 
@@ -1313,35 +1313,35 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
 
     operator fun times(other: BigInt): BigInt {
         return if (isNotZero() && other.isNotZero())
-            BigInt(meta.signFlag xor other.meta.signFlag, Magian.newMul(this.magia, other.magia))
+            BigInt(meta.signFlag xor other.meta.signFlag, Magus.newMul(this.magia, other.magia))
         else
             ZERO
     }
 
     operator fun times(n: Int): BigInt {
         return if (isNotZero() && n != 0)
-            BigInt(this.meta.signFlag xor (n < 0), Magian.newMul(this.magia, n.absoluteValue.toUInt()))
+            BigInt(this.meta.signFlag xor (n < 0), Magus.newMul(this.magia, n.absoluteValue.toUInt()))
         else
             ZERO
     }
 
     operator fun times(w: UInt): BigInt {
         return if (isNotZero() && w != 0u)
-            BigInt(this.meta.signFlag, Magian.newMul(this.magia, w))
+            BigInt(this.meta.signFlag, Magus.newMul(this.magia, w))
         else
             ZERO
     }
 
     operator fun times(l: Long): BigInt {
         return if (isNotZero() && l != 0L)
-            BigInt(this.meta.signFlag xor (l < 0), Magian.newMul(this.magia, l.absoluteValue.toULong()))
+            BigInt(this.meta.signFlag xor (l < 0), Magus.newMul(this.magia, l.absoluteValue.toULong()))
         else
             ZERO
     }
 
     operator fun times(dw: ULong): BigInt {
         return if (isNotZero() && dw != 0uL)
-            BigInt(this.meta.signFlag, Magian.newMul(this.magia, dw))
+            BigInt(this.meta.signFlag, Magus.newMul(this.magia, dw))
         else
             ZERO
     }
@@ -1350,7 +1350,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (other.isZero())
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magian.newDiv(this.magia, other.magia)
+            val quot = Magus.newDiv(this.magia, other.magia)
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag xor other.meta.signFlag, quot)
         }
@@ -1361,7 +1361,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (n == 0)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magian.newDiv(this.magia, n.absoluteValue.toUInt())
+            val quot = Magus.newDiv(this.magia, n.absoluteValue.toUInt())
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag xor (n < 0), quot)
         }
@@ -1372,7 +1372,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (w == 0u)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magian.newDiv(this.magia, w)
+            val quot = Magus.newDiv(this.magia, w)
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag, quot)
         }
@@ -1383,7 +1383,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (l == 0L)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magian.newDiv(this.magia, l.absoluteValue.toULong())
+            val quot = Magus.newDiv(this.magia, l.absoluteValue.toULong())
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag xor (l < 0), quot)
         }
@@ -1394,7 +1394,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (dw == 0uL)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magian.newDiv(this.magia, dw)
+            val quot = Magus.newDiv(this.magia, dw)
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag, quot)
         }
@@ -1405,7 +1405,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (other.isZero())
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magian.newRem(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
+            val rem = Magus.newRem(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
             if (rem.isNotEmpty())
                 return BigInt(this.meta.signFlag, rem)
         }
@@ -1420,7 +1420,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (w == 0u)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magian.newRem(this.magia, this.meta.normLen, w)
+            val rem = Magus.newRem(this.magia, this.meta.normLen, w)
             if (rem.isNotEmpty())
                 return BigInt(this.meta.signFlag, rem)
         }
@@ -1433,7 +1433,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (dw == 0uL)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val rem = Magian.newRem(this.magia, this.meta.normLen, dw)
+            val rem = Magus.newRem(this.magia, this.meta.normLen, dw)
             if (rem.isNotEmpty())
                 return BigInt(this.meta.signFlag, rem)
         }
@@ -1465,7 +1465,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         else
             return BigInt(
                 this.meta.signFlag xor signNumerator,
-                Magian.newFromULong(quotient)
+                Magus.newFromULong(quotient)
             )
     }
 
@@ -1487,12 +1487,12 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (this.isZero())
             throw ArithmeticException("div by zero")
         if (this.magnitudeCompareTo(numerator) > 0)
-            return BigInt(signNumerator, Magian.newFromULong(numerator))
+            return BigInt(signNumerator, Magus.newFromULong(numerator))
         val remainder = numerator % this.toULongMagnitude()
         if (remainder == 0uL)
             return ZERO
         else
-            return BigInt(signNumerator, Magian.newFromULong(remainder))
+            return BigInt(signNumerator, Magus.newFromULong(remainder))
     }
 
     /**
@@ -1502,8 +1502,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     fun sqr(): BigInt {
         if (this.isNotZero()) {
-            check(Magian.normLen(this.magia) > 0)
-            val magiaSqr = Magian.newSqr(this.magia)
+            check(Magus.normLen(this.magia) > 0)
+            val magiaSqr = Magus.newSqr(this.magia)
             return BigInt(magiaSqr)
         }
         return ZERO
@@ -1514,7 +1514,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * Equivalent to the number of bits required to represent the absolute value.
      */
-    fun magnitudeBitLen() = Magian.bitLen(magia, meta.normLen)
+    fun magnitudeBitLen() = Magus.bitLen(magia, meta.normLen)
 
     /**
      * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
@@ -1526,17 +1526,17 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * Example: `BigInteger("-1").bitLength() == 0` ... think about ie :)
      */
-    fun bitLengthBigIntegerStyle(): Int = Magian.bitLengthBigIntegerStyle(meta.isNegative, magia)
+    fun bitLengthBigIntegerStyle(): Int = Magus.bitLengthBigIntegerStyle(meta.isNegative, magia)
 
     /**
      * Returns the number of 32-bit integers required to store the binary magnitude.
      */
-    fun magnitudeIntArrayLen() = (Magian.bitLen(magia) + 31) ushr 5
+    fun magnitudeIntArrayLen() = (Magus.bitLen(magia) + 31) ushr 5
 
     /**
      * Returns the number of 64-bit longs required to store the binary magnitude.
      */
-    fun magnitudeLongArrayLen() = (Magian.bitLen(magia) + 63) ushr 6
+    fun magnitudeLongArrayLen() = (Magus.bitLen(magia) + 63) ushr 6
 
     /**
      * Computes the number of bytes needed to represent this BigInt
@@ -1559,7 +1559,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @param bitIndex 0-based, starting from the least-significant bit
      * @return true if the bit is set, false otherwise
      */
-    fun testBit(bitIndex: Int): Boolean = Magian.testBit(this.magia, this.meta.normLen, bitIndex)
+    fun testBit(bitIndex: Int): Boolean = Magus.testBit(this.magia, this.meta.normLen, bitIndex)
 
     fun withSetBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = true)
 
@@ -1569,8 +1569,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         if (bitIndex >= 0) {
             if (! (testBit(bitIndex) xor isSetOp))
                 return this
-            val newBitLen = max(bitIndex + 1, Magian.bitLen(this.magia, this.meta.normLen))
-            val magia = Magian.newCopyWithExactBitLen(this.magia, this.meta.normLen, newBitLen)
+            val newBitLen = max(bitIndex + 1, Magus.bitLen(this.magia, this.meta.normLen))
+            val magia = Magus.newCopyWithExactBitLen(this.magia, this.meta.normLen, newBitLen)
             val wordIndex = bitIndex ushr 5
             val isolatedBit = (1 shl (bitIndex and 0x1F))
             val limb = magia[wordIndex]
@@ -1593,12 +1593,12 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * @return bit index of the lowest set bit, or -1 if ZERO
      */
-    fun countTrailingZeroBits(): Int = Magian.ntz(this.magia)
+    fun countTrailingZeroBits(): Int = Magus.ntz(this.magia)
 
     /**
      * Returns the number of bits set in the magnitude, ignoring the sign.
      */
-    fun magnitudeCountOneBits(): Int = Magian.bitPopulationCount(this.magia)
+    fun magnitudeCountOneBits(): Int = Magus.bitPopulationCount(this.magia)
 
     /**
      * Returns a new BigInt representing the bitwise AND of the magnitudes,
@@ -1607,7 +1607,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * The result is always non-negative.
      */
     infix fun and(other: BigInt): BigInt {
-        val magiaAnd = Magian.newAnd(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
+        val magiaAnd = Magus.newAnd(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
         return if (magiaAnd.isNotEmpty()) BigInt(magiaAnd) else ZERO
     }
 
@@ -1619,7 +1619,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     infix fun or(other: BigInt): BigInt {
         val magiaOr =
-            Magian.newOr(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
+            Magus.newOr(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
         return if (magiaOr.isNotEmpty()) BigInt(magiaOr) else ZERO
     }
 
@@ -1630,7 +1630,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * The result is always non-negative.
      */
     infix fun xor(other: BigInt): BigInt {
-        val magiaXor = Magian.newXor(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
+        val magiaXor = Magus.newXor(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
         return if (magiaXor.isNotEmpty()) BigInt(magiaXor) else ZERO
     }
 
@@ -1645,8 +1645,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
     infix fun ushr(bitCount: Int): BigInt {
         return when {
             bitCount > 0 -> {
-                val magia = Magian.newShiftRight(this.magia, bitCount)
-                if (magia !== Magian.ZERO) BigInt(magia) else ZERO
+                val magia = Magus.newShiftRight(this.magia, bitCount)
+                if (magia !== Magus.ZERO) BigInt(magia) else ZERO
             }
 
             bitCount == 0 -> abs()
@@ -1668,11 +1668,11 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
                 val bitLen = magnitudeBitLen()
                 if (bitLen <= bitCount)
                     return if (meta.isPositive) ZERO else NEG_ONE
-                val needsIncrement = meta.isNegative && Magian.testAnyBitInLowerN(magia, bitCount)
-                var magia = Magian.newShiftRight(this.magia, bitCount)
-                check (Magian.normLen(magia) > 0)
+                val needsIncrement = meta.isNegative && Magus.testAnyBitInLowerN(magia, bitCount)
+                var magia = Magus.newShiftRight(this.magia, bitCount)
+                check (Magus.normLen(magia) > 0)
                 if (needsIncrement)
-                    magia = Magian.newOrMutateAdd(magia, 1u)
+                    magia = Magus.newOrMutateAdd(magia, 1u)
                 return BigInt(meta.signFlag, magia)
             }
 
@@ -1692,7 +1692,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
             isZero() || bitCount == 0 -> this
             bitCount > 0 -> BigInt(
                 this.meta.signFlag,
-                Magian.newShiftLeft(this.magia, bitCount)
+                Magus.newShiftLeft(this.magia, bitCount)
             )
 
             else -> throw IllegalArgumentException("bitCount < 0")
@@ -1720,13 +1720,13 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
                     bitIndex >= myBitLen ||
                     bitWidth == 1 && !testBit(bitIndex) -> return ZERO
             bitWidth == 1 -> {
-                val magia = Magian.newWithSetBit(bitIndex)
+                val magia = Magus.newWithSetBit(bitIndex)
                 return BigInt(meta.signFlag, magia)
             }
         }
         // more than 1 bit wide and some overlap
         val clampedBitLen = min(bitWidth + bitIndex, myBitLen)
-        val ret = Magian.newCopyWithExactBitLen(magia, meta.normLen, clampedBitLen)
+        val ret = Magus.newCopyWithExactBitLen(magia, meta.normLen, clampedBitLen)
         val nlz = (ret.size shl 5) - clampedBitLen
         ret[ret.lastIndex] = ret[ret.lastIndex] and (-1 ushr nlz)
         val loIndex = bitIndex ushr 5
@@ -1752,7 +1752,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
     override operator fun compareTo(other: BigInt): Int {
         if (this.meta.signFlag != other.meta.signFlag)
             return this.meta.signMask or 1
-        val cmp = Magian.compare(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
+        val cmp = Magus.compare(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
         return this.meta.negateIfNegative(cmp)
     }
 
@@ -1820,14 +1820,14 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @return -1,0,1
      */
     fun magnitudeCompareTo(other: BigInt) =
-        Magian.compare(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
+        Magus.compare(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
     fun magnitudeCompareTo(un: UInt) =
-        Magian.compare(this.magia, this.meta.normLen, un.toULong())
+        Magus.compare(this.magia, this.meta.normLen, un.toULong())
     fun magnitudeCompareTo(ul: ULong) =
-        Magian.compare(this.magia, this.meta.normLen, ul)
+        Magus.compare(this.magia, this.meta.normLen, ul)
     fun magnitudeCompareTo(littleEndianIntArray: IntArray) =
-        Magian.compare(this.magia, this.meta.normLen,
-            littleEndianIntArray, Magian.normLen(littleEndianIntArray))
+        Magus.compare(this.magia, this.meta.normLen,
+            littleEndianIntArray, Magus.normLen(littleEndianIntArray))
 
     /**
      * Comparison predicate for numerical equality with another [BigInt].
@@ -1837,7 +1837,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     infix fun EQ(other: BigInt): Boolean =
         (this.meta.meta == other.meta.meta) &&
-                Magian.compare(this.magia, meta.normLen, other.magia, other.meta.normLen) == 0
+                Magus.compare(this.magia, meta.normLen, other.magia, other.meta.normLen) == 0
 
     /**
      * Comparison predicate for numerical equality with the current
@@ -1848,7 +1848,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     infix fun EQ(acc: BigIntAccumulator): Boolean =
         (this.meta.meta == acc.meta.meta) &&
-                Magian.compare(this.magia, meta.normLen, acc.magia, acc.meta.normLen) == 0
+                Magus.compare(this.magia, meta.normLen, acc.magia, acc.meta.normLen) == 0
 
     /**
      * Comparison predicate for numerical equality with a signed 32-bit integer.
@@ -1969,7 +1969,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     override fun hashCode(): Int {
         var result = meta.isNegative.hashCode()
-        result = 31 * result + Magian.normalizedHashCode(magia)
+        result = 31 * result + Magus.normalizedHashCode(magia)
         return result
     }
 
@@ -1981,7 +1981,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * @return a decimal string representing the value of this BigInt
      */
-    override fun toString() = Magian.toString(meta.isNegative, magia, meta.normLen)
+    override fun toString() = Magus.toString(meta.isNegative, magia, meta.normLen)
 
     /**
      * Returns the hexadecimal string representation of this BigInt.
@@ -2019,7 +2019,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
             utf8[ich] = b
             ++ich
         }
-        Magian.toHexUtf8(magia, meta.normLen, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
+        Magus.toHexUtf8(magia, meta.normLen, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
         ich += nybbleCount
         for (b in suffixUtf8) {
             utf8[ich] = b
@@ -2053,7 +2053,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @return a new [ByteArray] containing the binary representation
      */
     fun toBinaryByteArray(isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray =
-        Magian.toBinaryByteArray(meta.isNegative, magia, meta.normLen, isTwosComplement, isBigEndian)
+        Magus.toBinaryByteArray(meta.isNegative, magia, meta.normLen, isTwosComplement, isBigEndian)
 
     /**
      * Writes this [BigInt] into the provided [bytes] array in the requested binary format.
@@ -2089,7 +2089,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         isTwosComplement: Boolean, isBigEndian: Boolean,
         bytes: ByteArray, offset: Int = 0, requestedLength: Int = -1
     ): Int =
-        Magian.toBinaryBytes(
+        Magus.toBinaryBytes(
             this.magia, isTwosComplement && this.meta.isNegative, isBigEndian,
             bytes, offset, requestedLength
         )
@@ -2102,7 +2102,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * @return a new IntArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianIntArray(): IntArray = Magian.newNormalizedCopy(magia, meta.normLen)
+    fun magnitudeToLittleEndianIntArray(): IntArray = Magus.newNormalizedCopy(magia, meta.normLen)
 
     /**
      * Returns a copy of the magnitude as a little-endian LongArray.
@@ -2145,7 +2145,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
     fun isNormalized() = magia.isEmpty() || magia[magia.lastIndex] != 0
 
     fun normalize(): BigInt =
-        if (isNormalized()) this else BigInt(meta.signFlag, Magian.newNormalizedCopy(magia, meta.normLen))
+        if (isNormalized()) this else BigInt(meta.signFlag, Magus.newNormalizedCopy(magia, meta.normLen))
 
     /**
      * Internal helper for addition or subtraction between two BigInts.
@@ -2162,13 +2162,13 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         val otherSign = isSub xor other.meta.isNegative
         if (this.meta.isNegative == otherSign)
             return BigInt(this.meta.signFlag,
-                Magian.newAdd(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+                Magus.newAdd(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
         val cmp = this.magnitudeCompareTo(other)
         val ret = when {
             cmp > 0 -> BigInt(this.meta.signFlag,
-                Magian.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+                Magus.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
             cmp < 0 -> BigInt(otherSign,
-                Magian.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
+                Magus.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
             else -> ZERO
         }
         return ret
@@ -2205,10 +2205,10 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         }
         val thisSign = this.meta.signFlag xor signFlipThis
         if (thisSign == otherSign)
-            return BigInt(thisSign, Magian.newAdd(this.magia, this.meta.normLen, w.toULong()))
+            return BigInt(thisSign, Magus.newAdd(this.magia, this.meta.normLen, w.toULong()))
         val cmp = this.magnitudeCompareTo(w)
         val ret = when {
-            cmp > 0 -> BigInt(thisSign, Magian.newSub(this.magia, this.meta.normLen, w.toULong()))
+            cmp > 0 -> BigInt(thisSign, Magus.newSub(this.magia, this.meta.normLen, w.toULong()))
             cmp < 0 -> BigInt(otherSign, intArrayOf(w.toInt() - this.magia[0]))
             else -> ZERO
         }
@@ -2246,14 +2246,14 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         }
         val thisSign = this.meta.signFlag xor signFlipThis
         if (thisSign == otherSign)
-            return BigInt(thisSign, Magian.newAdd(this.magia, this.meta.normLen, dw))
+            return BigInt(thisSign, Magus.newAdd(this.magia, this.meta.normLen, dw))
         val cmp = this.magnitudeCompareTo(dw)
         val ret = when {
-            cmp > 0 -> BigInt(thisSign, Magian.newSub(this.magia, this.meta.normLen, dw))
+            cmp > 0 -> BigInt(thisSign, Magus.newSub(this.magia, this.meta.normLen, dw))
             cmp < 0 -> {
                 val thisMag = this.toULongMagnitude()
                 val diff = dw - thisMag
-                BigInt(otherSign, Magian.newFromULong(diff))
+                BigInt(otherSign, Magus.newFromULong(diff))
             }
 
             else -> ZERO
@@ -2271,7 +2271,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
     fun compareToHelper(ulSign: Boolean, ulMag: ULong): Int {
         if (this.meta.isNegative != ulSign)
             return this.meta.signMask or 1
-        val cmp = Magian.compare(this.magia, this.meta.normLen, ulMag)
+        val cmp = Magus.compare(this.magia, this.meta.normLen, ulMag)
         return if (!ulSign) cmp else -cmp
     }
 
@@ -2292,7 +2292,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * - Does not return a value; writes directly into [bytes].
      */
     private fun writeBigEndianTwosComplementBytesZ(bytes: ByteArray, offset: Int, magByteLen: Int) =
-        Magian.toBinaryBytes(this.magia, this.meta.isNegative, isBigEndian = true, bytes, offset, magByteLen)
+        Magus.toBinaryBytes(this.magia, this.meta.isNegative, isBigEndian = true, bytes, offset, magByteLen)
 
     private fun writeBigEndianTwosComplementBytes(bytes: ByteArray, offset: Int, magByteLen: Int) {
         val last = offset + magByteLen - 1

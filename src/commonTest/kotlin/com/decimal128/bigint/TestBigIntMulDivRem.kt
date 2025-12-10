@@ -97,7 +97,7 @@ class TestBigIntMulDivRem {
 
         println("acc.magia = ${acc.magia.joinToString()}")
         println("meta.normLen = ${acc.meta.normLen}")
-        println("normLen(magia) = ${Magian.normLen(acc.magia)}")
+        println("normLen(magia) = ${Magus.normLen(acc.magia)}")
     }
 
     // ------------------------------------------------------------

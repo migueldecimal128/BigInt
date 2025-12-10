@@ -32,7 +32,7 @@ object BigIntAlgorithms {
         f[1] = (twentyBang ushr 32).toInt()
         var fNormLen = 2
         for (i in 21u..w)
-            fNormLen = Magian.setMul(f, f, fNormLen, i)
+            fNormLen = Magus.setMul(f, f, fNormLen, i)
         return BigInt(f, fNormLen)
     }
 
@@ -81,8 +81,8 @@ object BigIntAlgorithms {
             return b.abs()
         if (b.isZero())
             return a.abs()
-        val magia = Magian.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
-        check(magia !== Magian.ZERO)
+        val magia = Magus.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
+        check(magia !== Magus.ZERO)
         return BigInt(magia)
     }
 
@@ -98,11 +98,11 @@ object BigIntAlgorithms {
     fun lcm(a: BigInt, b: BigInt): BigInt {
         if (a.isZero() || b.isZero())
             return ZERO
-        val gcd = Magian.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
-        val lcm = if (Magian.bitLen(a.magia) < Magian.bitLen(b.magia))
-            Magian.newMul(Magian.newDiv(a.magia, gcd), b.magia)
+        val gcd = Magus.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
+        val lcm = if (Magus.bitLen(a.magia) < Magus.bitLen(b.magia))
+            Magus.newMul(Magus.newDiv(a.magia, gcd), b.magia)
         else
-            Magian.newMul(Magian.newDiv(b.magia, gcd), a.magia)
+            Magus.newMul(Magus.newDiv(b.magia, gcd), a.magia)
         return BigInt(lcm)
     }
 
@@ -132,14 +132,14 @@ object BigIntAlgorithms {
             exp == 0 -> ONE
             exp == 1 -> base
             base.isZero() -> ZERO
-            Magian.EQ(base.magia, 1) -> if (resultSign) BigInt.Companion.NEG_ONE else ONE
-            Magian.EQ(base.magia, 2) -> BigInt(resultSign, Magian.newWithSetBit(exp))
+            Magus.EQ(base.magia, 1) -> if (resultSign) BigInt.Companion.NEG_ONE else ONE
+            Magus.EQ(base.magia, 2) -> BigInt(resultSign, Magus.newWithSetBit(exp))
             exp == 2 -> base.sqr()
             else -> {
-                val maxBitLen = Magian.bitLen(base.magia) * exp
+                val maxBitLen = Magus.bitLen(base.magia) * exp
                 val maxBitLimbLen = (maxBitLen + 0x1F) ushr 5
-                var baseMag = Magian.newCopyWithExactLimbLen(base.magia, maxBitLimbLen)
-                var baseLen = Magian.normLen(base.magia)
+                var baseMag = Magus.newCopyWithExactLimbLen(base.magia, maxBitLimbLen)
+                var baseLen = Magus.normLen(base.magia)
                 var resultMag = IntArray(maxBitLimbLen)
                 resultMag[0] = 1
                 var resultLen = 1
@@ -149,7 +149,7 @@ object BigIntAlgorithms {
                 while (true) {
                     if ((e and 1) != 0) {
                         tmpMag.fill(0, 0, baseLen)
-                        resultLen = Magian.setMul(tmpMag, resultMag, resultLen, baseMag, baseLen)
+                        resultLen = Magus.setMul(tmpMag, resultMag, resultLen, baseMag, baseLen)
                         val t = tmpMag
                         tmpMag = resultMag
                         resultMag = t
@@ -158,7 +158,7 @@ object BigIntAlgorithms {
                     if (e == 0)
                         break
                     tmpMag.fill(0, 0, min(tmpMag.size, 2 * baseLen))
-                    baseLen = Magian.setSqr(tmpMag, baseMag, baseLen)
+                    baseLen = Magus.setSqr(tmpMag, baseMag, baseLen)
                     val t = tmpMag
                     tmpMag = baseMag
                     baseMag = t
@@ -234,13 +234,13 @@ object BigIntAlgorithms {
     fun isqrt(radicand: BigInt): BigInt {
         if (radicand.meta.isNegative)
             throw ArithmeticException("Square root of a negative BigInt")
-        val bitLen = Magian.bitLen(radicand.magia)
+        val bitLen = Magus.bitLen(radicand.magia)
         if (bitLen <= 53) {
             return when {
                 bitLen == 0 -> ZERO
                 bitLen == 1 -> ONE
                 else -> {
-                    val dw = Magian.toRawULong(radicand.magia)
+                    val dw = Magus.toRawULong(radicand.magia)
                     val d = dw.toDouble()
                     val sqrt = sqrt(d)
                     var isqrt = sqrt.toULong()
@@ -280,7 +280,7 @@ object BigIntAlgorithms {
         // These two errors are independent, and each can reduce the estimate by 1.
         // Therefore we add +2 total, ensuring the initial estimate of sqrt()
         // (after a single correction pass) is never too small.
-        val top = Magian.extractULongAtBitIndex(radicand.magia, topBitsIndex) + 1uL + 1uL
+        val top = Magus.extractULongAtBitIndex(radicand.magia, topBitsIndex) + 1uL + 1uL
         // a single check to ensure that the initial isqrt estimate >= the actual isqrt
         var topSqrt = ceil(sqrt(top.toDouble())).toULong()
         val crossCheck = topSqrt * topSqrt
@@ -303,9 +303,9 @@ object BigIntAlgorithms {
 
         var x = IntArray(tmpLimbLen)
         x[0] = topSqrt.toInt()
-        var xNormLen = Magian.setShiftLeft(x, x, 1, topBitsIndex shr 1)
-        val x2 = Magian.newWithUIntAtBitIndex(topSqrt.toUInt(), topBitsIndex shr 1)
-        check (Magian.EQ(x, x2))
+        var xNormLen = Magus.setShiftLeft(x, x, 1, topBitsIndex shr 1)
+        val x2 = Magus.newWithUIntAtBitIndex(topSqrt.toUInt(), topBitsIndex shr 1)
+        check (Magus.EQ(x, x2))
 
         var xPrev = IntArray(tmpLimbLen)
         var xPrevNormLen: Int
@@ -313,11 +313,11 @@ object BigIntAlgorithms {
             val t = xPrev; xPrev = x; x = t
             xPrevNormLen = xNormLen
 
-            xNormLen = Magian.setDiv(x, radicand.magia, radicand.meta.normLen, xPrev, xPrevNormLen)
-            xNormLen = Magian.setAdd(x, x, xNormLen, xPrev, xPrevNormLen)
-            xNormLen = Magian.setShiftRight(x, x, xNormLen, 1)
+            xNormLen = Magus.setDiv(x, radicand.magia, radicand.meta.normLen, xPrev, xPrevNormLen)
+            xNormLen = Magus.setAdd(x, x, xNormLen, xPrev, xPrevNormLen)
+            xNormLen = Magus.setShiftRight(x, x, xNormLen, 1)
 
-        } while (Magian.compare(x, xNormLen, xPrev, xPrevNormLen) < 0)
+        } while (Magus.compare(x, xNormLen, xPrev, xPrevNormLen) < 0)
         val ret = BigInt(xPrev, xPrevNormLen)
         return ret
     }
