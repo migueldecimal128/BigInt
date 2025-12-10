@@ -54,10 +54,11 @@ class TestHashCode {
            if (hiPos.isZero())
                continue
             val biggerBitLen = hiPos.magnitudeBitLen() + rng.nextInt(1000) + 32
-            // subtraction will generate non-normalized BigInt values
+            // subtraction will generate non-normalized BigInt magia
+            // arrays ... which are not SuperNormal
             val bigger = BigInt.withSetBit(biggerBitLen)
             val hiPos2 = (bigger + hiPos) - bigger
-            check (!hiPos2.isNormalized())
+            check (!hiPos2.isSuperNormalized())
 
             assertEquals(hiPos, hiPos2)
             assertEquals(hiPos.hashCode(), hiPos2.hashCode())

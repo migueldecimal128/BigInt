@@ -3017,19 +3017,7 @@ object Magus {
     }
 
     /**
-     * Returns the number of trailing zero *bits* in the magnitude [magia],
-     * or `-1` if the value is zero so the number of trailing zeros is infinite.
-     *
-     * This is equivalent to calling [ntz] with `xLen = magia.size`.
-     *
-     * Trailing zero bits are counted starting at the least significant bit
-     * of limb `magia[0]`, continuing upward through all limbs until a
-     * non-zero 32-bit limb is found.
-     */
-    internal fun ntz(magia: Magia): Int = ntz(magia, magia.size)
-
-    /**
-     * Returns the number of trailing zero *bits* in the lower [xLen] limbs
+     * Returns the count of trailing zero *bits* in the lower [xLen] limbs
      * of [x], or `-1` if all those limbs are zero.
      *
      * Limbs are interpreted in little-endian order:
@@ -3046,11 +3034,11 @@ object Magus {
      * @param x the magnitude array in little-endian limb order
      * @param xLen the number of low limbs to inspect; must satisfy
      *             `0 <= xLen <= x.size`
-     * @return the number of trailing zero bits, or `-1` if the inspected
+     * @return the count of trailing zero bits, or `-1` if the inspected
      *         region is entirely zero
      * @throws IllegalArgumentException if [xLen] is out of bounds
      */
-    internal fun ntz(x: Magia, xLen: Int): Int {
+    internal fun ctz(x: Magia, xLen: Int): Int {
         if (xLen >= 0 && xLen <= x.size) {
             for (i in 0..<xLen) {
                 if (x[i] != 0)
@@ -3074,11 +3062,14 @@ object Magus {
      * @param magia the integer array (least significant limb first)
      * @return the number of trailing zero bits, or -1 if all limbs are zero
      */
-    fun bitPopulationCount(magia: Magia): Int {
-        var popCount = 0
-        for (limb in magia)
-            popCount += limb.countOneBits()
-        return popCount
+    fun bitPopulationCount(x: Magia, xNormLen: Int): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            var popCount = 0
+            for (i in 0..<xNormLen)
+                popCount += x[i].countOneBits()
+            return popCount
+        }
+        throw IllegalArgumentException()
     }
 
     /**
@@ -3133,8 +3124,8 @@ object Magus {
         if (uNormLen <= 0 || vNormLen <= 0)
             throw IllegalArgumentException()
 
-        val ntzU = ntz(u, uNormLen)
-        val ntzV = ntz(v, vNormLen)
+        val ntzU = ctz(u, uNormLen)
+        val ntzV = ctz(v, vNormLen)
         val initialShift = min(ntzU, ntzV)
         if (ntzU > 0)
             uNormLen = setShiftRight(u, u, uNormLen, ntzU)
@@ -3144,7 +3135,7 @@ object Magus {
         // Now both u and v are odd
         while (vNormLen != 0) {
             // Remove factors of 2 from v
-            val tz = ntz(v, vNormLen)
+            val tz = ctz(v, vNormLen)
             if (tz > 0)
                 vNormLen = setShiftRight(v, v, vNormLen, tz)
             // Ensure u <= v

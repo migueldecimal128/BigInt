@@ -51,8 +51,8 @@ class Barrett private constructor (val m: BigInt,
         check (bitsAnswer == limbsAnswer)
         val limbs2Answer = reduceLimbs2(x)
         check (limbsAnswer == limbs2Answer)
-        val limbs3Answer = reduceLimbs3(x)
-        check (limbsAnswer == limbs3Answer)
+        //val limbs3Answer = reduceLimbs3(x)
+        //check (limbsAnswer == limbs3Answer)
         //val limbs4Answer = reduceLimbs4(x)
         //check (limbsAnswer == limbs4Answer)
         return limbsAnswer

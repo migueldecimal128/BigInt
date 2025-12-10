@@ -1009,6 +1009,8 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     fun isNotZero() = this !== ZERO
 
+    // <<<<<<<<<<<<<<<<<< BEGINNING OF SHARED TEXT SOURCE CODE >>>>>>>>>>>>>>>>>>>>>>
+
     /**
      * Returns `true` if this BigInt is negative.
      */
@@ -1025,7 +1027,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Returns `true` if the magnitude of this BigInt is a power of two
      * (exactly one bit set).
      */
-    fun isMagnitudePowerOfTwo(): Boolean = Magus.isPowerOfTwo(this.magia, this.meta.normLen)
+    fun isMagnitudePowerOfTwo(): Boolean = Zoro.isMagnitudePowerOfTwo(meta, magia)
 
     /**
      * Returns `true` if this value is exactly representable as a 32-bit
@@ -1212,12 +1214,12 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * @return bit index of the lowest set bit, or -1 if ZERO
      */
-    fun countTrailingZeroBits(): Int = Magus.ntz(this.magia)
+    fun countTrailingZeroBits(): Int = Zoro.countTrailingZeroBits(meta, magia)
 
     /**
      * Returns the number of bits set in the magnitude, ignoring the sign.
      */
-    fun magnitudeCountOneBits(): Int = Magus.bitPopulationCount(this.magia)
+    fun magnitudeCountOneBits(): Int = Zoro.magnitudeCountOneBits(meta, magia)
 
     /**
      * Tests whether the magnitude bit at [bitIndex] is set.
@@ -1225,7 +1227,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @param bitIndex 0-based, starting from the least-significant bit
      * @return true if the bit is set, false otherwise
      */
-    fun testBit(bitIndex: Int): Boolean = Magus.testBit(this.magia, this.meta.normLen, bitIndex)
+    fun testBit(bitIndex: Int): Boolean = Zoro.testBit(meta, magia, bitIndex)
 
     /**
      * Compares this [BigInt] with another [BigInt] for order.
@@ -1317,6 +1319,17 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *  * `1` if this value is greater than [dw].
      */
     operator fun compareTo(dw: ULong): Int = Zoro.compare(meta, magia, dw)
+
+    /**
+     * Helper for comparing this BigInt to an unsigned 64-bit integer.
+     *
+     * @param dwSign sign of the ULong operand
+     * @param dwMag the ULong magnitude
+     * @return -1 if this < ulMag, 0 if equal, 1 if this > ulMag
+     */
+    fun compareToHelper(dwSign: Boolean, dwMag: ULong): Int =
+        Zoro.compareHelper(meta, magia, dwSign, dwMag)
+
 
     /**
      * Compares magnitudes, disregarding sign flags.
@@ -1557,8 +1570,12 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Normalization is not required for correctness, but a normalized
      * representation avoids unnecessary high-order zero limbs.
      */
-    fun isNormalized() = magia.isEmpty() || magia[magia.lastIndex] != 0
+    fun isNormalized(): Boolean = Zoro.isNormalized(meta, magia)
 
+    fun isSuperNormalized(): Boolean = Zoro.isSuperNormalized(meta, magia)
+
+
+    // <<<<<<<<<<<<<<<<<< END OF SHARED TEXT SOURCE CODE >>>>>>>>>>>>>>>>>>>>>>
 
 // Note: `magia` is shared with `negate` and `abs`.
 // No mutation of `magia` is allowed.
@@ -1597,25 +1614,25 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
     operator fun unaryMinus() = negate()
     operator fun unaryPlus() = this
 
-    operator fun plus(other: BigInt): BigInt = this.addSubImpl(false, other)
+    operator fun plus(other: BigInt): BigInt = this.addImpl(false, other)
     operator fun plus(n: Int): BigInt =
-        this.addSubImpl(signFlipThis = false, signFlipOther = false, n = n)
+        this.addImpl(signFlipThis = false, signFlipOther = false, n = n)
     operator fun plus(w: UInt): BigInt =
-        this.addSubImpl(signFlipThis = false, otherSign = false, w = w)
+        this.addImpl(signFlipThis = false, otherSign = false, w = w)
     operator fun plus(l: Long): BigInt =
-        this.addSubImpl(signFlipThis = false, signFlipOther = false, l = l)
+        this.addImpl(signFlipThis = false, signFlipOther = false, l = l)
     operator fun plus(dw: ULong): BigInt =
-        this.addSubImpl(signFlipThis = false, otherSign = false, dw = dw)
+        this.addImpl(signFlipThis = false, otherSign = false, dw = dw)
 
-    operator fun minus(other: BigInt): BigInt = this.addSubImpl(true, other)
+    operator fun minus(other: BigInt): BigInt = this.addImpl(true, other)
     operator fun minus(n: Int): BigInt =
-        this.addSubImpl(signFlipThis = false, signFlipOther = true, n = n)
+        this.addImpl(signFlipThis = false, signFlipOther = true, n = n)
     operator fun minus(w: UInt): BigInt =
-        this.addSubImpl(signFlipThis = false, otherSign = true, w = w)
+        this.addImpl(signFlipThis = false, otherSign = true, w = w)
     operator fun minus(l: Long): BigInt =
-        this.addSubImpl(signFlipThis = false, signFlipOther = true, l = l)
+        this.addImpl(signFlipThis = false, signFlipOther = true, l = l)
     operator fun minus(dw: ULong): BigInt =
-        this.addSubImpl(signFlipThis = false, otherSign = true, dw = dw)
+        this.addImpl(signFlipThis = false, otherSign = true, dw = dw)
 
     operator fun times(other: BigInt): BigInt {
         return if (isNotZero() && other.isNotZero())
@@ -2031,6 +2048,9 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         result = 31 * result + Magus.normalizedHashCode(magia)
         return result
     }
+
+    // FIXME
+    //  who is calling this?
     fun normalize(): BigInt =
         if (isNormalized()) this else BigInt(meta.signFlag, Magus.newNormalizedCopy(magia, meta.normLen))
 
@@ -2041,7 +2061,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @param other the BigInt operand
      * @return a new BigInt representing the result
      */
-    private fun addSubImpl(isSub: Boolean, other: BigInt): BigInt {
+    private fun addImpl(isSub: Boolean, other: BigInt): BigInt {
         if (other === ZERO)
             return this
         if (this === ZERO)
@@ -2069,10 +2089,10 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @param n the Int operand
      * @return a new BigInt representing the result
      */
-    fun addSubImpl(signFlipThis: Boolean, signFlipOther: Boolean, n: Int): BigInt {
+    fun addImpl(signFlipThis: Boolean, signFlipOther: Boolean, n: Int): BigInt {
         val otherSign = n < 0
         val otherMag = n.absoluteValue
-        return addSubImpl(signFlipThis, otherSign xor signFlipOther, otherMag.toUInt())
+        return addImpl(signFlipThis, otherSign xor signFlipOther, otherMag.toUInt())
     }
 
     /**
@@ -2083,7 +2103,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @param w the UInt operand
      * @return a new BigInt representing the result
      */
-    fun addSubImpl(signFlipThis: Boolean, otherSign: Boolean, w: UInt): BigInt {
+    fun addImpl(signFlipThis: Boolean, otherSign: Boolean, w: UInt): BigInt {
         if (w == 0u)
             return if (signFlipThis) this.negate() else this
         if (isZero()) {
@@ -2110,10 +2130,10 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @param l the Long operand
      * @return a new BigInt representing the result
      */
-    fun addSubImpl(signFlipThis: Boolean, signFlipOther: Boolean, l: Long): BigInt {
+    fun addImpl(signFlipThis: Boolean, signFlipOther: Boolean, l: Long): BigInt {
         val otherSign = l < 0L
         val otherMag = l.absoluteValue
-        return addSubImpl(signFlipThis, otherSign xor signFlipOther, otherMag.toULong())
+        return addImpl(signFlipThis, otherSign xor signFlipOther, otherMag.toULong())
     }
 
     /**
@@ -2124,9 +2144,9 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * @param dw the ULong operand
      * @return a new BigInt representing the result
      */
-    fun addSubImpl(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
+    fun addImpl(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
         if ((dw shr 32) == 0uL)
-            return addSubImpl(signFlipThis, otherSign, dw.toUInt())
+            return addImpl(signFlipThis, otherSign, dw.toUInt())
         if (isZero()) {
             val magia = intArrayOf(dw.toInt(), (dw shr 32).toInt())
             return BigInt(otherSign, magia)
@@ -2146,20 +2166,6 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
             else -> ZERO
         }
         return ret
-    }
-
-    /**
-     * Helper for comparing this BigInt to an unsigned 64-bit integer.
-     *
-     * @param ulSign sign of the ULong operand
-     * @param ulMag the ULong magnitude
-     * @return -1 if this < ulMag, 0 if equal, 1 if this > ulMag
-     */
-    fun compareToHelper(ulSign: Boolean, ulMag: ULong): Int {
-        if (this.meta.isNegative != ulSign)
-            return this.meta.signMask or 1
-        val cmp = Magus.compare(this.magia, this.meta.normLen, ulMag)
-        return if (!ulSign) cmp else -cmp
     }
 
     /**
@@ -2228,22 +2234,22 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
  *   so that they produce correct signed results when a primitive appears on the left-hand side.
  */
 operator fun Int.plus(other: BigInt) =
-    other.addSubImpl(signFlipThis = false, signFlipOther = false, n = this)
+    other.addImpl(signFlipThis = false, signFlipOther = false, n = this)
 operator fun UInt.plus(other: BigInt) =
-    other.addSubImpl(signFlipThis = false, otherSign = false, w = this)
+    other.addImpl(signFlipThis = false, otherSign = false, w = this)
 operator fun Long.plus(other: BigInt) =
-    other.addSubImpl(signFlipThis = false, signFlipOther = false, l = this)
+    other.addImpl(signFlipThis = false, signFlipOther = false, l = this)
 operator fun ULong.plus(other: BigInt) =
-    other.addSubImpl(signFlipThis = false, otherSign = false, dw = this)
+    other.addImpl(signFlipThis = false, otherSign = false, dw = this)
 
 operator fun Int.minus(other: BigInt) =
-    other.addSubImpl(signFlipThis = true, signFlipOther = false, n = this)
+    other.addImpl(signFlipThis = true, signFlipOther = false, n = this)
 operator fun UInt.minus(other: BigInt) =
-    other.addSubImpl(signFlipThis = true, otherSign = false, w = this)
+    other.addImpl(signFlipThis = true, otherSign = false, w = this)
 operator fun Long.minus(other: BigInt) =
-    other.addSubImpl(signFlipThis = true, signFlipOther = false, l = this)
+    other.addImpl(signFlipThis = true, signFlipOther = false, l = this)
 operator fun ULong.minus(other: BigInt) =
-    other.addSubImpl(signFlipThis = true, otherSign = false, dw = this)
+    other.addImpl(signFlipThis = true, otherSign = false, dw = this)
 
 operator fun Int.times(other: BigInt) = other.times(this)
 operator fun UInt.times(other: BigInt) = other.times(this)

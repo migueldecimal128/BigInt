@@ -13,7 +13,7 @@ import kotlin.math.max
  * - interpreter of metadata
  * - wielder of magia
  */
-object Zoro {
+internal object Zoro {
 
 
     /**
@@ -22,6 +22,13 @@ object Zoro {
      * @return -1 if negative, 0 if zero, 1 if positive
      */
     inline fun signum(meta: Meta) = (meta.meta shr 31) or ((-meta.meta) ushr 31)
+
+    /**
+     * Returns `true` if the magnitude of this BigInt is a power of two
+     * (exactly one bit set).
+     */
+    fun isMagnitudePowerOfTwo(meta: Meta, magia: Magia): Boolean =
+        Magus.isPowerOfTwo(magia, meta.normLen)
 
     /**
      * Returns `true` if this value is exactly representable as a 32-bit
@@ -264,6 +271,35 @@ object Zoro {
     }
 
     /**
+     * Returns the index of the rightmost set bit (number of trailing zeros).
+     *
+     * If this BigInt is ZERO (no bits set), returns -1.
+     *
+     * Equivalent to `java.math.BigInteger.getLowestSetBit()`.
+     *
+
+     * @return bit index of the lowest set bit, or -1 if ZERO
+     */
+    fun countTrailingZeroBits(meta: Meta, magia: Magia): Int =
+        Magus.ctz(magia, meta.normLen)
+
+    /**
+     * Returns the number of bits set in the magnitude, ignoring the sign.
+     */
+    fun magnitudeCountOneBits(meta: Meta, magia: Magia): Int =
+        Magus.bitPopulationCount(magia, meta.normLen)
+
+    /**
+     * Tests whether the magnitude bit at [bitIndex] is set.
+     *
+     * @param bitIndex 0-based, starting from the least-significant bit
+     * @return true if the bit is set, false otherwise
+     */
+    fun testBit(meta: Meta, magia: Magia, bitIndex: Int): Boolean =
+        Magus.testBit(magia, meta.normLen, bitIndex)
+
+
+    /**
      * Compares this [BigInt] with another [BigInt] for order.
      *
      * The comparison is performed according to mathematical value:
@@ -352,7 +388,7 @@ object Zoro {
      * @param dwMag the ULong magnitude
      * @return -1 if this < ulMag, 0 if equal, 1 if this > ulMag
      */
-    private fun compareHelper(meta: Meta, magia: Magia, dwSign: Boolean, dwMag: ULong): Int {
+    fun compareHelper(meta: Meta, magia: Magia, dwSign: Boolean, dwMag: ULong): Int {
         if (meta.isNegative != dwSign)
             return meta.signMask or 1
         val cmp = Magus.compare(magia, meta.normLen, dwMag)
@@ -624,6 +660,19 @@ object Zoro {
      * Normalization is not required for correctness, but a normalized
      * representation avoids unnecessary high-order zero limbs.
      */
-    fun isNormalized(meta: Meta, magia: Magia) =
+    fun isNormalized(meta: Meta, magia: Magia): Boolean =
         Magus.isNormalized(magia, meta.normLen)
+
+    /**
+     * A superNormal value is one where there are no unused limbs in the
+     * magia.
+     *
+     * That is, the normalized length == magia.size && magia[magia.lastIndex] != 0
+     *
+     * This is really only used internally in some unit tests to help confirm
+     * that normalization is working correctly.
+     */
+    fun isSuperNormalized(meta: Meta, magia: Magia): Boolean =
+        meta.normLen == magia.size && Magus.isNormalized(magia, meta.normLen)
+
 }
