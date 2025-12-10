@@ -1200,6 +1200,213 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      */
     fun magnitudeLongArrayLen() = (Magus.bitLen(magia) + 63) ushr 6
 
+    /**
+     * Compares this [BigInt] with another [BigInt] for order.
+     *
+     * The comparison is performed according to mathematical value:
+     * - A negative number is always less than a positive number.
+     * - If both numbers have the same sign, their magnitudes are compared.
+     *
+     * @param other the [BigInt] to compare this value against.
+     * @return
+     *  * `-1` if this value is less than [other],
+     *  * `0` if this value is equal to [other],
+     *  * `1` if this value is greater than [other].
+     */
+    override operator fun compareTo(other: BigInt): Int =
+        Zoro.compare(meta, magia, other.meta, other.magia)
+
+    /**
+     * Compares this [BigInt] with a [BigIntAccumulator] for
+     * numerical order.
+     *
+     * The comparison is performed according to mathematical value:
+     * - A negative number is always less than a positive number.
+     * - If both numbers have the same sign, their magnitudes are compared.
+     *
+     * @param other the [BigIntAccumulator] to compare this value against.
+     * @return
+     *  * `-1` if this value is less than [other],
+     *  * `0` if this value is equal to [other],
+     *  * `1` if this value is greater than [other].
+     */
+    operator fun compareTo(other: BigIntAccumulator): Int =
+        Zoro.compare(meta, magia, other.meta, other.magia)
+
+    /**
+     * Compares this [BigInt] with a 32-bit signed integer value.
+     *
+     * The comparison is based on the mathematical value of both numbers:
+     * - Negative values of [n] are treated with a negative sign and compared by magnitude.
+     * - Positive values are compared directly by magnitude.
+     *
+     * @param n the integer value to compare with this [BigInt].
+     * @return
+     *  * `-1` if this value is less than [n],
+     *  * `0` if this value is equal to [n],
+     *  * `1` if this value is greater than [n].
+     */
+    operator fun compareTo(n: Int): Int = Zoro.compare(meta, magia, n)
+
+    /**
+     * Compares this [BigInt] with an unsigned 32-bit integer value.
+     *
+     * The comparison is performed by treating [w] as a non-negative value
+     * and comparing magnitudes directly.
+     *
+     * @param w the unsigned integer to compare with this [BigInt].
+     * @return
+     *  * `-1` if this value is less than [w],
+     *  * `0` if this value is equal to [w],
+     *  * `1` if this value is greater than [w].
+     */
+    operator fun compareTo(w: UInt): Int = Zoro.compare(meta, magia, w)
+
+    /**
+     * Compares this [BigInt] with a 64-bit signed integer value.
+     *
+     * The comparison is based on mathematical value:
+     * - If [l] is negative, the comparison accounts for its sign.
+     * - Otherwise, magnitudes are compared directly.
+     *
+     * @param l the signed long value to compare with this [BigInt].
+     * @return
+     *  * `-1` if this value is less than [l],
+     *  * `0` if this value is equal to [l],
+     *  * `1` if this value is greater than [l].
+     */
+    operator fun compareTo(l: Long): Int = Zoro.compare(meta, magia, l)
+
+    /**
+     * Compares this [BigInt] with an unsigned 64-bit integer value.
+     *
+     * The comparison is performed by treating [dw] as a non-negative value
+     * and comparing magnitudes directly.
+     *
+     * @param dw the unsigned long value to compare with this [BigInt].
+     * @return
+     *  * `-1` if this value is less than [dw],
+     *  * `0` if this value is equal to [dw],
+     *  * `1` if this value is greater than [dw].
+     */
+    operator fun compareTo(dw: ULong): Int = Zoro.compare(meta, magia, dw)
+
+    /**
+     * Compares magnitudes, disregarding sign flags.
+     *
+     * @return -1,0,1
+     */
+    fun magnitudeCompareTo(other: BigInt) =
+        Zoro.magnitudeCompare(meta, magia, other.meta, other.magia)
+    fun magnitudeCompareTo(other: BigIntAccumulator) =
+        Zoro.magnitudeCompare(meta, magia, other.meta, other.magia)
+    fun magnitudeCompareTo(w: UInt) =
+        Zoro.magnitudeCompare(meta, magia, w)
+    fun magnitudeCompareTo(dw: ULong) =
+        Zoro.magnitudeCompare(meta, magia, dw)
+    fun magnitudeCompareTo(littleEndianIntArray: IntArray) =
+        Zoro.magnitudeCompare(meta, magia, littleEndianIntArray)
+
+    /**
+     * Comparison predicate for numerical equality with another [BigInt].
+     *
+     * @param other the [BigInt] to compare with
+     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
+     */
+    infix fun EQ(other: BigInt): Boolean =
+        Zoro.EQ(meta, magia, other.meta, other.magia)
+
+    /**
+     * Comparison predicate for numerical equality with the current
+     * value of a mutable [BigIntAccumulator].
+     *
+     * @param acc the [BigIntAccumulator] to compare with
+     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
+     */
+    infix fun EQ(acc: BigIntAccumulator): Boolean =
+        Zoro.EQ(meta, magia, acc.meta, acc.magia)
+
+    /**
+     * Comparison predicate for numerical equality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value equals [n], `false` otherwise
+     */
+    infix fun EQ(n: Int): Boolean = Zoro.compare(meta, magia, n) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value equals [w], `false` otherwise
+     */
+    infix fun EQ(w: UInt): Boolean = Zoro.compare(meta, magia, w) == 0
+
+    /**
+     * Comparison predicate for numerical equality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value equals [l], `false` otherwise
+     */
+    infix fun EQ(l: Long): Boolean = Zoro.compare(meta, magia, l) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value equals [dw], `false` otherwise
+     */
+    infix fun EQ(dw: ULong): Boolean = Zoro.compare(meta, magia, dw) == 0
+
+    /**
+     * Comparison predicate for numerical inequality with another [BigInt].
+     *
+     * @param other the [BigInt] to compare with
+     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
+     */
+    infix fun NE(other: BigInt): Boolean = !EQ(other)
+
+    /**
+     * Comparison predicate for numerical inequality with a [BigIntAccumulator].
+     *
+     * @param acc the [BigIntAccumulator] to compare with
+     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
+     */
+    infix fun NE(acc: BigIntAccumulator): Boolean = !EQ(acc)
+
+    /**
+     * Comparison predicate for numerical inequality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value does not equal [n], `false` otherwise
+     */
+    infix fun NE(n: Int): Boolean = !EQ(n)
+
+    /**
+     * Comparison predicate for numerical inequality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value does not equal [w], `false` otherwise
+     */
+    infix fun NE(w: UInt): Boolean = !EQ(w)
+
+    /**
+     * Comparison predicate for numerical inequality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value does not equal [l], `false` otherwise
+     */
+    infix fun NE(l: Long): Boolean = !EQ(l)
+
+    /**
+     * Comparison predicate for numerical inequality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value does not equal [dw], `false` otherwise
+     */
+    infix fun NE(dw: ULong): Boolean = !EQ(dw)
+
+
 // Note: `magia` is shared with `negate` and `abs`.
 // No mutation of `magia` is allowed.
 
@@ -1652,200 +1859,6 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         ret[loIndex] = ret[loIndex] and (-1 shl ctz)
         return BigInt(meta.signFlag, ret)
     }
-
-    /**
-     * Compares this [BigInt] with another [BigInt] for order.
-     *
-     * The comparison is performed according to mathematical value:
-     * - A negative number is always less than a positive number.
-     * - If both numbers have the same sign, their magnitudes are compared.
-     *
-     * @param other the [BigInt] to compare this value against.
-     * @return
-     *  * `-1` if this value is less than [other],
-     *  * `0` if this value is equal to [other],
-     *  * `1` if this value is greater than [other].
-     */
-    override operator fun compareTo(other: BigInt): Int {
-        if (this.meta.signFlag != other.meta.signFlag)
-            return this.meta.signMask or 1
-        val cmp = Magus.compare(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-        return this.meta.negateIfNegative(cmp)
-    }
-
-    /**
-     * Compares this [BigInt] with a 32-bit signed integer value.
-     *
-     * The comparison is based on the mathematical value of both numbers:
-     * - Negative values of [n] are treated with a negative sign and compared by magnitude.
-     * - Positive values are compared directly by magnitude.
-     *
-     * @param n the integer value to compare with this [BigInt].
-     * @return
-     *  * `-1` if this value is less than [n],
-     *  * `0` if this value is equal to [n],
-     *  * `1` if this value is greater than [n].
-     */
-    operator fun compareTo(n: Int) = compareToHelper(n < 0, n.absoluteValue.toUInt().toULong())
-
-    /**
-     * Compares this [BigInt] with an unsigned 32-bit integer value.
-     *
-     * The comparison is performed by treating [w] as a non-negative value
-     * and comparing magnitudes directly.
-     *
-     * @param w the unsigned integer to compare with this [BigInt].
-     * @return
-     *  * `-1` if this value is less than [w],
-     *  * `0` if this value is equal to [w],
-     *  * `1` if this value is greater than [w].
-     */
-    operator fun compareTo(w: UInt) = compareToHelper(false, w.toULong())
-
-    /**
-     * Compares this [BigInt] with a 64-bit signed integer value.
-     *
-     * The comparison is based on mathematical value:
-     * - If [l] is negative, the comparison accounts for its sign.
-     * - Otherwise, magnitudes are compared directly.
-     *
-     * @param l the signed long value to compare with this [BigInt].
-     * @return
-     *  * `-1` if this value is less than [l],
-     *  * `0` if this value is equal to [l],
-     *  * `1` if this value is greater than [l].
-     */
-    operator fun compareTo(l: Long) = compareToHelper(l < 0, l.absoluteValue.toULong())
-
-    /**
-     * Compares this [BigInt] with an unsigned 64-bit integer value.
-     *
-     * The comparison is performed by treating [dw] as a non-negative value
-     * and comparing magnitudes directly.
-     *
-     * @param dw the unsigned long value to compare with this [BigInt].
-     * @return
-     *  * `-1` if this value is less than [dw],
-     *  * `0` if this value is equal to [dw],
-     *  * `1` if this value is greater than [dw].
-     */
-    operator fun compareTo(dw: ULong) = compareToHelper(false, dw)
-
-    /**
-     * Compares magnitudes, disregarding sign flags.
-     *
-     * @return -1,0,1
-     */
-    fun magnitudeCompareTo(other: BigInt) =
-        Magus.compare(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-    fun magnitudeCompareTo(un: UInt) =
-        Magus.compare(this.magia, this.meta.normLen, un.toULong())
-    fun magnitudeCompareTo(ul: ULong) =
-        Magus.compare(this.magia, this.meta.normLen, ul)
-    fun magnitudeCompareTo(littleEndianIntArray: IntArray) =
-        Magus.compare(this.magia, this.meta.normLen,
-            littleEndianIntArray, Magus.normLen(littleEndianIntArray))
-
-    /**
-     * Comparison predicate for numerical equality with another [BigInt].
-     *
-     * @param other the [BigInt] to compare with
-     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
-     */
-    infix fun EQ(other: BigInt): Boolean =
-        (this.meta.meta == other.meta.meta) &&
-                Magus.compare(this.magia, meta.normLen, other.magia, other.meta.normLen) == 0
-
-    /**
-     * Comparison predicate for numerical equality with the current
-     * value of a mutable [BigIntAccumulator].
-     *
-     * @param acc the [BigIntAccumulator] to compare with
-     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
-     */
-    infix fun EQ(acc: BigIntAccumulator): Boolean =
-        (this.meta.meta == acc.meta.meta) &&
-                Magus.compare(this.magia, meta.normLen, acc.magia, acc.meta.normLen) == 0
-
-    /**
-     * Comparison predicate for numerical equality with a signed 32-bit integer.
-     *
-     * @param n the [Int] value to compare with
-     * @return `true` if this value equals [n], `false` otherwise
-     */
-    infix fun EQ(n: Int): Boolean = compareTo(n) == 0
-
-    /**
-     * Comparison predicate for numerical equality with an unsigned 32-bit integer.
-     *
-     * @param w the [UInt] value to compare with
-     * @return `true` if this value equals [w], `false` otherwise
-     */
-    infix fun EQ(w: UInt): Boolean = compareTo(w) == 0
-
-    /**
-     * Comparison predicate for numerical equality with a signed 64-bit integer.
-     *
-     * @param l the [Long] value to compare with
-     * @return `true` if this value equals [l], `false` otherwise
-     */
-    infix fun EQ(l: Long): Boolean = compareTo(l) == 0
-
-    /**
-     * Comparison predicate for numerical equality with an unsigned 64-bit integer.
-     *
-     * @param dw the [ULong] value to compare with
-     * @return `true` if this value equals [dw], `false` otherwise
-     */
-    infix fun EQ(dw: ULong): Boolean = compareTo(dw) == 0
-
-    /**
-     * Comparison predicate for numerical inequality with another [BigInt].
-     *
-     * @param other the [BigInt] to compare with
-     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
-     */
-    infix fun NE(other: BigInt): Boolean = !(this EQ other)
-
-    /**
-     * Comparison predicate for numerical inequality with a [BigIntAccumulator].
-     *
-     * @param acc the [BigIntAccumulator] to compare with
-     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
-     */
-    infix fun NE(acc: BigIntAccumulator): Boolean = !(this EQ acc)
-
-    /**
-     * Comparison predicate for numerical inequality with a signed 32-bit integer.
-     *
-     * @param n the [Int] value to compare with
-     * @return `true` if this value does not equal [n], `false` otherwise
-     */
-    infix fun NE(n: Int): Boolean = compareTo(n) != 0
-
-    /**
-     * Comparison predicate for numerical inequality with an unsigned 32-bit integer.
-     *
-     * @param w the [UInt] value to compare with
-     * @return `true` if this value does not equal [w], `false` otherwise
-     */
-    infix fun NE(w: UInt): Boolean = compareTo(w) != 0
-
-    /**
-     * Comparison predicate for numerical inequality with a signed 64-bit integer.
-     *
-     * @param l the [Long] value to compare with
-     * @return `true` if this value does not equal [l], `false` otherwise
-     */
-    infix fun NE(l: Long): Boolean = compareTo(l) != 0
-
-    /**
-     * Comparison predicate for numerical inequality with an unsigned 64-bit integer.
-     *
-     * @param dw the [ULong] value to compare with
-     * @return `true` if this value does not equal [dw], `false` otherwise
-     */
-    infix fun NE(dw: ULong): Boolean = compareTo(dw) != 0
 
     /**
      * Compares this [BigInt] with another object for numerical equality.

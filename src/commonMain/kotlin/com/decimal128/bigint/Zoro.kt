@@ -2,6 +2,8 @@
 
 package com.decimal128.bigint
 
+import kotlin.math.absoluteValue
+
 /**
  * These are operations that are layered above Magia and
  * below [BigInt] and [BigIntAccumulator].
@@ -259,5 +261,158 @@ object Zoro {
             return Magus.extractULongAtBitIndex(magia, meta.normLen, bitIndex)
         throw IllegalArgumentException("invalid bitIndex:$bitIndex")
     }
+
+    /**
+     * Compares this [BigInt] with another [BigInt] for order.
+     *
+     * The comparison is performed according to mathematical value:
+     * - A negative number is always less than a positive number.
+     * - If both numbers have the same sign, their magnitudes are compared.
+     *
+     * @param other the [BigInt] to compare this value against.
+     * @return
+     *  * `-1` if this value is less than [other],
+     *  * `0` if this value is equal to [other],
+     *  * `1` if this value is greater than [other].
+     */
+    fun compare(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Int {
+        if (xMeta.signMask != yMeta.signMask)
+            return xMeta.signMask or 1
+        val cmp = Magus.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        return xMeta.negateIfNegative(cmp)
+    }
+
+    /**
+     * Compares this [BigInt] with a 32-bit signed integer value.
+     *
+     * The comparison is based on the mathematical value of both numbers:
+     * - Negative values of [n] are treated with a negative sign and compared by magnitude.
+     * - Positive values are compared directly by magnitude.
+     *
+     * @param n the integer value to compare with this [BigInt].
+     * @return
+     *  * `-1` if this value is less than [n],
+     *  * `0` if this value is equal to [n],
+     *  * `1` if this value is greater than [n].
+     */
+    fun compare(xMeta: Meta, xMagia: Magia, n: Int) =
+        compareHelper(xMeta, xMagia, n < 0, n.absoluteValue.toUInt().toULong())
+
+    /**
+     * Compares this [BigInt] with an unsigned 32-bit integer value.
+     *
+     * The comparison is performed by treating [w] as a non-negative value
+     * and comparing magnitudes directly.
+     *
+     * @param w the unsigned integer to compare with this [BigInt].
+     * @return
+     *  * `-1` if this value is less than [w],
+     *  * `0` if this value is equal to [w],
+     *  * `1` if this value is greater than [w].
+     */
+    fun compare(xMeta: Meta, xMagia: Magia, w: UInt) =
+        compareHelper(xMeta, xMagia, false, w.toULong())
+
+    /**
+     * Compares this [BigInt] with a 64-bit signed integer value.
+     *
+     * The comparison is based on mathematical value:
+     * - If [l] is negative, the comparison accounts for its sign.
+     * - Otherwise, magnitudes are compared directly.
+     *
+     * @param l the signed long value to compare with this [BigInt].
+     * @return
+     *  * `-1` if this value is less than [l],
+     *  * `0` if this value is equal to [l],
+     *  * `1` if this value is greater than [l].
+     */
+    fun compare(xMeta: Meta, xMagia: Magia, l: Long) =
+        compareHelper(xMeta, xMagia, l < 0, l.absoluteValue.toULong())
+
+    /**
+     * Compares this [BigInt] with an unsigned 64-bit integer value.
+     *
+     * The comparison is performed by treating [dw] as a non-negative value
+     * and comparing magnitudes directly.
+     *
+     * @param dw the unsigned long value to compare with this [BigInt].
+     * @return
+     *  * `-1` if this value is less than [dw],
+     *  * `0` if this value is equal to [dw],
+     *  * `1` if this value is greater than [dw].
+     */
+    fun compare(xMeta: Meta, xMagia: Magia, dw: ULong) =
+        compareHelper(xMeta, xMagia, false, dw)
+
+    /**
+     * Helper for comparing this BigInt to an unsigned 64-bit integer.
+     *
+     * @param dwSign sign of the ULong operand
+     * @param dwMag the ULong magnitude
+     * @return -1 if this < ulMag, 0 if equal, 1 if this > ulMag
+     */
+    private fun compareHelper(meta: Meta, magia: Magia, dwSign: Boolean, dwMag: ULong): Int {
+        if (meta.isNegative != dwSign)
+            return meta.signMask or 1
+        val cmp = Magus.compare(magia, meta.normLen, dwMag)
+        return if (dwSign) -cmp else cmp
+    }
+
+
+
+    /**
+     * Compares magnitudes, disregarding sign flags.
+     *
+     * @return -1,0,1
+     */
+    fun magnitudeCompare(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia) =
+        Magus.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+    fun magnitudeCompare(xMeta: Meta, xMagia: Magia, w: UInt) =
+        Magus.compare(xMagia, xMeta.normLen, w.toULong())
+    fun magnitudeCompare(xMeta: Meta, xMagia: Magia, dw: ULong) =
+        Magus.compare(xMagia, xMeta.normLen, dw)
+    fun magnitudeCompare(xMeta: Meta, xMagia: Magia, littleEndianIntArray: IntArray) =
+        Magus.compare(xMagia, xMeta.normLen,
+            littleEndianIntArray, Magus.normLen(littleEndianIntArray))
+
+    /**
+     * Comparison predicate for numerical equality between two
+     * [Meta]/[Magia] pairs
+     */
+    fun EQ(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean =
+        (xMeta.meta == yMeta.meta) &&
+                Magus.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen) == 0
+
+    /**
+     * Comparison predicate for numerical equality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value equals [n], `false` otherwise
+     */
+    fun EQ(xMeta: Meta, xMagia: Magia, n: Int): Boolean = compare(xMeta, xMagia, n) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value equals [w], `false` otherwise
+     */
+    fun EQ(xMeta: Meta, xMagia: Magia, w: UInt): Boolean = compare(xMeta, xMagia, w) == 0
+
+    /**
+     * Comparison predicate for numerical equality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value equals [l], `false` otherwise
+     */
+    fun EQ(xMeta: Meta, xMagia: Magia, l: Long): Boolean = compare(xMeta, xMagia, l) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value equals [dw], `false` otherwise
+     */
+    fun EQ(xMeta: Meta, xMagia: Magia, dw: ULong): Boolean = compare(xMeta, xMagia, dw) == 0
 
 }
