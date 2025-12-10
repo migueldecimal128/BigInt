@@ -1206,6 +1206,15 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         Zoro.magnitudeLongArrayLen(meta, magia)
 
     /**
+     * Computes the number of bytes needed to represent this BigInt
+     * in two's-complement format.
+     *
+     * Always returns at least 1 for zero.
+     */
+    fun calcTwosComplementByteLength(): Int =
+        Zoro.calcTwosComplementByteLength(meta, magia)
+
+    /**
      * Returns the index of the rightmost set bit (number of trailing zeros).
      *
      * If this BigInt is ZERO (no bits set), returns -1.
@@ -1832,20 +1841,6 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         return ZERO
     }
 
-    /**
-     * Computes the number of bytes needed to represent this BigInt
-     * in two's-complement format.
-     *
-     * Always returns at least 1 for zero.
-     */
-    fun calcTwosComplementByteLength(): Int {
-        if (isZero())
-            return 1
-        // add one for the sign bit
-        val bitLen2sComplement = bitLengthBigIntegerStyle() + 1
-        val byteLength = (bitLen2sComplement + 7) ushr 3
-        return byteLength
-    }
 
     fun withSetBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = true)
 
@@ -2168,56 +2163,9 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         return ret
     }
 
-    /**
-     * Writes the magnitude of this BigInt into the specified [bytes] array
-     * in **big-endian two's-complement** format.
-     *
-     * This is an internal helper used by [toTwosComplementBigEndianByteArray].
-     *
-     * @param bytes target byte array
-     * @param offset starting index in [bytes] to write
-     * @param magByteLen number of bytes of the magnitude to write
-     *
-     * Notes:
-     * - Handles both positive and negative values.
-     * - For negative numbers, computes two's complement in-place.
-     * - Assumes [bytes] has enough space to hold the output.
-     * - Does not return a value; writes directly into [bytes].
-     */
-    private fun writeBigEndianTwosComplementBytesZ(bytes: ByteArray, offset: Int, magByteLen: Int) =
-        Magus.toBinaryBytes(this.magia, this.meta.isNegative, isBigEndian = true, bytes, offset, magByteLen)
-
-    private fun writeBigEndianTwosComplementBytes(bytes: ByteArray, offset: Int, magByteLen: Int) {
-        val last = offset + magByteLen - 1
-        var dest = last
-        var remaining = magByteLen
-        var i = 0
-        bytes[0] = meta.signMask.toByte()
-        while (remaining > 0 && i < magia.size) {
-            var w = magia[i] xor meta.signMask
-            var j = 4
-            do {
-                bytes[dest--] = w.toByte()
-                w = w ushr 8
-                --remaining
-                --j
-            } while (remaining > 0 && j > 0)
-            ++i
-        }
-        if (meta.isNegative) {
-            var carry = 1
-            var k = last
-            while (carry > 0 && k >= 0) {
-                val t = (bytes[k].toInt() and 0xFF) + carry
-                bytes[k] = t.toByte()
-                carry = t ushr 8
-                --k
-            }
-        }
-    }
-
 }
 
+// <<<< THESE PORT OVER TO BigIntAccumulator WITH BigInt => BigIntAccumulator >>>>
 /**
  * Extension operators to enable arithmetic and comparison between primitive integer types
  * (`Int`, `UInt`, `Long`, `ULong`) and `BigInt`.
@@ -2402,6 +2350,8 @@ fun CharSequence.toBigInt() = BigInt.from(this)
 
 /** Parses this CharArray as a `BigInt` using `BigInt.from(this)`. */
 fun CharArray.toBigInt() = BigInt.from(this)
+
+// <<<<<<<<<<< END OF EXTENSION FUNCTIONS >>>>>>>>>>>>>>
 
 /**
  * Returns a random `BigInt` whose magnitude is drawn uniformly from

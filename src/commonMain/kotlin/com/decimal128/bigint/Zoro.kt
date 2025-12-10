@@ -525,6 +525,7 @@ internal object Zoro {
     fun toTwosComplementBigEndianByteArray(meta: Meta, magia: Magia): ByteArray =
         toBinaryByteArray(meta, magia, isTwosComplement = true, isBigEndian = true)
 
+
     /**
      * Converts this [BigInt] to a [ByteArray] in the requested binary format.
      *
@@ -648,6 +649,22 @@ internal object Zoro {
      */
     fun magnitudeLongArrayLen(meta: Meta, magia: Magia) =
         (magnitudeBitLen(meta, magia) + 63) ushr 6
+
+    /**
+     * Computes the number of bytes needed to represent this BigInt
+     * in two's-complement format.
+     *
+     * Always returns at least 1 for zero.
+     */
+    fun calcTwosComplementByteLength(meta: Meta, magia: Magia): Int {
+        if (meta.isZero)
+            return 1
+        // add one for the sign bit ...
+        // ... since bitLengthBigIntegerStyle does not include the sign bit
+        val bitLen2sComplement = bitLengthBigIntegerStyle(meta, magia) + 1
+        val byteLength = (bitLen2sComplement + 7) ushr 3
+        return byteLength
+    }
 
     /**
      * Returns `true` if this value is in normalized form.
