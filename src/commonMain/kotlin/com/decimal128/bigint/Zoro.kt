@@ -613,5 +613,17 @@ object Zoro {
     fun magnitudeLongArrayLen(meta: Meta, magia: Magia) =
         (magnitudeBitLen(meta, magia) + 63) ushr 6
 
-
+    /**
+     * Returns `true` if this value is in normalized form.
+     *
+     * A `BigInt` is normalized when:
+     *  - it is exactly the canonical zero (`BigInt.ZERO`), or
+     *  - its magnitude array does not contain unused leading zero limbs
+     *    (i.e., the most significant limb is non-zero).
+     *
+     * Normalization is not required for correctness, but a normalized
+     * representation avoids unnecessary high-order zero limbs.
+     */
+    fun isNormalized(meta: Meta, magia: Magia) =
+        Magus.isNormalized(magia, meta.normLen)
 }
