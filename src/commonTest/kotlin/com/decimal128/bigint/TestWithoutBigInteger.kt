@@ -69,14 +69,14 @@ class TestWithoutBigInteger {
 
         var bitCount = 0
         for (i in 0..<hi1.magnitudeBitLen())
-            if (hi1.isBitSet(i))
+            if (hi1.testBit(i))
                 ++bitCount
         assertEquals(bitCount, hi2.magnitudeCountOneBits())
 
         hi1 = hi1.abs()
         hi2 -= hi2
         for (i in 0..<hi1.magnitudeBitLen())
-            if (hi1.isBitSet(i)) {
+            if (hi1.testBit(i)) {
                 when (rng.nextInt(3)) {
                     0 -> hi2 += BigInt.withSetBit(i)
                     1 -> hi2 = hi2 or BigInt.withSetBit(i)

@@ -4,7 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.BigInt.Companion.ONE
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import kotlin.math.absoluteValue
 import kotlin.math.min
@@ -80,7 +79,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 return ZERO
             val signBit = sign.bit
             val meta = Meta(signBit, magia)
-            return BigInt(meta, magia)
+            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
         }
 
         internal operator fun invoke(sign: Boolean, magia: IntArray): BigInt {
@@ -90,7 +89,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             }
             val signBit = if (sign) 1 else 0
             val meta = Meta(signBit, magia)
-            return BigInt(meta, magia)
+            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
         }
 
         internal operator fun invoke(magia: IntArray): BigInt {
@@ -100,7 +99,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             }
             val signBit = 0
             val meta = Meta(signBit, magia)
-            return BigInt(meta, magia)
+            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
         }
 
         internal operator fun invoke(magia: IntArray, normLen: Int): BigInt {
@@ -112,7 +111,19 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             for (i in normLen..<magia.size)
                 magia[i] = 0
             val meta = Meta(signBit, normLen)
-            return BigInt(meta, magia)
+            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
+        }
+
+        internal operator fun invoke(sign: Boolean, magia: IntArray, normLen: Int): BigInt {
+            if (magia.isEmpty()) {
+                check (magia === Magia.ZERO)
+                return ZERO
+            }
+            val signBit = if (sign) 1 else 0
+            for (i in normLen..<magia.size)
+                magia[i] = 0
+            val meta = Meta(signBit, normLen)
+            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
         }
 
         /**
@@ -1594,16 +1605,26 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * @param bitIndex 0-based, starting from the least-significant bit
      * @return true if the bit is set, false otherwise
      */
-    fun isBitSet(bitIndex: Int): Boolean = Magia.testBit(this.magia, bitIndex)
+    fun testBit(bitIndex: Int): Boolean = Magia.testBit(this.magia, this.meta.normLen, bitIndex)
 
-    fun setBit(bitIndex: Int): BigInt {
+    fun withSetBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = true)
+
+    fun withClearBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = false)
+
+    private fun withBitOp(bitIndex: Int, isSetOp: Boolean): BigInt {
         if (bitIndex >= 0) {
-            if (isBitSet(bitIndex))
+            if (! (testBit(bitIndex) xor isSetOp))
                 return this
-            val newBitLen = max(bitIndex + 1, Magia.bitLen(this.magia))
-            val magia = Magia.newCopyWithExactBitLen(this.magia, newBitLen)
+            val newBitLen = max(bitIndex + 1, Magia.bitLen(this.magia, this.meta.normLen))
+            val magia = Magia.newCopyWithExactBitLen(this.magia, this.meta.normLen, newBitLen)
             val wordIndex = bitIndex ushr 5
-            magia[wordIndex] = magia[wordIndex] or (1 shl (bitIndex and 0x1F))
+            val isolatedBit = (1 shl (bitIndex and 0x1F))
+            val limb = magia[wordIndex]
+            magia[wordIndex] =
+                if (isSetOp)
+                    limb or isolatedBit
+                else
+                    limb and isolatedBit.inv()
             return BigInt(this.meta.signFlag, magia)
         }
         throw IllegalArgumentException()

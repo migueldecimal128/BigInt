@@ -34,7 +34,7 @@ class TestRandomBigInt {
                     "Incorrect bitLength for k=$k: got ${x.magnitudeBitLen()} value=$x")
 
                 // 3. Check top bit explicitly (bit k-1)
-                assertTrue(x.isBitSet(k - 1),
+                assertTrue(x.testBit(k - 1),
                     "Top bit (k-1) is not set for k=$k: value=$x")
 
                 // 4. Value must be strictly less than 2^k

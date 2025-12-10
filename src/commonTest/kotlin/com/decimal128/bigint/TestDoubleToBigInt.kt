@@ -45,7 +45,7 @@ class TestDoubleToBigInt {
             d *= 2.0
             val hi = d.toBigInt()
             assertTrue(hi.isMagnitudePowerOfTwo())
-            assertTrue(hi.isBitSet(i))
+            assertTrue(hi.testBit(i))
         }
     }
 

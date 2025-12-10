@@ -2,7 +2,6 @@ package com.decimal128.bigint
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class TestBarrett {
 
@@ -48,7 +47,7 @@ class TestBarrett {
             BigInt.randomWithMaxBitLen(128),
             BigInt.randomWithMaxBitLen(192),
             BigInt.randomWithMaxBitLen(256),
-            BigInt.randomWithMaxBitLen(511).setBit(510) // force top bit
+            BigInt.randomWithMaxBitLen(511).withSetBit(510) // force top bit
         )
 
         for (m in testMods) {

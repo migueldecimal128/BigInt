@@ -338,18 +338,28 @@ object Magia {
      * to hold [exactBitLen] bits. Leading limbs are preserved or truncated as needed.
      */
     fun newCopyWithExactBitLen(x: IntArray, exactBitLen: Int): IntArray =
-        newCopyWithExactLimbLen(x, (exactBitLen + 0x1F) ushr 5)
+        newCopyWithExactLimbLen(x, x.size, (exactBitLen + 0x1F) ushr 5)
+
+    /**
+     * Returns a copy of [x] whose length is the minimum number of limbs required
+     * to hold [exactBitLen] bits. Leading limbs are preserved or truncated as needed.
+     */
+    fun newCopyWithExactBitLen(x: IntArray, xLen: Int, exactBitLen: Int): IntArray =
+        newCopyWithExactLimbLen(x, xLen, (exactBitLen + 0x1F) ushr 5)
 
     /**
      * Returns a copy of [x] resized to exactly `exactLimbLen` limbs.
      * If the new length is larger, high-order limbs are zero-filled; if smaller,
      * high-order limbs are truncated.
      */
-    fun newCopyWithExactLimbLen(x: IntArray, exactLimbLen: Int): IntArray {
+    fun newCopyWithExactLimbLen(x: IntArray, exactLimbLen: Int): IntArray =
+        newCopyWithExactLimbLen(x, x.size, exactLimbLen)
+
+    fun newCopyWithExactLimbLen(x: IntArray, xLen: Int, exactLimbLen: Int): IntArray {
         if (exactLimbLen in 1..MAX_ALLOC_SIZE) {
             val dst = IntArray(exactLimbLen)
             //System.arraycopy(src, 0, dst, 0, min(src.size, dst.size))
-            x.copyInto(dst, 0, 0, min(x.size, dst.size))
+            x.copyInto(dst, 0, 0, min(xLen, dst.size))
             return dst
         }
         if (exactLimbLen == 0)
@@ -357,7 +367,7 @@ object Magia {
         throw IllegalArgumentException("invalid allocation length:$exactLimbLen")
     }
 
-     /**
+    /**
      * Returns a new limb array representing [x] plus the unsigned 64-bit value [dw].
      *
      * The result is extended as needed to hold any carry or sign extension from the addition.
