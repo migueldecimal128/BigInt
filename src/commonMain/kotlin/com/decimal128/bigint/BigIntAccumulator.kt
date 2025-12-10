@@ -9,6 +9,7 @@ import com.decimal128.bigint.BigInt.Companion.NEG_ONE
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
+import kotlin.math.max
 
 /**
  * A mutable arbitrary-precision integer accumulator for efficient series operations.
@@ -171,7 +172,7 @@ class BigIntAccumulator private constructor (
      * @return this accumulator instance, for call chaining.
      */
     fun set(sign: Boolean, dw: ULong): BigIntAccumulator {
-        val normLen = (64 - dw.countLeadingZeroBits() + 31) shr 5
+        val normLen = (64 - dw.countLeadingZeroBits() + 31) ushr 5
         meta = Meta(sign, normLen)
         // limbLen = if (dw == 0uL) 0 else if ((dw shr 32) == 0uL) 1 else 2
         magia[0] = dw.toInt()
@@ -179,21 +180,75 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    /**
+     * Ensures that the backing limb array has at least [minLimbLen] capacity.
+     *
+     * If the current array is too small, a new zero-initialized array of the
+     * required size is allocated and the previous contents are discarded.
+     * Existing contents are **not** preserved.
+     */
     private inline fun ensureCapacityDiscard(minLimbLen: Int) {
         if (magia.size < minLimbLen)
             magia = Magia.newWithFloorLen(minLimbLen)
     }
 
+    /**
+     * Ensures the limb array has at least [minLimbLen] capacity.
+     *
+     * If the array is too small, a larger one is allocated and the
+     * existing contents are copied into it.
+     */
     private inline fun ensureCapacityCopy(minLimbLen: Int) {
         if (magia.size < minLimbLen)
             magia = Magia.newCopyWithFloorLen(magia, minLimbLen)
     }
 
+    /**
+     * Ensures capacity for at least [minBitLen] bits, discarding any existing data.
+     * Converts the bit requirement to limb capacity and delegates to
+     * `ensureCapacityDiscard`.
+     */
     private inline fun ensureBitCapacityDiscard(minBitLen: Int) =
         ensureCapacityDiscard((minBitLen + 0x1F) ushr 5)
 
+    /**
+     * Ensures capacity for at least [minBitLen] bits, preserving existing data.
+     * Converts the bit requirement to limb capacity and delegates to
+     * `ensureCapacityCopy`.
+     */
     private inline fun ensureBitCapacityCopy(minBitLen: Int) =
         ensureCapacityCopy((minBitLen + 0x1F) ushr 5)
+
+
+    /**
+     * Ensures the backing array has at least [newLimbLen] limbs and that any
+     * newly-exposed limbs are zero-initialized.
+     *
+     * - If [newLimbLen] ≤ current `normLen`, nothing is done.
+     * - If [newLimbLen] ≤ current capacity, the unused limbs are zeroed
+     *   from the current `meta.normLen` up to [newLimbLen].
+     * - Otherwise a new zeroed array with minimum [newLimbLen] is
+     *   allocated and existing limbs up to `meta.normLen` are copied.
+     *
+     * This adjusts physical storage only; callers remain responsible for updating
+     * `meta.normLen` as needed.
+     */
+    private fun ensureLimbLen(newLimbLen: Int) {
+        if (newLimbLen <= meta.normLen)
+            return
+        if (newLimbLen <= magia.size) {
+            magia.fill(0, meta.normLen, newLimbLen)
+            return
+        }
+        magia = Magia.newCopyWithFloorLen(magia, meta.normLen, newLimbLen)
+    }
+
+    /**
+     * Ensures backing storage for at least [newBitLen] bits, zero-initializing
+     * any newly added limbs. Does not modify `meta.normLen`.
+     */
+    private fun ensureBitLen(newBitLen: Int) = ensureLimbLen((newBitLen + 0x1F) ushr 5)
+
 
     private inline fun swapTmp1() {
         val t = tmp1; tmp1 = magia; magia = t
@@ -667,6 +722,76 @@ class BigIntAccumulator private constructor (
             else -> throw IllegalArgumentException("bitCount < 0")
         }
         return this
+    }
+
+    /**
+     * Tests whether the magnitude bit at [bitIndex] is set.
+     *
+     * @param bitIndex 0-based, starting from the least-significant bit
+     * @return true if the bit is set, false otherwise
+     */
+    fun testBit(bitIndex: Int): Boolean = Magia.testBit(this.magia, this.meta.normLen, bitIndex)
+
+    /**
+     * Sets the bit at [bitIndex] in the magnitude, growing the limb array if needed.
+     *
+     * If the bit lies within the current normalized limb range, the limb is updated
+     * in place. Otherwise the array is extended and the new highest limb set.
+     *
+     * @throws IllegalArgumentException if [bitIndex] is negative
+     */
+    fun setBit(bitIndex: Int): BigIntAccumulator {
+        if (bitIndex >= 0) {
+            val wordIndex = bitIndex ushr 5
+            val isolatedBit = (1 shl (bitIndex and 0x1F))
+            if (wordIndex < meta.normLen) {
+                magia[wordIndex] = magia[wordIndex] or isolatedBit
+                return this
+            }
+            ensureLimbLen(wordIndex + 1)
+            magia[wordIndex] = isolatedBit
+            meta = Meta(meta.signBit, wordIndex + 1)
+            return this
+        }
+        throw IllegalArgumentException()
+    }
+
+    /**
+     * Clears the bit at [bitIndex] in the magnitude. If the cleared bit was in the
+     * most-significant used limb, the normalized length is reduced accordingly.
+     *
+     * @throws IllegalArgumentException if [bitIndex] is negative
+     */
+    fun clearBit(bitIndex: Int): BigIntAccumulator {
+        if (bitIndex >= 0) {
+            val wordIndex = bitIndex ushr 5
+            if (wordIndex < meta.normLen) {
+                val isolatedBitMask = (1 shl (bitIndex and 0x1F)).inv()
+                magia[wordIndex] = magia[wordIndex] and isolatedBitMask
+                meta = Meta(meta.signBit, Magia.normLen(magia, meta.normLen))
+            }
+            return this
+        }
+        throw IllegalArgumentException()
+    }
+
+    private fun performBitOp(bitIndex: Int, isSetOp: Boolean): BigIntAccumulator {
+        if (bitIndex >= 0) {
+            val newBitLen = max(bitIndex + 1, Magia.bitLen(this.magia, this.meta.normLen))
+            ensureBitLen(newBitLen)
+            val wordIndex = bitIndex ushr 5
+            val isolatedBit = (1 shl (bitIndex and 0x1F))
+            val limb = magia[wordIndex]
+            magia[wordIndex] =
+                if (isSetOp)
+                    limb or isolatedBit
+                else
+                    limb and isolatedBit.inv()
+            meta = Meta(meta.signBit, max(meta.normLen, wordIndex + 1))
+            check (Magia.isNormalized(magia, meta.normLen))
+            return this
+        }
+        throw IllegalArgumentException()
     }
 
     /**

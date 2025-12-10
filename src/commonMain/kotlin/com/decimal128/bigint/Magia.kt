@@ -326,11 +326,19 @@ object Magia {
     fun newCopyWithFloorLen(x: IntArray, floorLen: Int) : IntArray {
         if (floorLen > x.size) {
             val z = newWithFloorLen(floorLen)
-            x.copyInto(z, 0, 0, min(x.size, z.size))
+            x.copyInto(z, 0, 0, x.size)
             return z
-        } else {
-            throw IllegalArgumentException()
         }
+        throw IllegalArgumentException()
+    }
+
+    fun newCopyWithFloorLen(x: IntArray, xLen: Int, floorLen: Int): IntArray {
+        if (xLen <= x.size && xLen < floorLen) {
+            val z = newWithFloorLen(floorLen)
+            x.copyInto(z, 0, 0, xLen)
+            return z
+        }
+        throw IllegalArgumentException()
     }
 
     /**
