@@ -1851,6 +1851,17 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
                 Magia.compare(this.magia, meta.normLen, other.magia, other.meta.normLen) == 0
 
     /**
+     * Comparison predicate for numerical equality with the current
+     * value of a mutable [BigIntAccumulator].
+     *
+     * @param acc the [BigIntAccumulator] to compare with
+     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
+     */
+    infix fun EQ(acc: BigIntAccumulator): Boolean =
+        (this.meta.meta == acc.meta.meta) &&
+                Magia.compare(this.magia, meta.normLen, acc.magia, acc.meta.normLen) == 0
+
+    /**
      * Comparison predicate for numerical equality with a signed 32-bit integer.
      *
      * @param n the [Int] value to compare with
@@ -1888,8 +1899,15 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * @param other the [BigInt] to compare with
      * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
      */
-    infix fun NE(other: BigInt): Boolean =
-        (this.meta.signFlag != other.meta.signFlag) || !Magia.EQ(this.magia, other.magia)
+    infix fun NE(other: BigInt): Boolean = !(this EQ other)
+
+    /**
+     * Comparison predicate for numerical inequality with a [BigIntAccumulator].
+     *
+     * @param acc the [BigIntAccumulator] to compare with
+     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
+     */
+    infix fun NE(acc: BigIntAccumulator): Boolean = !(this EQ acc)
 
     /**
      * Comparison predicate for numerical inequality with a signed 32-bit integer.
@@ -1934,10 +1952,23 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      * unrelated types that will compile quietly but will always evaluate to
      * `false` at runtime.
      *
+     * Note that for convenience `BigInt.equals(BigIntAccumulator)` is accepted
+     * and will compare the values for numeric equality. However, this behavior
+     * cannot break collections since [BigIntAccumulator] cannot be stored
+     * in a collection. To enforce this, [BigIntAccumulator.hashCode()] throws
+     * an Exception.
+     *
      * @param other the object to compare against
-     * @return `true` if [other] is a [BigInt] with the same value; `false` otherwise
+     * @return `true` if [other] is a [BigInt] or [BigIntAccumulator] with the
+     *         same numeric value; `false` otherwise
      */
-    override fun equals(other: Any?): Boolean = (other is BigInt) && (this EQ other)
+    override fun equals(other: Any?): Boolean {
+        return when (other) {
+            is BigInt -> this EQ other
+            is BigIntAccumulator -> this EQ other
+            else -> false
+        }
+    }
 
     /**
      * Returns a hash code for this BigInt.
