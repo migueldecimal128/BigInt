@@ -1019,7 +1019,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * @return -1 if negative, 0 if zero, 1 if positive
      */
-    fun signum() = Magian.signum(meta)
+    fun signum() = Zoro.signum(meta)
 
     /**
      * Returns `true` if the magnitude of this BigInt is a power of two
@@ -1034,33 +1034,25 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Only values whose magnitude fits in one 32-bit limb (or zero) pass
      * this check.
      */
-    fun fitsInt(): Boolean = Magian.fitsInt(meta, magia)
+    fun fitsInt(): Boolean = Zoro.fitsInt(meta, magia)
 
     /**
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 32-bit integer (`0 .. UInt.MAX_VALUE`).
      */
-    fun fitsUInt() = meta.isPositive && Magus.normLen(magia) <= 1
+    fun fitsUInt(): Boolean = Zoro.fitsUInt(meta)
 
     /**
      * Returns `true` if this value fits in a signed 64-bit integer
      * (`Long.MIN_VALUE .. Long.MAX_VALUE`).
      */
-    fun fitsLong(): Boolean {
-        val limbLen = Magus.normLen(magia)
-        return when {
-            limbLen > 2 -> false
-            limbLen < 2 -> true
-            magia[1] >= 0 -> true
-            else -> meta.isNegative && magia[1] == Int.MIN_VALUE && magia[0] == 0
-        }
-    }
+    fun fitsLong(): Boolean = Zoro.fitsLong(meta, magia)
 
     /**
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 64-bit integer (`0 .. ULong.MAX_VALUE`).
      */
-    fun fitsULong() = meta.isPositive && Magus.normLen(magia) <= 2
+    fun fitsULong(): Boolean = Zoro.fitsULong(meta)
 
     /**
      * Returns the low 32 bits of this value, interpreted as a signed
@@ -1074,18 +1066,14 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * See also: `toIntClamped()` for a range-checked conversion.
      */
-    fun toInt() = if (magia.isEmpty()) 0 else (magia[0] xor meta.signMask) - meta.signMask
+    fun toInt() = Zoro.toInt(meta, magia)
 
     /**
      * Returns this value as a signed `Int`, throwing an [ArithmeticException]
      * if it cannot be represented exactly. Unlike [toInt], this performs a
      * strict range check instead of truncating the upper bits.
      */
-    fun toIntExact(): Int =
-        if (fitsInt())
-            toInt()
-        else
-            throw ArithmeticException("BigInt out of Int range")
+    fun toIntExact(): Int = Zoro.toIntExact(meta, magia)
 
     /**
      * Returns this BigInt as a signed Int, clamped to `Int.MIN_VALUE..Int.MAX_VALUE`.
@@ -1093,34 +1081,20 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Values greater than `Int.MAX_VALUE` return `Int.MAX_VALUE`.
      * Values less than `Int.MIN_VALUE` return `Int.MIN_VALUE`.
      */
-    fun toIntClamped(): Int {
-        val bitLen = Magus.bitLen(magia)
-        if (bitLen == 0)
-            return 0
-        val mag = magia[0]
-        return if (meta.isPositive) {
-            if (bitLen <= 31) mag else Int.MAX_VALUE
-        } else {
-            if (bitLen <= 31) -mag else Int.MIN_VALUE
-        }
-    }
+    fun toIntClamped(): Int = Zoro.toIntClamped(meta, magia)
 
     /**
      * Returns the low 32 bits of this value interpreted as an unsigned
      * two’s-complement `UInt` (i.e., wraps modulo 2³², like `Long.toUInt()`).
      */
-    fun toUInt() = toInt().toUInt()
+    fun toUInt(): UInt = Zoro.toUInt(meta, magia)
 
     /**
      * Returns this value as a `UInt`, throwing an [ArithmeticException]
      * if it cannot be represented exactly. Unlike [toUInt], this checks
      * that the value is within the unsigned 32-bit range.
      */
-    fun toUIntExact(): UInt =
-        if (fitsUInt())
-            toUInt()
-        else
-            throw ArithmeticException("BigInt out of UInt range")
+    fun toUIntExact(): UInt = Zoro.toUIntExact(meta, magia)
 
     /**
      * Returns this BigInt as an unsigned UInt, clamped to `0..UInt.MAX_VALUE`.
@@ -1128,16 +1102,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Values greater than `UInt.MAX_VALUE` return `UInt.MAX_VALUE`.
      * Negative values return 0.
      */
-    fun toUIntClamped(): UInt {
-        if (meta.isPositive) {
-            val bitLen = Magus.bitLen(magia)
-            if (bitLen > 0) {
-                val magnitude = magia[0]
-                return if (bitLen <= 32) magnitude.toUInt() else UInt.MAX_VALUE
-            }
-        }
-        return 0u
-    }
+    fun toUIntClamped(): UInt = Zoro.toUIntClamped(meta, magia)
 
     /**
      * Returns the low 64 bits of this value as a signed two’s-complement `Long`.
@@ -1146,26 +1111,14 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * sign applied afterward; upper bits are discarded (wraps modulo 2⁶⁴),
      * matching `Long` conversion behavior.
      */
-    fun toLong(): Long {
-        val l = when {
-            magia.isEmpty() -> 0L
-            magia.size == 1 -> magia[0].toUInt().toLong()
-            else -> (magia[1].toLong() shl 32) or magia[0].toUInt().toLong()
-        }
-        val mask = meta.signMask.toLong()
-        return (l xor mask) - mask
-    }
+    fun toLong(): Long = Zoro.toLong(meta, magia)
 
     /**
      * Returns this value as a `Long`, throwing an [ArithmeticException]
      * if it cannot be represented exactly. Unlike [toLong], this checks
      * that the value lies within the signed 64-bit range.
      */
-    fun toLongExact(): Long =
-        if (fitsLong())
-            toLong()
-        else
-            throw ArithmeticException("BigInt out of Long range")
+    fun toLongExact(): Long = Zoro.toLongExact(meta, magia)
 
     /**
      * Returns this BigInt as a signed Long, clamped to `Long.MIN_VALUE..Long.MAX_VALUE`.
@@ -1173,36 +1126,20 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Values greater than `Long.MAX_VALUE` return `Long.MAX_VALUE`.
      * Values less than `Long.MIN_VALUE` return `Long.MIN_VALUE`.
      */
-    fun toLongClamped(): Long {
-        val bitLen = Magus.bitLen(magia)
-        val magnitude = when (magia.size) {
-            0 -> 0L
-            1 -> magia[0].toLong() and 0xFFFF_FFFFL
-            else -> (magia[1].toLong() shl 32) or (magia[0].toLong() and 0xFFFF_FFFFL)
-        }
-        return if (meta.isPositive) {
-            if (bitLen <= 63) magnitude else Long.MAX_VALUE
-        } else {
-            if (bitLen <= 63) -magnitude else Long.MIN_VALUE
-        }
-    }
+    fun toLongClamped(): Long = Zoro.toLongClamped(meta, magia)
 
     /**
      * Returns the low 64 bits of this value interpreted as an unsigned
      * two’s-complement `ULong` (wraps modulo 2⁶⁴, like `Long.toULong()`).
      */
-    fun toULong(): ULong = toLong().toULong()
+    fun toULong(): ULong = Zoro.toULong(meta, magia)
 
     /**
      * Returns this value as a `ULong`, throwing an [ArithmeticException]
      * if it cannot be represented exactly. Unlike [toULong], this checks
      * that the value is within the unsigned 64-bit range.
      */
-    fun toULongExact(): ULong =
-        if (fitsULong())
-            toULong()
-        else
-            throw ArithmeticException("BigInt out of ULong range")
+    fun toULongExact(): ULong = Zoro.toULongExact(meta, magia)
 
     /**
      * Returns this BigInt as an unsigned ULong, clamped to `0..ULong.MAX_VALUE`.
@@ -1210,36 +1147,19 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      * Values greater than `ULong.MAX_VALUE` return `ULong.MAX_VALUE`.
      * Negative values return 0.
      */
-    fun toULongClamped(): ULong {
-        if (meta.isPositive) {
-            val bitLen = Magus.bitLen(magia)
-            val magnitude = when (magia.size) {
-                0 -> 0L
-                1 -> magia[0].toLong() and 0xFFFF_FFFFL
-                else -> (magia[1].toLong() shl 32) or (magia[0].toLong() and 0xFFFF_FFFFL)
-            }
-            return if (bitLen <= 64) magnitude.toULong() else ULong.MAX_VALUE
-        }
-        return 0uL
-    }
+    fun toULongClamped(): ULong = Zoro.toULongClamped(meta, magia)
 
     /**
      * Returns the low 32 bits of the magnitude as a `UInt`
      * (ignores the sign).
      */
-    fun toUIntMagnitude() = if (magia.isEmpty()) 0 else magia[0].toUInt()
+    fun toUIntMagnitude(): UInt = Zoro.toUIntMagnitude(meta, magia)
 
     /**
      * Returns the low 64 bits of the magnitude as a `ULong`
      * (ignores the sign).
      */
-    fun toULongMagnitude(): ULong {
-        return when {
-            magia.isEmpty() -> 0uL
-            magia.size == 1 -> magia[0].toUInt().toULong()
-            else -> (magia[1].toULong() shl 32) or magia[0].toUInt().toULong()
-        }
-    }
+    fun toULongMagnitude(): ULong = Zoro.toULongMagnitude(meta, magia)
 
     /**
      * Extracts a 64-bit unsigned value from the magnitude of this number,
@@ -1248,11 +1168,37 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * @throws IllegalArgumentException if `bitIndex` is negative.
      */
-    fun extractULongAtBitIndex(bitIndex: Int): ULong {
-        if (bitIndex >= 0)
-            return Magus.extractULongAtBitIndex(magia, bitIndex)
-        throw IllegalArgumentException("invalid bitIndex:$bitIndex")
-    }
+    fun extractULongAtBitIndex(bitIndex: Int): ULong =
+        Zoro.extractULongAtBitIndex(meta, magia, bitIndex)
+
+    /**
+     * Returns the bit-length of the magnitude of this BigInt.
+     *
+     * Equivalent to the number of bits required to represent the absolute value.
+     */
+    fun magnitudeBitLen() = Magus.bitLen(magia, meta.normLen)
+
+    /**
+     * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
+     *
+     * BigInteger.bitLength() attempts a pseudo-twos-complement answer
+     * It is the number of bits required, minus the sign bit.
+     * - For non-negative values, it is simply the number of bits in the magnitude.
+     * - For negative values, it becomes a little wonky.
+     *
+     * Example: `BigInteger("-1").bitLength() == 0` ... think about ie :)
+     */
+    fun bitLengthBigIntegerStyle(): Int = Magus.bitLengthBigIntegerStyle(meta.isNegative, magia)
+
+    /**
+     * Returns the number of 32-bit integers required to store the binary magnitude.
+     */
+    fun magnitudeIntArrayLen() = (Magus.bitLen(magia) + 31) ushr 5
+
+    /**
+     * Returns the number of 64-bit longs required to store the binary magnitude.
+     */
+    fun magnitudeLongArrayLen() = (Magus.bitLen(magia) + 63) ushr 6
 
 // Note: `magia` is shared with `negate` and `abs`.
 // No mutation of `magia` is allowed.
@@ -1508,35 +1454,6 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
         }
         return ZERO
     }
-
-    /**
-     * Returns the bit-length of the magnitude of this BigInt.
-     *
-     * Equivalent to the number of bits required to represent the absolute value.
-     */
-    fun magnitudeBitLen() = Magus.bitLen(magia, meta.normLen)
-
-    /**
-     * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
-     *
-     * BigInteger.bitLength() attempts a pseudo-twos-complement answer
-     * It is the number of bits required, minus the sign bit.
-     * - For non-negative values, it is simply the number of bits in the magnitude.
-     * - For negative values, it becomes a little wonky.
-     *
-     * Example: `BigInteger("-1").bitLength() == 0` ... think about ie :)
-     */
-    fun bitLengthBigIntegerStyle(): Int = Magus.bitLengthBigIntegerStyle(meta.isNegative, magia)
-
-    /**
-     * Returns the number of 32-bit integers required to store the binary magnitude.
-     */
-    fun magnitudeIntArrayLen() = (Magus.bitLen(magia) + 31) ushr 5
-
-    /**
-     * Returns the number of 64-bit longs required to store the binary magnitude.
-     */
-    fun magnitudeLongArrayLen() = (Magus.bitLen(magia) + 63) ushr 6
 
     /**
      * Computes the number of bytes needed to represent this BigInt

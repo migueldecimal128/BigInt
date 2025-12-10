@@ -280,7 +280,8 @@ object BigIntAlgorithms {
         // These two errors are independent, and each can reduce the estimate by 1.
         // Therefore we add +2 total, ensuring the initial estimate of sqrt()
         // (after a single correction pass) is never too small.
-        val top = Magus.extractULongAtBitIndex(radicand.magia, topBitsIndex) + 1uL + 1uL
+        val top = Magus.extractULongAtBitIndex(radicand.magia,
+            radicand.meta.normLen, topBitsIndex) + 1uL + 1uL
         // a single check to ensure that the initial isqrt estimate >= the actual isqrt
         var topSqrt = ceil(sqrt(top.toDouble())).toULong()
         val crossCheck = topSqrt * topSqrt

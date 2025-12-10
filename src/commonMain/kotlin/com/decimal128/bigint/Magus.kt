@@ -1553,18 +1553,18 @@ object Magus {
      * @param bitIndex the starting bit position (0 = least-significant bit).
      * @return the low 64 bits of (magnitude >> bitIndex).
      */
-    fun extractULongAtBitIndex(x: Magia, bitIndex: Int): ULong {
+    fun extractULongAtBitIndex(x: Magia, xNormLen: Int, bitIndex: Int): ULong {
         val loLimb = bitIndex ushr 5
         val innerShift = bitIndex and 0x1F
         if (bitIndex == 0)
             return toRawULong(x)
-        if (loLimb >= x.size)
+        if (loLimb >= xNormLen)
             return 0uL
         val lo = x[loLimb].toUInt().toULong()
-        if ((loLimb + 1) == x.size)
+        if ((loLimb + 1) == xNormLen)
             return lo shr innerShift
         val mid = x[loLimb + 1].toUInt().toULong()
-        if ((loLimb + 2) == x.size || innerShift == 0)
+        if ((loLimb + 2) == xNormLen || innerShift == 0)
             return ((mid shl 32) or lo) shr innerShift
         val hi = x[loLimb + 2].toUInt().toULong()
         return (hi shl (64 - innerShift)) or (mid shl (32 - innerShift)) or (lo shr innerShift)
@@ -1600,7 +1600,7 @@ object Magus {
             check (innerShift != 0)
             z[limbIndex + 1] = (w shr (32 - innerShift)).toInt()
         }
-        check (extractULongAtBitIndex(z, bitIndex) == w.toULong())
+        check (extractULongAtBitIndex(z, z.size, bitIndex) == w.toULong())
         return z
     }
 
