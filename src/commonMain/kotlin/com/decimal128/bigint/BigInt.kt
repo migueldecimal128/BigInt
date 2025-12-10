@@ -1727,9 +1727,9 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
             bitIndex < 0 || bitWidth < 0 ->
                 throw IllegalArgumentException(
                     "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
-            bitWidth == 0 -> return ZERO
-            bitIndex >= myBitLen -> return ZERO
-            bitWidth == 1 && !testBit(bitIndex) -> return ZERO
+            bitWidth == 0 ||
+                    bitIndex >= myBitLen ||
+                    bitWidth == 1 && !testBit(bitIndex) -> return ZERO
             bitWidth == 1 -> {
                 val magia = Magia.newWithSetBit(bitIndex)
                 return BigInt(meta.signFlag, magia)
