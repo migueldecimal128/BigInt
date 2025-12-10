@@ -1019,8 +1019,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: In
      *
      * @return -1 if negative, 0 if zero, 1 if positive
      */
-    // FIXME ... do this branchless with normLen
-    fun signum() = if (meta.signFlag) -1 else if (isZero()) 0 else 1
+    fun signum() = Magus.signum(meta)
 
     /**
      * Returns `true` if the magnitude of this BigInt is a power of two
