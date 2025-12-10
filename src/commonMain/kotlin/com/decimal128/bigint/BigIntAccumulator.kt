@@ -775,25 +775,6 @@ class BigIntAccumulator private constructor (
         throw IllegalArgumentException()
     }
 
-    private fun performBitOp(bitIndex: Int, isSetOp: Boolean): BigIntAccumulator {
-        if (bitIndex >= 0) {
-            val newBitLen = max(bitIndex + 1, Magia.bitLen(this.magia, this.meta.normLen))
-            ensureBitLen(newBitLen)
-            val wordIndex = bitIndex ushr 5
-            val isolatedBit = (1 shl (bitIndex and 0x1F))
-            val limb = magia[wordIndex]
-            magia[wordIndex] =
-                if (isSetOp)
-                    limb or isolatedBit
-                else
-                    limb and isolatedBit.inv()
-            meta = Meta(meta.signBit, max(meta.normLen, wordIndex + 1))
-            check (Magia.isNormalized(magia, meta.normLen))
-            return this
-        }
-        throw IllegalArgumentException()
-    }
-
     /**
      * Adds the square of the given value to this accumulator in place.
      *
