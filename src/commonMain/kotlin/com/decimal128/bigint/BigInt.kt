@@ -1911,7 +1911,7 @@ class BigInt private constructor(internal val meta: Meta, internal val magia: Ma
      *
      * @return a decimal string representing the value of this BigInt
      */
-    override fun toString() = Magus.toString(meta.isNegative, magia, meta.normLen)
+    override fun toString() = Zoro.toString(meta, magia)
 
     /**
      * Returns the hexadecimal string representation of this BigInt.

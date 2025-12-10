@@ -3,6 +3,7 @@
 package com.decimal128.bigint
 
 import kotlin.math.absoluteValue
+import kotlin.math.max
 
 /**
  * These are operations that are layered above Magia and
@@ -414,5 +415,203 @@ object Zoro {
      * @return `true` if this value equals [dw], `false` otherwise
      */
     fun EQ(xMeta: Meta, xMagia: Magia, dw: ULong): Boolean = compare(xMeta, xMagia, dw) == 0
+
+    /**
+     * Returns the decimal string representation of this BigInt.
+     *
+     * - Negative values are prefixed with a `-` sign.
+     * - Equivalent to calling `java.math.BigInteger.toString()`.
+     *
+     * @return a decimal string representing the value of this BigInt
+     */
+    fun toString(meta: Meta, magia: Magia): String =
+        Magus.toString(meta.isNegative, magia, meta.normLen)
+
+    private val HEX_PREFIX_UTF8_0x = byteArrayOf('0'.code.toByte(), 'x'.code.toByte())
+    private val HEX_SUFFIX_UTF8_nada = ByteArray(0)
+
+
+    /**
+     * Returns the hexadecimal string representation of this BigInt.
+     *
+     * - The string is prefixed with `0x`.
+     * - Uses uppercase hexadecimal characters.
+     * - Negative values are prefixed with a `-` sign before `0x`.
+     *
+     * @return a hexadecimal string representing the value of this BigInt
+     */
+    fun toHexString(meta: Meta, magia: Magia): String =
+        toHexString(meta, magia, HEX_PREFIX_UTF8_0x, useUpperCase = true, minPrintLength = 1, HEX_SUFFIX_UTF8_nada)
+
+    fun toHexString(meta: Meta, magia: Magia, hexFormat: HexFormat): String {
+        if (hexFormat === HexFormat.UpperCase)
+            return toHexString(meta, magia)
+        return toHexString(meta, magia,
+            hexFormat.number.prefix.encodeToByteArray(),
+            hexFormat.upperCase,
+            hexFormat.number.minLength,
+            hexFormat.number.suffix.encodeToByteArray()
+        )
+    }
+
+    private fun toHexString(meta: Meta, magia: Magia, prefixUtf8: ByteArray, useUpperCase: Boolean, minPrintLength: Int, suffixUtf8: ByteArray): String {
+        val signCount = meta.signBit
+        val prefixCount = prefixUtf8.size
+        val nybbleCount = max((magnitudeBitLen(meta, magia) + 3) / 4, minPrintLength)
+        val suffixCount = suffixUtf8.size
+        val totalLen = signCount + prefixCount + nybbleCount + suffixCount
+        val utf8 = ByteArray(totalLen)
+        utf8[0] = '-'.code.toByte()
+        var ich = signCount
+        for (b in prefixUtf8) {
+            utf8[ich] = b
+            ++ich
+        }
+        Magus.toHexUtf8(magia, meta.normLen, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
+        ich += nybbleCount
+        for (b in suffixUtf8) {
+            utf8[ich] = b
+            ++ich
+        }
+        return utf8.decodeToString()
+    }
+
+    /**
+     * Converts this [BigInt] to a **big-endian two's-complement** byte array.
+     *
+     * - Negative values use standard two's-complement representation.
+     * - The returned array has the minimal length needed to represent the value,
+     *   **but always at least 1 byte**.
+     * - For other binary formats, see [toBinaryByteArray] or [toBinaryBytes].
+     *
+     * @return a new [ByteArray] containing the two's-complement representation
+     */
+    fun toTwosComplementBigEndianByteArray(meta: Meta, magia: Magia): ByteArray =
+        toBinaryByteArray(meta, magia, isTwosComplement = true, isBigEndian = true)
+
+    /**
+     * Converts this [BigInt] to a [ByteArray] in the requested binary format.
+     *
+     * - The format is determined by [isTwosComplement] and [isBigEndian].
+     * - Negative values are represented in two's-complement form if [isTwosComplement] is true.
+     * - The returned array has the minimal length needed, **but always at least 1 byte**.
+     *
+     * @param isTwosComplement whether to use two's-complement representation for negative numbers
+     * @param isBigEndian whether the bytes are written in big-endian or little-endian order
+     * @return a new [ByteArray] containing the binary representation
+     */
+    fun toBinaryByteArray(meta: Meta, magia: Magia, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray =
+        Magus.toBinaryByteArray(meta.isNegative, magia, meta.normLen, isTwosComplement, isBigEndian)
+
+    /**
+     * Writes this [BigInt] into the provided [bytes] array in the requested binary format.
+     *
+     * - No heap allocation takes place.
+     * - If [isTwosComplement] is true, values use two's-complement representation
+     *   with the most significant bit indicating the sign.
+     * - If [isTwosComplement] is false, the unsigned magnitude is written,
+     *   possibly with the most significant bit set.
+     * - Bytes are written in big-endian order if [isBigEndian] is true,
+     *   otherwise little-endian order.
+     * - If [requestedLength] is 0, the minimal number of bytes needed is calculated
+     *   and written, **but always at least 1 byte**.
+     * - If [requestedLength] > 0, exactly that many bytes will be written:
+     *   - If the requested length is greater than the minimum required, the sign will
+     *     be extended into the extra bytes.
+     *   - If the requested length is insufficient… you will have a bad day.
+     * - In all cases, the actual number of bytes written is returned.
+     * - May throw [IndexOutOfBoundsException] if the supplied [bytes] array is too small.
+     *
+     * For a standard **two's-complement big-endian** version, see [toTwosComplementBigEndianByteArray].
+     * For a version that allocates a new array automatically, see [toBinaryByteArray].
+     *
+     * @param isTwosComplement whether to use two's-complement representation for negative numbers
+     * @param isBigEndian whether bytes are written in big-endian (true) or little-endian (false) order
+     * @param bytes the target array to write into
+     * @param offset the start index in [bytes] to begin writing
+     * @param requestedLength number of bytes to write (<= 0 means minimal required, but always at least 1)
+     * @return the number of bytes actually written
+     * @throws IndexOutOfBoundsException if [bytes] is too small
+     */
+    fun toBinaryBytes(meta: Meta, magia: Magia,
+        isTwosComplement: Boolean, isBigEndian: Boolean,
+        bytes: ByteArray, offset: Int = 0, requestedLength: Int = -1
+    ): Int =
+        Magus.toBinaryBytes(
+            magia, isTwosComplement && meta.isNegative, isBigEndian,
+            bytes, offset, requestedLength
+        )
+
+    /**
+     * Returns a copy of the magnitude as a little-endian IntArray.
+     *
+     * - Least significant limb is at index 0.
+     * - Sign is ignored; only the magnitude is returned.
+     *
+     * @return a new IntArray containing the magnitude in little-endian order
+     */
+    fun magnitudeToLittleEndianIntArray(meta: Meta, magia: Magia): IntArray = Magus.newNormalizedCopy(magia, meta.normLen)
+
+    /**
+     * Returns a copy of the magnitude as a little-endian LongArray.
+     *
+     * - Combines every two 32-bit limbs into a 64-bit long.
+     * - Least significant bits are in index 0.
+     * - Sign is ignored; only the magnitude is returned.
+     *
+     * @return a new LongArray containing the magnitude in little-endian order
+     */
+    fun magnitudeToLittleEndianLongArray(meta: Meta, magia: Magia): LongArray {
+        val intLen = meta.normLen
+        val longLen = (intLen + 1) ushr 1
+        val z = LongArray(longLen)
+        var iw = 0
+        var il = 0
+        while (intLen - iw >= 2) {
+            val lo = magia[iw].toUInt().toLong()
+            val hi = magia[iw + 1].toLong() shl 32
+            z[il] = hi or lo
+            ++il
+            iw += 2
+        }
+        if (iw < intLen)
+            z[il] = magia[iw].toUInt().toLong()
+        return z
+    }
+
+    /**
+     * Returns the bit-length of the magnitude of this BigInt.
+     *
+     * Equivalent to the number of bits required to represent the absolute value.
+     */
+    fun magnitudeBitLen(meta: Meta, magia: Magia): Int =
+        Magus.bitLen(magia, meta.normLen)
+
+    /**
+     * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
+     *
+     * BigInteger.bitLength() attempts a pseudo-twos-complement answer
+     * It is the number of bits required, minus the sign bit.
+     * - For non-negative values, it is simply the number of bits in the magnitude.
+     * - For negative values, it becomes a little wonky.
+     *
+     * Example: `BigInteger("-1").bitLength() == 0` ... think about ie :)
+     */
+    // FIXME - move bitLengthBigIntegerStyle out of Magus and into Zoro
+    fun bitLengthBigIntegerStyle(meta: Meta, magia: Magia): Int =
+        Magus.bitLengthBigIntegerStyle(meta.isNegative, magia)
+
+    /**
+     * Returns the number of 32-bit integers required to store the binary magnitude.
+     */
+    fun magnitudeIntArrayLen(meta: Meta, magia: Magia) =
+        (magnitudeBitLen(meta, magia) + 31) ushr 5
+
+    /**
+     * Returns the number of 64-bit longs required to store the binary magnitude.
+     */
+    fun magnitudeLongArrayLen(meta: Meta, magia: Magia) =
+        (magnitudeBitLen(meta, magia) + 63) ushr 6
+
 
 }

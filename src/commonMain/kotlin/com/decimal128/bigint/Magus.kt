@@ -1247,7 +1247,7 @@ object Magus {
      * @param xLen the number of significant limbs to examine.
      * @throws IllegalArgumentException if [xLen] is out of range.
      */
-    fun bitLen(x: Magia, xLen: Int): Int {
+    internal fun bitLen(x: Magia, xLen: Int): Int {
         if (xLen >= 0 && xLen <= x.size) {
             for (i in xLen - 1 downTo 0)
                 if (x[i] != 0)
