@@ -56,7 +56,10 @@ import kotlin.text.HexFormat
  * and increases cache coherency for statistical summations on large data sets
  * and for compute-heavy crypto calculations.
  */
-class BigInt private constructor(internal val meta: Meta, internal val magia: Magia) : Comparable<BigInt> {
+class BigInt private constructor(
+    override val meta: Meta,
+    override val magia: Magia
+) : Comparable<BigInt>, Magian {
 
     companion object {
         /**

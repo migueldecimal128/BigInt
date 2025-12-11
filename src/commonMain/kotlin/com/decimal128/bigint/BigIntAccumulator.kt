@@ -63,9 +63,10 @@ import kotlin.math.min
  * @see BigInt for the immutable arbitrary-precision integer implementation.
  */
 class BigIntAccumulator private constructor (
-    var meta: Meta,
-    var magia: Magia,
-    var tmp1: Magia) {
+    override var meta: Meta,
+    override var magia: Magia,
+    internal var tmp1: Magia
+) : Magian {
     constructor() : this(Meta(0), Magia(4), Magus.ZERO)
 
     val normLen: Int
