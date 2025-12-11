@@ -38,7 +38,6 @@ class TestBigIntAccum {
                 println("before: hi:$hi hia:$hia n:$n")
             hi += n
             hia += n
-            hia.toStringX()
             if (verbose)
                 println(" after: hi:$hi hia:$hia n:$n")
             assertTrue(hi EQ hia.toBigInt())
