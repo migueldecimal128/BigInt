@@ -111,8 +111,10 @@ value class Meta internal constructor(val meta: Int) {
 
     /**
      * Returns the negation of the sign with the same normLen magnitude.
+     *
+     * Do not allow negative zero.
      */
-    fun negate() = Meta(meta xor Int.MIN_VALUE)
+    fun negate() = Meta((meta xor Int.MIN_VALUE) and (-(meta and Int.MAX_VALUE) shr 31))
 
     /**
      * Returns a meta with non-negative sign and the same normLen magnitude.

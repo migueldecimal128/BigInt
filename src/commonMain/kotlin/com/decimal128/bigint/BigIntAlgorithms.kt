@@ -17,38 +17,30 @@ object BigIntAlgorithms {
      * Uses an optimized multiplication tree and
      * fast paths for small `w`, and returns `ONE` for `w == 0` or `1`.
      */
-    fun factorial(w: UInt): BigInt {
-        if (w <= 20u) {
-            if (w <= 1u)
+    fun factorial(n: Int): BigInt {
+        if (n < 0)
+            throw IllegalArgumentException("factorial of a negative number")
+        if (n <= 20) {
+            if (n <= 1)
                 return ONE
-            var f = 1uL
-            for (i in 2uL..w.toULong())
+            var f = 1L
+            for (i in 2L..n.toLong())
                 f *= i
             return from(f)
         }
-        val limbLen = estimateFactorialLimbLen(w)
-        val f = IntArray(limbLen)
-        val twentyBang = 2_432_902_008_176_640_000
-        f[0] = twentyBang.toInt()
-        f[1] = (twentyBang ushr 32).toInt()
-        var fNormLen = 2
-        for (i in 21u..w)
-            fNormLen = Magus.setMul(f, f, fNormLen, i)
-        return BigInt(f, fNormLen)
+        val bitCapacityRequired = estimateFactorialBitLen(n)
+        val f = BigIntAccumulator.withInitialBitCapacity(bitCapacityRequired)
+        val twentyBang = 2_432_902_008_176_640_000L
+        f.set(twentyBang)
+        for (i in 21..n)
+            f *= i
+        return f.toBigInt()
     }
 
-    private fun estimateFactorialLimbLen(w: UInt): Int {
-        val bits = estimateFactorialBits(w)
-        val limbs = ((bits + 0x1FuL) shr 5)
-        if (limbs == limbs.toInt().toULong())
-            return limbs.toInt()
-        throw IllegalArgumentException("factorial will overflow memory constraints")
-    }
+    private fun estimateFactorialBitLen(n: Int): Int {
+        if (n < 2) return 1
 
-    private fun estimateFactorialBits(w: UInt): ULong {
-        if (w < 2u) return 1uL
-
-        val nn = w.toDouble()
+        val nn = n.toDouble()
         val log2e = 1.4426950408889634
         val pi = 3.141592653589793
 
@@ -62,7 +54,11 @@ object BigIntAlgorithms {
         // Add correction term 1/(12n ln 2)
         val correction = 0.12022644346 / nn
 
-        return kotlin.math.floor(estimate + correction).toULong() + 1u
+        val final = estimate + correction.toLong() + 1L
+        if (final > Int.MAX_VALUE)
+            throw ArithmeticException("factorial will overflow max bitLen of Int.MAX_VALUE")
+
+        return final.toInt()
     }
 
     /**
@@ -82,9 +78,30 @@ object BigIntAlgorithms {
             return b.abs()
         if (b.isZero())
             return a.abs()
-        val magia = Magus.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
-        check(magia !== Magus.ZERO)
-        return BigInt(magia)
+
+        var x = a.toBigIntAccumulator().mutAbs()
+        var y = b.toBigIntAccumulator().mutAbs()
+
+        val ctzX = x.countTrailingZeroBits()
+        val ctzY = y.countTrailingZeroBits()
+        val initialShift = min(ctzX, ctzY)
+        x.mutShr(ctzX)
+        y.mutShr(ctzY)
+
+        // Now both x and y are odd
+        while (y.isNotZero()) {
+            // Remove factors of 2 from y
+            y.mutShr(y.countTrailingZeroBits())
+            // Ensure x <= y
+            if (x > y) {
+                val swap = x; x = y; y = swap
+            }
+            // y = y - x
+            y -= x
+        }
+        // Final result = u * 2^shift
+        x.mutShl(initialShift)
+        return x.toBigInt()
     }
 
     /**
@@ -99,12 +116,13 @@ object BigIntAlgorithms {
     fun lcm(a: BigInt, b: BigInt): BigInt {
         if (a.isZero() || b.isZero())
             return ZERO
-        val gcd = Magus.gcd(a.magia, a.meta.normLen, b.magia, b.meta.normLen)
-        val lcm = if (Magus.bitLen(a.magia) < Magus.bitLen(b.magia))
-            Magus.newMul(Magus.newDiv(a.magia, gcd), b.magia)
+        val aAbs = a.abs()
+        val bAbs = b.abs()
+        val gcd = gcd(aAbs, bAbs)
+        if (aAbs < bAbs)
+            return (aAbs / gcd) * bAbs
         else
-            Magus.newMul(Magus.newDiv(b.magia, gcd), a.magia)
-        return BigInt(lcm)
+            return (bAbs / gcd) * aAbs
     }
 
     /**
@@ -127,57 +145,6 @@ object BigIntAlgorithms {
      * @throws IllegalArgumentException if [exp] is negative
      */
     fun pow(base: BigInt, exp: Int): BigInt {
-        val pow1 = pow1(base, exp)
-        val pow2 = pow2(base, exp)
-        if (pow1 != pow2) {
-            println("kilroy was here!")
-            println("base:$base exp:$exp")
-            println("pow1:$pow1")
-            println("pow2:$pow2")
-            check (false)
-        }
-        return pow1
-    }
-
-    fun pow1(base: BigInt, exp: Int): BigInt {
-        val resultSign = base.meta.signFlag && ((exp and 1) != 0)
-        return when {
-            exp < 0 -> throw IllegalArgumentException("cannot raise BigInt to negative power:$exp")
-            exp == 0 -> ONE
-            exp == 1 -> base
-            base.isZero() -> ZERO
-            Magus.EQ(base.magia, 1) -> if (resultSign) NEG_ONE else ONE
-            Magus.EQ(base.magia, 2) -> BigInt(resultSign, Magus.newWithSetBit(exp))
-            exp == 2 -> base.sqr()
-            else -> {
-                val maxBitLen = Magus.bitLen(base.magia) * exp
-                val maxBitLimbLen = (maxBitLen + 0x1F) ushr 5
-                var b = Magus.newCopyWithExactLimbLen(base.magia, maxBitLimbLen)
-                var bNormLen = Magus.normLen(base.magia)
-                var r = IntArray(maxBitLimbLen)
-                r[0] = 1
-                var rNormlen = 1
-                var t = IntArray(maxBitLimbLen)
-
-                var e = exp
-                while (true) {
-                    if ((e and 1) != 0) {
-                        rNormlen = Magus.setMul(t, r, rNormlen, b, bNormLen)
-                        val swap = t; t = r; r = swap
-                    }
-                    e = e ushr 1
-                    if (e == 0)
-                        break
-                    t.fill(0, 0, min(t.size, 2 * bNormLen))
-                    bNormLen = Magus.setSqr(t, b, bNormLen)
-                    val swap = t; t = b; b = swap
-                }
-                BigInt(resultSign, r)
-            }
-        }
-    }
-
-    fun pow2(base: BigInt, exp: Int): BigInt {
         val resultSign = base.isNegative() && ((exp and 1) != 0)
         val baseAbs = base.abs()
         return when {
@@ -270,99 +237,7 @@ object BigIntAlgorithms {
      * @return the non-negative integer square root of this value.
      * @throws ArithmeticException if this value is negative.
      */
-    fun isqrt1(radicand: BigInt): BigInt {
-        if (radicand.meta.isNegative)
-            throw ArithmeticException("Square root of a negative BigInt")
-        val bitLen = Magus.bitLen(radicand.magia)
-        if (bitLen <= 53) {
-            return when {
-                bitLen == 0 -> ZERO
-                bitLen == 1 -> ONE
-                else -> {
-                    val dw = Magus.toRawULong(radicand.magia)
-                    val d = dw.toDouble()
-                    val sqrt = sqrt(d)
-                    var isqrt = sqrt.toULong()
-                    var crossCheck = isqrt * isqrt
-                    //while ((crossCheck) < dw) {
-                    //    ++isqrt
-                    //    crossCheck = isqrt * isqrt
-                    //}
-                    isqrt += (crossCheck - dw) shr 63
-                    crossCheck = isqrt * isqrt
-                    isqrt += (crossCheck - dw) shr 63
-                    crossCheck = isqrt * isqrt
-                    //if (crossCheck > dw)
-                    //    --isqrt
-                    isqrt -= (dw - crossCheck) shr 63
-                    check(isqrt * isqrt <= dw && (isqrt + 1uL) * (isqrt + 1uL) > dw)
-                    // we started with 53 bits, so the result will be <= 27 bits
-                    from(isqrt.toUInt())
-                }
-            }
-        }
-        // topBitsIndex is an even number
-        // the isqrt will have bitsIndex/2 bits below topSqrt
-        // above topBitsIndex are 52 or 53 bits .. which fits in a Double
-        val topBitsIndex = (bitLen - 52) and 1.inv()
-        // We now add 2 to the extracted 53-bit chunk for two independent reasons:
-        //
-        // (1) +1 accounts for the unknown lower bits of the original number.
-        //     When we extract only the top 52–53 bits, the discarded lower bits
-        //     could all be 1s, so the true value could be up to 1 larger than
-        //     the extracted value at this scale.
-        //
-        // (2) +1 accounts for possible downward rounding of sqrt(double).
-        //     Even though the input is an exactly representable 53-bit integer,
-        //     the IEEE-754 sqrt() result may round down by as much as 1 integer.
-        //
-        // These two errors are independent, and each can reduce the estimate by 1.
-        // Therefore we add +2 total, ensuring the initial estimate of sqrt()
-        // (after a single correction pass) is never too small.
-        val top = Magus.extractULongAtBitIndex(radicand.magia,
-            radicand.meta.normLen, topBitsIndex) + 1uL + 1uL
-        // a single check to ensure that the initial isqrt estimate >= the actual isqrt
-        var topSqrt = ceil(sqrt(top.toDouble())).toULong()
-        val crossCheck = topSqrt * topSqrt
-        topSqrt += (crossCheck - top) shr 63 // add 1 iff crossCheck < top
-
-        // FIXME
-        //  improve 27 bit sqrt initial guess by shifting left 5 bits
-        //  and dividing into the to 64 bits of N
-        //  Do this in the 64-bit world
-        //  Roll this into a better initial guess
-        //  complicated because this might all be clamped by
-        //  topBitsIndex
-
-        // 27 == sqrt of the top bits
-        // topBitsIndex/2 accounts for shifting
-        // 1 is for the carry when we average in-place
-        val xInitialBitLen = 27 + (topBitsIndex / 2) + 1
-        val xInitialLimbLen = (xInitialBitLen + 0x1F) ushr 5
-        val tmpLimbLen = max(xInitialLimbLen, radicand.meta.normLen - xInitialLimbLen + 1)
-
-        var x = IntArray(tmpLimbLen)
-        x[0] = topSqrt.toInt()
-        var xNormLen = Magus.setShiftLeft(x, x, 1, topBitsIndex shr 1)
-        val x2 = Magus.newWithUIntAtBitIndex(topSqrt.toUInt(), topBitsIndex shr 1)
-        check (Magus.EQ(x, x2))
-
-        var xPrev = IntArray(tmpLimbLen)
-        var xPrevNormLen: Int
-        do {
-            val t = xPrev; xPrev = x; x = t
-            xPrevNormLen = xNormLen
-
-            xNormLen = Magus.setDiv(x, radicand.magia, radicand.meta.normLen, xPrev, xPrevNormLen)
-            xNormLen = Magus.setAdd(x, x, xNormLen, xPrev, xPrevNormLen)
-            xNormLen = Magus.setShiftRight(x, x, xNormLen, 1)
-
-        } while (Magus.compare(x, xNormLen, xPrev, xPrevNormLen) < 0)
-        val ret = BigInt(xPrev, xPrevNormLen)
-        return ret
-    }
-
-    fun isqrt2(radicand: BigInt): BigInt {
+    fun isqrt(radicand: BigInt): BigInt {
         if (radicand.isNegative())
             throw ArithmeticException("Square root of a negative BigInt")
         val bitLen = radicand.magnitudeBitLen()
@@ -433,16 +308,9 @@ object BigIntAlgorithms {
             val t = xPrev; xPrev = x; x = t
             x.setDiv(radicand, xPrev)
             x += xPrev
-            x.shr(1)
+            x.mutShr(1)
         } while (x < xPrev)
         return xPrev.toBigInt()
-    }
-
-    fun isqrt(radicand: BigInt): BigInt {
-        val sqrt1 = isqrt1(radicand)
-        val sqrt2 = isqrt2(radicand)
-        check (sqrt1 EQ sqrt2)
-        return sqrt2
     }
 
 }

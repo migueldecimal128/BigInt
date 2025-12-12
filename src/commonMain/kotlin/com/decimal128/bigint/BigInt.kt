@@ -965,16 +965,7 @@ class BigInt private constructor(
          * `n` must be non-negative. Uses an optimized multiplication tree and
          * fast paths for small `n`, and returns `ONE` for `n == 0` or `1`.
          */
-        fun factorial(n: Int): BigInt {
-            if (n >= 0)
-                return BigIntAlgorithms.factorial(n.toUInt())
-            throw IllegalArgumentException("factorial of a negative number")
-        }
-
-        /**
-         * Returns `w!` as a [BigInt].
-         */
-        fun factorial(w: UInt): BigInt = BigIntAlgorithms.factorial(w)
+        fun factorial(n: Int): BigInt = BigIntAlgorithms.factorial(n)
 
         /**
          * Returns the greatest common divisor (GCD) of the two values [a] and [b].
@@ -2150,7 +2141,7 @@ class BigInt private constructor(
      */
     override fun hashCode(): Int {
         var result = meta.isNegative.hashCode()
-        result = 31 * result + Magus.normalizedHashCode(magia)
+        result = 31 * result + Zoro.normalizedHashCode(magia, meta.normLen)
         return result
     }
 

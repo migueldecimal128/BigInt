@@ -77,10 +77,24 @@ class BigIntAccumulator private constructor (
         fun withInitialBitCapacity(initialBitCapacity: Int): BigIntAccumulator {
             if (initialBitCapacity >= 0) {
                 val initialLimbCapacity = max(4, limbLenFromBitLen(initialBitCapacity))
-                return BigIntAccumulator(Meta(0), Magia(initialLimbCapacity), Magia(initialLimbCapacity))
+                return BigIntAccumulator(
+                    Meta(0),
+                    Magus.newWithFloorLen(initialLimbCapacity),
+                    Magus.newWithFloorLen(initialLimbCapacity)
+                )
             }
             throw IllegalArgumentException()
         }
+
+        private fun from(meta: Meta, magia: Magia): BigIntAccumulator {
+            return BigIntAccumulator(
+                Meta(0),
+                Magus.newWithFloorLen(meta.normLen), Magus.ZERO
+            ).set(meta, magia)
+        }
+
+        fun from(bi: BigInt) = from(bi.meta, bi.magia)
+
     }
 
     val normLen: Int
@@ -105,6 +119,11 @@ class BigIntAccumulator private constructor (
     fun isZero() = meta.normLen == 0
 
     /**
+     * Returns `true` if this BigIntAccumulator currently is nonzero.
+     */
+    fun isNotZero() = !isZero()
+
+    /**
      * Resets this accumulator to zero.
      *
      * This method clears the current value by setting the internal length to zero
@@ -116,6 +135,11 @@ class BigIntAccumulator private constructor (
     fun setZero(): BigIntAccumulator {
         validate()
         meta = Meta(0)
+        return this
+    }
+
+    fun mutAbs(): BigIntAccumulator {
+        meta = meta.abs()
         return this
     }
 
@@ -691,7 +715,7 @@ class BigIntAccumulator private constructor (
      * Sign remains the same.
      * Throws if [bitCount] is negative.
      */
-    fun shl(bitCount: Int): BigIntAccumulator =
+    fun mutShl(bitCount: Int): BigIntAccumulator =
         setShlImpl(meta, magia, bitCount)
 
     private fun setShlImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
@@ -741,7 +765,7 @@ class BigIntAccumulator private constructor (
      *
      * Throws if [bitCount] is negative.
      */
-    fun ushr(bitCount: Int): BigIntAccumulator =
+    fun mutUshr(bitCount: Int): BigIntAccumulator =
         setUshrImpl(meta, magia, bitCount)
 
     private fun setUshrImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
@@ -793,7 +817,7 @@ class BigIntAccumulator private constructor (
      *
      * Throws if [bitCount] is negative.
      */
-    fun shr(bitCount: Int): BigIntAccumulator =
+    fun mutShr(bitCount: Int): BigIntAccumulator =
         setShrImpl(meta, magia, bitCount)
 
     private fun setShrImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
@@ -1995,3 +2019,5 @@ class BigIntAccumulator private constructor (
  * @return the zero-extended 64-bit unsigned value.
  */
 private inline fun dw32(n: Int) = n.toUInt().toULong()
+
+fun BigInt.toBigIntAccumulator() = BigIntAccumulator.from(this)

@@ -2,6 +2,9 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.Magus.bitLen
+import com.decimal128.bigint.Magus.isNormalized
+import com.decimal128.bigint.Magus.normLen
 import kotlin.math.absoluteValue
 import kotlin.math.max
 
@@ -651,5 +654,118 @@ internal object Zoro {
      */
     fun isSuperNormalized(meta: Meta, magia: Magia): Boolean =
         meta.normLen == magia.size && Magus.isNormalized(magia, meta.normLen)
+
+
+    /**
+     * Computes a hash code for the magnitude [x], ignoring any leading
+     * zero limbs. The effective length is determined by [normLen],
+     * ensuring that numerically equal magnitudes with different limb
+     * capacities produce the same hash.
+     *
+     * The hash is a standard polynomial hash using multiplier 31,
+     * identical to applying:
+     *
+     *     h = 31 * h + limb
+     *
+     * for each non-zero limb in order.
+     *
+     * The loop over limbs is manually unrolled in groups of four solely
+     * for performance. The result is **bit-for-bit identical** to the
+     * non-unrolled version.
+     *
+     * This function is used by [BigInt.hashCode] so that the hash depends
+     * only on the numeric value, not on redundant leading zero limbs or
+     * array capacity.
+     *
+     * @param x the magnitude array in little-endian limb order
+     * @return a hash code consistent with numeric equality of magnitudes
+     */
+    fun normalizedHashCode(x: Magia, xNormLen: Int): Int {
+        check (isNormalized(x, xNormLen))
+        var h = 0
+        var i = 0
+        while (i + 3 < xNormLen) {
+            h = 31 * 31 * 31 * 31 * h +
+                    31 * 31 * 31 * x[i] +
+                    31 * 31 * x[i + 1] +
+                    31 * x[i + 2] +
+                    x[i + 3]
+            i += 4
+        }
+        while (i < xNormLen) {
+            h = 31 * h + x[i]
+            ++i
+        }
+        return h
+    }
+
+    /**
+     * Returns true if the value represented by the lower [xLen] limbs of [x]
+     * is an exact power of two.
+     *
+     * A power of two has exactly one bit set in its binary representation.
+     * Limbs above [xLen] are ignored.
+     *
+     * @param x the array of limbs, in little-endian order.
+     * @param xLen the number of valid limbs to examine.
+     * @return true if the value is a power of two; false otherwise.
+     */
+    fun isPowerOfTwo(x: Magia, xNormLen: Int): Boolean {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            var bitSeen = false
+            for (i in 0..<xNormLen) {
+                val w = x[i]
+                if (w != 0) {
+                    if (bitSeen || (w and (w - 1)) != 0)
+                        return false
+                    bitSeen = true
+                }
+            }
+            return bitSeen
+        } else {
+            throw IllegalArgumentException()
+        }
+    }
+
+    /**
+     * Overload of [bitLengthBigIntegerStyle] that considers all limbs in [x].
+     *
+     * Equivalent to calling [bitLengthBigIntegerStyle] with `xLen = x.size`.
+     *
+     * @param sign `true` if the value is negative, `false` otherwise.
+     * @param x the array of 32-bit limbs representing the magnitude.
+     * @return the bit length following BigInteger’s definition.
+     */
+    fun bitLengthBigIntegerStyle(sign: Boolean, x: Magia): Int =
+        bitLengthBigIntegerStyle(sign, x, normLen(x))
+
+    /**
+     * Returns the bit length using Java's BigInteger-style semantics.
+     *
+     * This represents the number of bits required to encode the value in
+     * two's-complement form, excluding the sign bit.
+     *
+     * For positive values, this is identical to [bitLen(x, xLen)].
+     * For negative values, the result is one less if the magnitude is an
+     * exact power of two (for example, -128 has a bit length of 7 not 8,
+     * and -1 has a bit length of 0).
+     *
+     * @param sign `true` if the value is negative, `false` otherwise.
+     * @param x the array of 32-bit limbs representing the magnitude.
+     * @param xLen the number of significant limbs to consider; must be normalized.
+     * @return the bit length following BigInteger’s definition.
+     */
+    fun bitLengthBigIntegerStyle(sign: Boolean, x: Magia, xNormLen: Int): Int {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            val bitLen = bitLen(x, xNormLen)
+            val isNegPowerOfTwo = sign && isPowerOfTwo(x, xNormLen)
+            val bitLengthBigIntegerStyle = bitLen - if (isNegPowerOfTwo) 1 else 0
+            return bitLengthBigIntegerStyle
+        } else {
+            throw IllegalArgumentException()
+        }
+    }
 
 }
