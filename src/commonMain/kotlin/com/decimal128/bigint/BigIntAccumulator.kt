@@ -124,6 +124,11 @@ class BigIntAccumulator private constructor (
     fun isNotZero() = !isZero()
 
     /**
+     * Returns `true` if this BigIntAccumulator currently is One
+     */
+    fun isOne() = meta.normLen == 1 && magia[0] == 1
+
+    /**
      * Resets this accumulator to zero.
      *
      * This method clears the current value by setting the internal length to zero
@@ -140,6 +145,11 @@ class BigIntAccumulator private constructor (
 
     fun mutAbs(): BigIntAccumulator {
         meta = meta.abs()
+        return this
+    }
+
+    fun mutNegate(): BigIntAccumulator {
+        meta = meta.negate()
         return this
     }
 
