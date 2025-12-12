@@ -6,6 +6,7 @@ package com.decimal128.bigint
 
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
+import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -68,6 +69,19 @@ class BigIntAccumulator private constructor (
     internal var tmp1: Magia
 ) : Magian {
     constructor() : this(Meta(0), Magia(4), Magus.ZERO)
+
+    companion object {
+
+        private inline fun limbLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
+
+        fun withInitialBitCapacity(initialBitCapacity: Int): BigIntAccumulator {
+            if (initialBitCapacity >= 0) {
+                val initialLimbCapacity = max(4, limbLenFromBitLen(initialBitCapacity))
+                return BigIntAccumulator(Meta(0), Magia(initialLimbCapacity), Magia(initialLimbCapacity))
+            }
+            throw IllegalArgumentException()
+        }
+    }
 
     val normLen: Int
         get() = meta.normLen
