@@ -413,46 +413,6 @@ internal object Zoro {
             littleEndianIntArray, Magus.normLen(littleEndianIntArray))
 
     /**
-     * Comparison predicate for numerical equality between two
-     * [Meta]/[Magia] pairs
-     */
-    fun EQ(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean =
-        (xMeta.meta == yMeta.meta) &&
-                Magus.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen) == 0
-
-    /**
-     * Comparison predicate for numerical equality with a signed 32-bit integer.
-     *
-     * @param n the [Int] value to compare with
-     * @return `true` if this value equals [n], `false` otherwise
-     */
-    fun EQ(xMeta: Meta, xMagia: Magia, n: Int): Boolean = compare(xMeta, xMagia, n) == 0
-
-    /**
-     * Comparison predicate for numerical equality with an unsigned 32-bit integer.
-     *
-     * @param w the [UInt] value to compare with
-     * @return `true` if this value equals [w], `false` otherwise
-     */
-    fun EQ(xMeta: Meta, xMagia: Magia, w: UInt): Boolean = compare(xMeta, xMagia, w) == 0
-
-    /**
-     * Comparison predicate for numerical equality with a signed 64-bit integer.
-     *
-     * @param l the [Long] value to compare with
-     * @return `true` if this value equals [l], `false` otherwise
-     */
-    fun EQ(xMeta: Meta, xMagia: Magia, l: Long): Boolean = compare(xMeta, xMagia, l) == 0
-
-    /**
-     * Comparison predicate for numerical equality with an unsigned 64-bit integer.
-     *
-     * @param dw the [ULong] value to compare with
-     * @return `true` if this value equals [dw], `false` otherwise
-     */
-    fun EQ(xMeta: Meta, xMagia: Magia, dw: ULong): Boolean = compare(xMeta, xMagia, dw) == 0
-
-    /**
      * Returns the decimal string representation of this BigInt.
      *
      * - Negative values are prefixed with a `-` sign.

@@ -183,6 +183,21 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    fun set(sign: Boolean, dwHi: ULong, dwLo: ULong): BigIntAccumulator {
+        val bitLen = if (dwHi == 0uL)
+            64 - dwLo.countLeadingZeroBits()
+        else
+            128 - dwHi.countLeadingZeroBits()
+        val normLen = (bitLen + 0x1F) ushr 5
+        meta = Meta(sign, normLen)
+        // limbLen = if (dw == 0uL) 0 else if ((dw shr 32) == 0uL) 1 else 2
+        magia[0] = dwLo.toInt()
+        magia[1] = (dwLo shr 32).toInt()
+        magia[2] = dwHi.toInt()
+        magia[3] = (dwHi shr 32).toInt()
+        return this
+    }
+
     /**
      * Ensures that the backing limb array has at least [minLimbLen] capacity.
      *
@@ -204,6 +219,13 @@ class BigIntAccumulator private constructor (
     private inline fun ensureCapacityCopy(minLimbLen: Int) {
         if (magia.size < minLimbLen)
             magia = Magus.newCopyWithFloorLen(magia, minLimbLen)
+    }
+
+    private inline fun ensureCapacityClear(minLimbLen: Int) {
+        if (magia.size < minLimbLen)
+            magia = Magus.newCopyWithFloorLen(magia, minLimbLen)
+        else
+            magia.fill(0, 0, minLimbLen)
     }
 
     /**
@@ -274,7 +296,7 @@ class BigIntAccumulator private constructor (
     private fun set(yMeta: Meta, y: Magia): BigIntAccumulator {
         ensureCapacityDiscard(yMeta.normLen)
         meta = yMeta
-        y.copyInto(magia)
+        y.copyInto(magia, 0, 0, yMeta.normLen)
         return this
     }
 
@@ -357,6 +379,31 @@ class BigIntAccumulator private constructor (
         ensureCapacityDiscard(xNormLen + yNormLen)
         meta = Meta(xMeta.signBit xor yMeta.signBit,
             Magus.setMul(magia, x, xNormLen, y, yNormLen))
+        return this
+    }
+
+    fun setSqr(x: BigInt): BigIntAccumulator =
+        setSqrImpl(x.meta, x.magia)
+    fun setSqr(x: BigIntAccumulator): BigIntAccumulator =
+        setSqrImpl(x.meta, x.magia)
+    fun setSqr(n: Int): BigIntAccumulator = setSqr(n.absoluteValue.toUInt())
+    fun setSqr(w: UInt): BigIntAccumulator {
+        val abs = w.toULong()
+        return set(abs * abs)
+    }
+    fun setSqr(l: Long): BigIntAccumulator = setSqr(l.absoluteValue.toULong())
+    fun setSqr(dw: ULong): BigIntAccumulator {
+        val lo = dw * dw
+        val hi = unsignedMulHi(dw, dw)
+        return set(false, hi, lo)
+    }
+
+    private fun setSqrImpl(xMeta: Meta, x: Magia): BigIntAccumulator {
+        swapTmp1()
+        val xNormLen = xMeta.normLen
+        ensureCapacityClear(xNormLen + xNormLen)
+        meta = Meta(0,
+            Magus.setSqr(magia, x, xNormLen))
         return this
     }
 
@@ -625,6 +672,14 @@ class BigIntAccumulator private constructor (
     fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
         setShlImpl(x.meta, x.magia, bitCount)
 
+    /**
+     * Mutates accumulator `this <<= bitCount`.
+     * Sign remains the same.
+     * Throws if [bitCount] is negative.
+     */
+    fun shl(bitCount: Int): BigIntAccumulator =
+        setShlImpl(meta, magia, bitCount)
+
     private fun setShlImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
         return when {
             bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
@@ -663,6 +718,17 @@ class BigIntAccumulator private constructor (
      */
     fun setUshr(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
         setUshrImpl(x.meta, x.magia, bitCount)
+
+    /**
+     * Mutates this accumulator `this >>>= bitCount`.
+     *
+     * The sign of this is ignored and the resulting value is the
+     * non-negative magnitude.
+     *
+     * Throws if [bitCount] is negative.
+     */
+    fun ushr(bitCount: Int): BigIntAccumulator =
+        setUshrImpl(meta, magia, bitCount)
 
     private fun setUshrImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
         val xBitLen = Magus.bitLen(x, xMeta.normLen)
@@ -703,6 +769,18 @@ class BigIntAccumulator private constructor (
      */
     fun setShr(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
         setShrImpl(x.meta, x.magia, bitCount)
+
+    /**
+     * Mutates this accumulator `x >>= bitCount`.
+     *
+     * Follows arithmetic shift right semantics ...
+     * effectively treating the resulting value as if
+     * `this` were stored in twos-complement.
+     *
+     * Throws if [bitCount] is negative.
+     */
+    fun shr(bitCount: Int): BigIntAccumulator =
+        setShrImpl(meta, magia, bitCount)
 
     private fun setShrImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
         when {
@@ -1562,7 +1640,7 @@ class BigIntAccumulator private constructor (
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
     infix fun EQ(other: BigInt): Boolean =
-        Zoro.EQ(meta, magia, other.meta, other.magia)
+        Zoro.compare(meta, magia, other.meta, other.magia) == 0
 
     /**
      * Comparison predicate for numerical equality with the current
@@ -1572,7 +1650,7 @@ class BigIntAccumulator private constructor (
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
     infix fun EQ(acc: BigIntAccumulator): Boolean =
-        Zoro.EQ(meta, magia, acc.meta, acc.magia)
+        Zoro.compare(meta, magia, acc.meta, acc.magia) == 0
 
     /**
      * Comparison predicate for numerical equality with a signed 32-bit integer.
@@ -1634,7 +1712,8 @@ class BigIntAccumulator private constructor (
      * Comparison predicate for numerical inequality with an unsigned 32-bit integer.
      *
      * @param w the [UInt] value to compare with
-     * @return `true` if this value does not equal [w], `false` otherwise
+     * @
+     * return `true` if this value does not equal [w], `false` otherwise
      */
     infix fun NE(w: UInt): Boolean = !EQ(w)
 
@@ -1653,6 +1732,109 @@ class BigIntAccumulator private constructor (
      * @return `true` if this value does not equal [dw], `false` otherwise
      */
     infix fun NE(dw: ULong): Boolean = !EQ(dw)
+
+    /**
+     * Comparison predicate for numerical equality with another [BigInt].
+     *
+     * @param other the [BigInt] to compare with
+     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
+     */
+    infix fun magEQ(other: BigInt): Boolean =
+        Zoro.magnitudeCompare(meta, magia, other.meta, other.magia) == 0
+
+    /**
+     * Comparison predicate for numerical equality with the current
+     * value of a mutable [BigIntAccumulator].
+     *
+     * @param acc the [BigIntAccumulator] to compare with
+     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
+     */
+    infix fun magEQ(acc: BigIntAccumulator): Boolean =
+        Zoro.magnitudeCompare(meta, magia, acc.meta, acc.magia) == 0
+
+    /**
+     * Comparison predicate for numerical equality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value equals [n], `false` otherwise
+     */
+    infix fun magEQ(n: Int): Boolean =
+        Zoro.magnitudeCompare(meta, magia, n.absoluteValue.toUInt()) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value equals [w], `false` otherwise
+     */
+    infix fun magEQ(w: UInt): Boolean =
+        Zoro.magnitudeCompare(meta, magia, w) == 0
+
+    /**
+     * Comparison predicate for numerical equality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value equals [l], `false` otherwise
+     */
+    infix fun magEQ(l: Long): Boolean =
+        Zoro.magnitudeCompare(meta, magia, l.absoluteValue.toULong()) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value equals [dw], `false` otherwise
+     */
+    infix fun magEQ(dw: ULong): Boolean =
+        Zoro.magnitudeCompare(meta, magia, dw) == 0
+
+    /**
+     * Comparison predicate for numerical inequality with another [BigInt].
+     *
+     * @param other the [BigInt] to compare with
+     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
+     */
+    infix fun magNE(other: BigInt): Boolean = !magEQ(other)
+
+    /**
+     * Comparison predicate for numerical inequality with a [BigIntAccumulator].
+     *
+     * @param acc the [BigIntAccumulator] to compare with
+     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
+     */
+    infix fun magNE(acc: BigIntAccumulator): Boolean = !magEQ(acc)
+
+    /**
+     * Comparison predicate for numerical inequality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value does not equal [n], `false` otherwise
+     */
+    infix fun magNE(n: Int): Boolean = !magEQ(n)
+
+    /**
+     * Comparison predicate for numerical inequality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value does not equal [w], `false` otherwise
+     */
+    infix fun magNE(w: UInt): Boolean = !magEQ(w)
+
+    /**
+     * Comparison predicate for numerical inequality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value does not equal [l], `false` otherwise
+     */
+    infix fun magNE(l: Long): Boolean = !magEQ(l)
+
+    /**
+     * Comparison predicate for numerical inequality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value does not equal [dw], `false` otherwise
+     */
+    infix fun magNE(dw: ULong): Boolean = !magEQ(dw)
 
 
     /**

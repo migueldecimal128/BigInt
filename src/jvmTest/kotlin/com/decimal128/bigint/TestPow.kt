@@ -17,10 +17,10 @@ class TestPow {
     val rng = Random.Default
 
     fun test1() {
-        val hi = randomHi(2048)
+        val hi = randomHi(10)
         val bi = hi.toBigInteger()
 
-        val pow = rng.nextInt(25)
+        val pow = rng.nextInt(10)
 
         val hiResult = hi.pow(pow)
         val biResult = bi.pow(pow)

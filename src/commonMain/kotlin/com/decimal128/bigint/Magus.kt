@@ -929,18 +929,16 @@ object Magus {
      * Squares the first [xLen] limbs of [x], storing the result in [z].
      *
      * Requirements:
-     * - [z] must be completely zero-initialized by the caller.
      * - [z.size] must be sufficient to hold the squared result (2 * [xLen] or 2 * [xLen] - 1 limbs).
-     *
-     * Only the minimum required limbs are written to [z]; if only 2 * [xLen] - 1 limbs are non-zero,
-     * that is how many will be written. The caller must ensure zero-initialization of all 2 * [xLen] limbs.
      *
      * @return the normalized limb length of the result.
      */
-    fun setSqr(z: Magia, x: Magia, xLen: Int) : Int {
-        if (xLen > 0 && xLen <= x.size) {
-            val xNormLen = normLen(x, xLen)
+    fun setSqr(z: Magia, x: Magia, xNormLen: Int) : Int {
+        if (xNormLen > 0 && xNormLen <= x.size) {
+            check (isNormalized(x, xNormLen))
             if (z.size >= 2 * xNormLen - 1) {
+                z.fill(0, 0, min(z.size, 2 * xNormLen))
+
                 // 1) Cross terms: for i<j, add (x[i]*x[j]) twice into p[i+j]
                 // these terms are doubled
                 for (i in 0..<xNormLen) {
@@ -970,7 +968,7 @@ object Magus {
 
                 // 2) Diagonals: add x[i]**2 into columns 2*i and 2*i+1
                 // terms on the diagonal are not doubled
-                for (i in 0..<xLen) {
+                for (i in 0..<xNormLen) {
                     val sq = dw32(x[i]) * dw32(x[i])      // 64-bit
                     // add low 32 to p[2*i]
                     var t = dw32(z[2 * i]) + (sq and 0xFFFF_FFFFuL)
@@ -2174,12 +2172,13 @@ object Magus {
      *
      * @param isNegative whether the resulting string should include a leading minus sign.
      * @param x the array of 32-bit limbs representing the integer (least-significant limb first).
-     * @param xLen the number of significant limbs to consider from `x`.
+     * @param xNormLen the number of significant limbs to consider from `x`.
      * @return the decimal string representation of the integer value.
      */
-    fun toString(isNegative: Boolean, x: Magia, xLen: Int): String {
-        if (xLen >= 0 && xLen <= x.size) {
-            val bitLen = bitLen(x, xLen)
+    fun toString(isNegative: Boolean, x: Magia, xNormLen: Int): String {
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            check (isNormalized(x, xNormLen))
+            val bitLen = bitLen(x, xNormLen)
             if (bitLen < 2) {
                 if (bitLen == 0)
                     return "0"
@@ -2187,7 +2186,7 @@ object Magus {
             }
             val maxSignedLen = maxDigitLenFromBitLen(bitLen) + if (isNegative) 1 else 0
             val utf8 = ByteArray(maxSignedLen)
-            val limbLen = normLen(x, xLen)
+            val limbLen = normLen(x, xNormLen)
             val t = newCopyWithExactLimbLen(x, limbLen)
             val len = destructiveToUtf8BeforeIndex(utf8, utf8.size, isNegative, t, limbLen)
             val startingIndex = utf8.size - len
@@ -2198,6 +2197,7 @@ object Magus {
         }
     }
 
+    fun toString(x: Magia, xNormLen: Int) = toString(false, x, xNormLen)
     /**
      * Returns an upper bound on the number of decimal digits required to
      * represent a non-negative integer with the given bit length.

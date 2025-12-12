@@ -129,6 +129,9 @@ class BigInt private constructor(
             return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
         }
 
+        internal operator fun invoke(sign: Boolean, biMagnitude: BigInt): BigInt =
+            fromLittleEndianIntArray(sign, biMagnitude.magia, biMagnitude.meta.normLen)
+
         /**
          * Converts a 32-bit signed [Int] into a signed [BigInt].
          *
@@ -1366,7 +1369,7 @@ class BigInt private constructor(
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
     infix fun EQ(other: BigInt): Boolean =
-        Zoro.EQ(meta, magia, other.meta, other.magia)
+        Zoro.compare(meta, magia, other.meta, other.magia) == 0
 
     /**
      * Comparison predicate for numerical equality with the current
@@ -1376,7 +1379,7 @@ class BigInt private constructor(
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
     infix fun EQ(acc: BigIntAccumulator): Boolean =
-        Zoro.EQ(meta, magia, acc.meta, acc.magia)
+        Zoro.compare(meta, magia, acc.meta, acc.magia) == 0
 
     /**
      * Comparison predicate for numerical equality with a signed 32-bit integer.
@@ -1457,6 +1460,110 @@ class BigInt private constructor(
      * @return `true` if this value does not equal [dw], `false` otherwise
      */
     infix fun NE(dw: ULong): Boolean = !EQ(dw)
+
+
+    /**
+     * Comparison predicate for numerical equality with another [BigInt].
+     *
+     * @param other the [BigInt] to compare with
+     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
+     */
+    infix fun magEQ(other: BigInt): Boolean =
+        Zoro.magnitudeCompare(meta, magia, other.meta, other.magia) == 0
+
+    /**
+     * Comparison predicate for numerical equality with the current
+     * value of a mutable [BigIntAccumulator].
+     *
+     * @param acc the [BigIntAccumulator] to compare with
+     * @return `true` if both have the same sign and identical magnitude, `false` otherwise
+     */
+    infix fun magEQ(acc: BigIntAccumulator): Boolean =
+        Zoro.magnitudeCompare(meta, magia, acc.meta, acc.magia) == 0
+
+    /**
+     * Comparison predicate for numerical equality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value equals [n], `false` otherwise
+     */
+    infix fun magEQ(n: Int): Boolean =
+        Zoro.magnitudeCompare(meta, magia, n.absoluteValue.toUInt()) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value equals [w], `false` otherwise
+     */
+    infix fun magEQ(w: UInt): Boolean =
+        Zoro.magnitudeCompare(meta, magia, w) == 0
+
+    /**
+     * Comparison predicate for numerical equality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value equals [l], `false` otherwise
+     */
+    infix fun magEQ(l: Long): Boolean =
+        Zoro.magnitudeCompare(meta, magia, l.absoluteValue.toULong()) == 0
+
+    /**
+     * Comparison predicate for numerical equality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value equals [dw], `false` otherwise
+     */
+    infix fun magEQ(dw: ULong): Boolean =
+        Zoro.magnitudeCompare(meta, magia, dw) == 0
+
+    /**
+     * Comparison predicate for numerical inequality with another [BigInt].
+     *
+     * @param other the [BigInt] to compare with
+     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
+     */
+    infix fun magNE(other: BigInt): Boolean = !magEQ(other)
+
+    /**
+     * Comparison predicate for numerical inequality with a [BigIntAccumulator].
+     *
+     * @param acc the [BigIntAccumulator] to compare with
+     * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
+     */
+    infix fun magNE(acc: BigIntAccumulator): Boolean = !magEQ(acc)
+
+    /**
+     * Comparison predicate for numerical inequality with a signed 32-bit integer.
+     *
+     * @param n the [Int] value to compare with
+     * @return `true` if this value does not equal [n], `false` otherwise
+     */
+    infix fun magNE(n: Int): Boolean = !magEQ(n)
+
+    /**
+     * Comparison predicate for numerical inequality with an unsigned 32-bit integer.
+     *
+     * @param w the [UInt] value to compare with
+     * @return `true` if this value does not equal [w], `false` otherwise
+     */
+    infix fun magNE(w: UInt): Boolean = !magEQ(w)
+
+    /**
+     * Comparison predicate for numerical inequality with a signed 64-bit integer.
+     *
+     * @param l the [Long] value to compare with
+     * @return `true` if this value does not equal [l], `false` otherwise
+     */
+    infix fun magNE(l: Long): Boolean = !magEQ(l)
+
+    /**
+     * Comparison predicate for numerical inequality with an unsigned 64-bit integer.
+     *
+     * @param dw the [ULong] value to compare with
+     * @return `true` if this value does not equal [dw], `false` otherwise
+     */
+    infix fun magNE(dw: ULong): Boolean = !magEQ(dw)
 
 
     /**

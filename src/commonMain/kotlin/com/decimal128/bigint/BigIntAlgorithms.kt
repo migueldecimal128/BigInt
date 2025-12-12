@@ -1,5 +1,6 @@
 package com.decimal128.bigint
 
+import com.decimal128.bigint.BigInt.Companion.NEG_ONE
 import com.decimal128.bigint.BigInt.Companion.ONE
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigInt.Companion.from
@@ -126,44 +127,82 @@ object BigIntAlgorithms {
      * @throws IllegalArgumentException if [exp] is negative
      */
     fun pow(base: BigInt, exp: Int): BigInt {
+        val pow1 = pow1(base, exp)
+        val pow2 = pow2(base, exp)
+        if (pow1 != pow2) {
+            println("kilroy was here!")
+            println("base:$base exp:$exp")
+            println("pow1:$pow1")
+            println("pow2:$pow2")
+            check (false)
+        }
+        return pow1
+    }
+
+    fun pow1(base: BigInt, exp: Int): BigInt {
         val resultSign = base.meta.signFlag && ((exp and 1) != 0)
         return when {
             exp < 0 -> throw IllegalArgumentException("cannot raise BigInt to negative power:$exp")
             exp == 0 -> ONE
             exp == 1 -> base
             base.isZero() -> ZERO
-            Magus.EQ(base.magia, 1) -> if (resultSign) BigInt.Companion.NEG_ONE else ONE
+            Magus.EQ(base.magia, 1) -> if (resultSign) NEG_ONE else ONE
             Magus.EQ(base.magia, 2) -> BigInt(resultSign, Magus.newWithSetBit(exp))
             exp == 2 -> base.sqr()
             else -> {
                 val maxBitLen = Magus.bitLen(base.magia) * exp
                 val maxBitLimbLen = (maxBitLen + 0x1F) ushr 5
-                var baseMag = Magus.newCopyWithExactLimbLen(base.magia, maxBitLimbLen)
-                var baseLen = Magus.normLen(base.magia)
-                var resultMag = IntArray(maxBitLimbLen)
-                resultMag[0] = 1
-                var resultLen = 1
-                var tmpMag = IntArray(maxBitLimbLen)
+                var b = Magus.newCopyWithExactLimbLen(base.magia, maxBitLimbLen)
+                var bNormLen = Magus.normLen(base.magia)
+                var r = IntArray(maxBitLimbLen)
+                r[0] = 1
+                var rNormlen = 1
+                var t = IntArray(maxBitLimbLen)
 
                 var e = exp
                 while (true) {
                     if ((e and 1) != 0) {
-                        tmpMag.fill(0, 0, baseLen)
-                        resultLen = Magus.setMul(tmpMag, resultMag, resultLen, baseMag, baseLen)
-                        val t = tmpMag
-                        tmpMag = resultMag
-                        resultMag = t
+                        rNormlen = Magus.setMul(t, r, rNormlen, b, bNormLen)
+                        val swap = t; t = r; r = swap
                     }
                     e = e ushr 1
                     if (e == 0)
                         break
-                    tmpMag.fill(0, 0, min(tmpMag.size, 2 * baseLen))
-                    baseLen = Magus.setSqr(tmpMag, baseMag, baseLen)
-                    val t = tmpMag
-                    tmpMag = baseMag
-                    baseMag = t
+                    t.fill(0, 0, min(t.size, 2 * bNormLen))
+                    bNormLen = Magus.setSqr(t, b, bNormLen)
+                    val swap = t; t = b; b = swap
                 }
-                BigInt(resultSign, resultMag)
+                BigInt(resultSign, r)
+            }
+        }
+    }
+
+    fun pow2(base: BigInt, exp: Int): BigInt {
+        val resultSign = base.isNegative() && ((exp and 1) != 0)
+        val baseAbs = base.abs()
+        return when {
+            exp < 0 -> throw IllegalArgumentException("cannot raise BigInt to negative power:$exp")
+            exp == 0 -> ONE
+            exp == 1 -> base
+            base.isZero() -> ZERO
+            baseAbs EQ 1 -> if (resultSign) NEG_ONE else ONE
+            baseAbs EQ 2 -> BigInt(resultSign, BigInt.withSetBit(exp))
+            exp == 2 -> baseAbs.sqr()
+            else -> {
+                val maxBitLen = base.magnitudeBitLen() * exp
+                val b = BigIntAccumulator().set(base)
+                val r = BigIntAccumulator().set(1)
+
+                var e = exp
+                while (true) {
+                    if ((e and 1) != 0)
+                        r.setMul(r, b)
+                    e = e ushr 1
+                    if (e == 0)
+                        break
+                    b.setSqr(b)
+                }
+                BigInt(resultSign, r.magia, r.normLen)
             }
         }
     }
@@ -231,7 +270,7 @@ object BigIntAlgorithms {
      * @return the non-negative integer square root of this value.
      * @throws ArithmeticException if this value is negative.
      */
-    fun isqrt(radicand: BigInt): BigInt {
+    fun isqrt1(radicand: BigInt): BigInt {
         if (radicand.meta.isNegative)
             throw ArithmeticException("Square root of a negative BigInt")
         val bitLen = Magus.bitLen(radicand.magia)
@@ -322,5 +361,89 @@ object BigIntAlgorithms {
         val ret = BigInt(xPrev, xPrevNormLen)
         return ret
     }
+
+    fun isqrt2(radicand: BigInt): BigInt {
+        if (radicand.isNegative())
+            throw ArithmeticException("Square root of a negative BigInt")
+        val bitLen = radicand.magnitudeBitLen()
+        if (bitLen <= 53) {
+            return when {
+                bitLen == 0 -> ZERO
+                bitLen == 1 -> ONE
+                else -> {
+                    val dw = radicand.toULong()
+                    val d = dw.toDouble()
+                    val sqrt = sqrt(d)
+                    var isqrt = sqrt.toULong()
+                    var crossCheck = isqrt * isqrt
+                    //while ((crossCheck) < dw) {
+                    //    ++isqrt
+                    //    crossCheck = isqrt * isqrt
+                    //}
+                    isqrt += (crossCheck - dw) shr 63
+                    crossCheck = isqrt * isqrt
+                    isqrt += (crossCheck - dw) shr 63
+                    crossCheck = isqrt * isqrt
+                    //if (crossCheck > dw)
+                    //    --isqrt
+                    isqrt -= (dw - crossCheck) shr 63
+                    check(isqrt * isqrt <= dw && (isqrt + 1uL) * (isqrt + 1uL) > dw)
+                    // we started with 53 bits, so the result will be <= 27 bits
+                    from(isqrt.toUInt())
+                }
+            }
+        }
+        // topBitsIndex is an even number
+        // the isqrt will have bitsIndex/2 bits below topSqrt
+        // above topBitsIndex are 52 or 53 bits .. which fits in a Double
+        val topBitsIndex = (bitLen - 52) and 1.inv()
+        // We now add 2 to the extracted 53-bit chunk for two independent reasons:
+        //
+        // (1) +1 accounts for the unknown lower bits of the original number.
+        //     When we extract only the top 52–53 bits, the discarded lower bits
+        //     could all be 1s, so the true value could be up to 1 larger than
+        //     the extracted value at this scale.
+        //
+        // (2) +1 accounts for possible downward rounding of sqrt(double).
+        //     Even though the input is an exactly representable 53-bit integer,
+        //     the IEEE-754 sqrt() result may round down by as much as 1 integer.
+        //
+        // These two errors are independent, and each can reduce the estimate by 1.
+        // Therefore we add +2 total, ensuring the initial estimate of sqrt()
+        // (after a single correction pass) is never too small.
+        val top = radicand.extractULongAtBitIndex(topBitsIndex) + 1uL + 1uL
+        // a single check to ensure that the initial isqrt estimate >= the actual isqrt
+        var topSqrt = ceil(sqrt(top.toDouble())).toULong()
+        val crossCheck = topSqrt * topSqrt
+        topSqrt += (crossCheck - top) shr 63 // add 1 iff crossCheck < top
+
+        // FIXME
+        //  improve 27 bit sqrt initial guess by shifting left 5 bits
+        //  and dividing into the to 64 bits of N
+        //  Do this in the 64-bit world
+        //  Roll this into a better initial guess
+        //  complicated because this might all be clamped by
+        //  topBitsIndex
+
+        var x = BigIntAccumulator().set(topSqrt)
+        x.setShl(x, topBitsIndex shr 1)
+
+        var xPrev = BigIntAccumulator()
+        do {
+            val t = xPrev; xPrev = x; x = t
+            x.setDiv(radicand, xPrev)
+            x += xPrev
+            x.shr(1)
+        } while (x < xPrev)
+        return xPrev.toBigInt()
+    }
+
+    fun isqrt(radicand: BigInt): BigInt {
+        val sqrt1 = isqrt1(radicand)
+        val sqrt2 = isqrt2(radicand)
+        check (sqrt1 EQ sqrt2)
+        return sqrt2
+    }
+
 }
 
