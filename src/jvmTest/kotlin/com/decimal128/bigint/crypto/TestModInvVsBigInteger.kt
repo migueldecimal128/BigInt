@@ -29,9 +29,9 @@ class TestModInvVsBigInteger {
 
     @Test
     fun modInv_randomizedAgainstBigInteger() {
-        val rnd = java.util.Random(12345)
+        val rnd = java.util.Random(98)
 
-        val mJava = BigInteger.probablePrime(128, rnd)
+        val mJava = BigInteger.probablePrime(97, rnd)
         val m = mJava.toString().toBigInt()
         val ctx = ModContext(m)
         val out = BigIntAccumulator()

@@ -362,17 +362,13 @@ object Magus {
         newCopyWithExactLimbLen(x, xLen, (exactBitLen + 0x1F) ushr 5)
 
     /**
-     * Returns a copy of [x] resized to exactly `exactLimbLen` limbs.
+     * Returns a copy of the first [xLen] limbs of [x] resized to exactly `exactLimbLen` limbs.
      * If the new length is larger, high-order limbs are zero-filled; if smaller,
      * high-order limbs are truncated.
      */
-    fun newCopyWithExactLimbLen(x: Magia, exactLimbLen: Int): Magia =
-        newCopyWithExactLimbLen(x, x.size, exactLimbLen)
-
     fun newCopyWithExactLimbLen(x: Magia, xLen: Int, exactLimbLen: Int): Magia {
         if (exactLimbLen in 1..MAX_ALLOC_SIZE) {
             val dst = Magia(exactLimbLen)
-            //System.arraycopy(src, 0, dst, 0, min(src.size, dst.size))
             x.copyInto(dst, 0, 0, min(xLen, dst.size))
             return dst
         }
@@ -1791,9 +1787,9 @@ object Magus {
      *
      * @return the normalized quotient, or [ZERO] if the quotient is zero.
      */
-    fun newDiv(x: Magia, y: Magia): Magia {
-        val xNormLen = normLen(x)
-        val yNormLen = normLen(y)
+    fun newDiv(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
         when {
             yNormLen < 2 -> return newDiv(x, y[0].toUInt())
             xNormLen < yNormLen -> return ZERO
@@ -2012,8 +2008,8 @@ object Magus {
             throw IllegalArgumentException()
 
         // Step D1: Normalize
-        val un = newCopyWithExactLimbLen(u, m + 1)
-        val vn = newCopyWithExactLimbLen(v, n)
+        val un = newCopyWithExactLimbLen(u, m, m + 1)
+        val vn = newCopyWithExactLimbLen(v, n, n)
         val shift = vn[n - 1].countLeadingZeroBits()
         if (shift > 0) {
             setShiftLeft(vn, vn, n, shift)
@@ -2189,7 +2185,7 @@ object Magus {
             val maxSignedLen = maxDigitLenFromBitLen(bitLen) + if (isNegative) 1 else 0
             val utf8 = ByteArray(maxSignedLen)
             val limbLen = normLen(x, xNormLen)
-            val t = newCopyWithExactLimbLen(x, limbLen)
+            val t = newCopyWithExactLimbLen(x, xNormLen, limbLen)
             val len = destructiveToUtf8BeforeIndex(utf8, utf8.size, isNegative, t, limbLen)
             val startingIndex = utf8.size - len
             check (startingIndex <= 1)

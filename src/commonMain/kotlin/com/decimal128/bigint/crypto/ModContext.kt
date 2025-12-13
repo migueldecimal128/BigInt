@@ -43,15 +43,10 @@ class ModContext(val m: BigInt) {
         invNewT.setOne()
 
         while (invNewR.isNotZero()) {
-            println("before invR:$invR")
             invQ.setDiv(invR, invNewR)
-            println(" after invR:$invR")
 
             invQNewR.setMul(invQ, invNewR)
             invTmpR.setSub(invR, invQNewR)
-            // Must hold for Euclid:
-            check(invTmpR >= 0) { "remainder negative: R=$invR newR=$invNewR q=$invQ q*newR=$invQNewR tmpR=$invTmpR" }
-            check(invTmpR < invNewR) { "remainder too large" }
             val rotateR = invR; invR = invNewR; invNewR = invTmpR; invTmpR = rotateR
 
             invQNewT.setMul(invQ, invNewT)

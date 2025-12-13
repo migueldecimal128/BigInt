@@ -150,7 +150,7 @@ class TestMagia {
             return
         val magiaA = MagiaTransducer.magiaFromBi(jbiA)
         val magiaB = MagiaTransducer.magiaFromBi(jbiB)
-        val magiaQuot = Magus.newDiv(magiaA, magiaB)
+        val magiaQuot = Magus.newDiv(magiaA, Magus.normLen(magiaA), magiaB, Magus.normLen(magiaB))
 
         val jbiQuot = jbiA.divide(jbiB)
 

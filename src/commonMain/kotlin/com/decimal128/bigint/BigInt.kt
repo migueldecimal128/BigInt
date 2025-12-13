@@ -1783,7 +1783,7 @@ class BigInt private constructor(
         if (other.isZero())
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magus.newDiv(this.magia, other.magia)
+            val quot = Magus.newDiv(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag xor other.meta.signFlag, quot)
         }
