@@ -11,10 +11,11 @@ class Barrett private constructor (val m: BigInt,
     val shiftKPlus1Bits  = (kLimbs + 1) * 32
     val bPowKPlus1 = BigInt.withSetBit(shiftKPlus1Bits)
 
-    val q = BigIntAccumulator()
-    val r = BigIntAccumulator()
-    val r1 = BigIntAccumulator()
-    val r2 = BigIntAccumulator()
+    // Initial capacities are sized by bitLen to avoid resizing in modPow hot paths
+    val q = BigIntAccumulator.withInitialBitCapacity(2 * kBits + 32)
+    val r = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    val r1 = BigIntAccumulator.withInitialBitCapacity(kBits + 32)
+    val r2 = BigIntAccumulator.withInitialBitCapacity(2*kBits + 32)
 
     companion object {
         operator fun invoke(m: BigInt): Barrett {
