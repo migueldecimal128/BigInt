@@ -447,6 +447,7 @@ class BigIntAccumulator private constructor (
     }
 
     private fun setSqrImpl(xMeta: Meta, x: Magia): BigIntAccumulator {
+        check (Magus.isNormalized(x, xMeta.normLen))
         swapTmp1()
         val xNormLen = xMeta.normLen
         ensureCapacityClear(xNormLen + xNormLen)

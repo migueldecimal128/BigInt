@@ -1,4 +1,7 @@
-package com.decimal128.bigint
+package com.decimal128.bigint.crypto
+
+import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.BigIntAccumulator
 
 object BigIntCrypto {
 
@@ -6,9 +9,9 @@ object BigIntCrypto {
         val mBitLen = m.magnitudeBitLen()
         if (mBitLen <= 1)
             throw IllegalArgumentException()
-        var t = BigIntAccumulator
+        var t = BigIntAccumulator.Companion
             .withInitialBitCapacity(2 * mBitLen)
-        var newT = BigIntAccumulator
+        var newT = BigIntAccumulator.Companion
             .withInitialBitCapacity(2 * mBitLen)
             .set(1)
         var tmpT = BigIntAccumulator()

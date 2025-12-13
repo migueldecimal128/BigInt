@@ -1,6 +1,7 @@
-package com.decimal128.bigint
+package com.decimal128.bigint.crypto
 
-import com.decimal128.bigint.BigIntCrypto.modInv
+import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.toBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -21,11 +22,11 @@ class TestBigIntCryptoModInv {
     @Test
     fun modInv_ofOne() {
         val m = 97.toBigInt()
-        val a = BigInt.ONE
+        val a = BigInt.Companion.ONE
 
         val inv = BigIntCrypto.modInv(a, m)
 
-        assertEquals(BigInt.ONE, inv)
+        assertEquals(BigInt.Companion.ONE, inv)
     }
 
     @Test
@@ -51,7 +52,7 @@ class TestBigIntCryptoModInv {
 
     @Test
     fun modInv_modulusOne() {
-        val m = BigInt.ONE
+        val m = BigInt.Companion.ONE
         val a = 0.toBigInt()
 
         assertFailsWith<IllegalArgumentException> {
@@ -62,7 +63,7 @@ class TestBigIntCryptoModInv {
     @Test
     fun modInv_zeroA() {
         val m = 101.toBigInt()
-        val a = BigInt.ZERO
+        val a = BigInt.Companion.ZERO
 
         assertFailsWith<ArithmeticException> {
             BigIntCrypto.modInv(a, m)
@@ -76,7 +77,7 @@ class TestBigIntCryptoModInv {
 
         val inv = BigIntCrypto.modInv(a, m)
 
-        assertTrue(inv >= BigInt.ZERO)
+        assertTrue(inv >= BigInt.Companion.ZERO)
         assertTrue(inv < m)
     }
 
@@ -108,9 +109,9 @@ class TestBigIntCryptoModInv {
 
         for (m in primes) {
             for (a in testAs) {
-                val inv = modInv(a, m)
+                val inv = BigIntCrypto.modInv(a, m)
                 val check = (a * inv) % m
-                assertEquals(BigInt.ONE, check, "failed for a=$a mod m(bitLen=${m.magnitudeBitLen()})")
+                assertEquals(BigInt.Companion.ONE, check, "failed for a=$a mod m(bitLen=${m.magnitudeBitLen()})")
             }
         }
     }

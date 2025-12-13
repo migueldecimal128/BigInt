@@ -1,5 +1,7 @@
-package com.decimal128.bigint
+package com.decimal128.bigint.crypto
 
+import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.toBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -10,7 +12,7 @@ class TestBarrett {
 
         fun checkRemainder(m: BigInt, x: BigInt) {
             val bar = Barrett(m)
-            val r1 = bar.remainder(x)
+            val r1 = bar.reduce(x)
             val r2 = x % m
             assertEquals(r2, r1, "Mismatch for x=$x, m=$m")
         }
@@ -43,11 +45,11 @@ class TestBarrett {
         // 2. Medium & large moduli (random)
         // ------------------------------------------------
         val testMods = listOf(
-            BigInt.randomWithMaxBitLen(64),
-            BigInt.randomWithMaxBitLen(128),
-            BigInt.randomWithMaxBitLen(192),
-            BigInt.randomWithMaxBitLen(256),
-            BigInt.randomWithMaxBitLen(511).withSetBit(510) // force top bit
+            BigInt.Companion.randomWithMaxBitLen(64),
+            BigInt.Companion.randomWithMaxBitLen(128),
+            BigInt.Companion.randomWithMaxBitLen(192),
+            BigInt.Companion.randomWithMaxBitLen(256),
+            BigInt.Companion.randomWithMaxBitLen(511).withSetBit(510) // force top bit
         )
 
         for (m in testMods) {
@@ -62,9 +64,9 @@ class TestBarrett {
 
             // random tests inside x < m²
             repeat(200) {
-                var x = BigInt.randomWithMaxBitLen(m2BitLen)
+                var x = BigInt.Companion.randomWithMaxBitLen(m2BitLen)
                 while (x >= m2)
-                    x = BigInt.randomWithMaxBitLen(m2BitLen)
+                    x = BigInt.Companion.randomWithMaxBitLen(m2BitLen)
                 checkRemainder(m, x)
             }
         }
@@ -85,7 +87,7 @@ class TestBarrett {
             val m2 = m * m
 
             repeat(200) {
-                val x = BigInt.randomBelow(m2)
+                val x = BigInt.Companion.randomBelow(m2)
                 checkRemainder(m, x)
             }
         }
@@ -94,7 +96,7 @@ class TestBarrett {
         // 4. Deterministic brute-force for small m
         // ------------------------------------------------
         repeat(20) {
-            val m = BigInt.randomWithMaxBitLen(64)
+            val m = BigInt.Companion.randomWithMaxBitLen(64)
             val m2 = m * m
 
             for (v in 0..2000) {
@@ -107,16 +109,16 @@ class TestBarrett {
     fun randomLargeBarrett() {
         val bits = listOf(512, 1024, 1536, 2048, 3072, 4096)
         for (k in bits) {
-            val m = BigInt.randomWithBitLen(k)
+            val m = BigInt.Companion.randomWithBitLen(k)
             val bar = Barrett(m)
             val m2 = m * m
             repeat(1) {
                 val m2bit = m2.magnitudeBitLen()
                 var x: BigInt
                 do {
-                    x = BigInt.randomWithBitLen(m2bit)
+                    x = BigInt.Companion.randomWithBitLen(m2bit)
                 } while (x >= m2)
-                assertEquals(x % m, bar.remainder(x))
+                assertEquals(x % m, bar.reduce(x))
             }
         }
     }
@@ -127,7 +129,7 @@ class TestBarrett {
         val x = "123456789012345678901234567890".toBigInt()
         val barrett = Barrett(m)
         val rKnuth = x % m
-        val rBarrett = barrett.remainder(x)
+        val rBarrett = barrett.reduce(x)
         assertEquals(rKnuth, rBarrett)
     }
 
@@ -137,7 +139,7 @@ class TestBarrett {
         val x = "235477347269641899085489191398656418338".toBigInt()
         val barrett = Barrett(m)
         val rKnuth = x % m
-        val rBarrett = barrett.remainder(x)
+        val rBarrett = barrett.reduce(x)
         assertEquals(rKnuth, rBarrett)
     }
 }

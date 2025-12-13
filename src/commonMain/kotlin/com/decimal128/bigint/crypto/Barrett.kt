@@ -1,4 +1,7 @@
-package com.decimal128.bigint
+package com.decimal128.bigint.crypto
+
+import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.BigIntAccumulator
 
 class Barrett private constructor (val m: BigInt,
                                    val muBits: BigInt,
@@ -9,13 +12,13 @@ class Barrett private constructor (val m: BigInt,
     val kLimbs = (kBits + 0x1F) ushr 5
     val shiftKMinus1Bits = (kLimbs - 1) * 32
     val shiftKPlus1Bits  = (kLimbs + 1) * 32
-    val bPowKPlus1 = BigInt.withSetBit(shiftKPlus1Bits)
+    val bPowKPlus1 = BigInt.Companion.withSetBit(shiftKPlus1Bits)
 
     // Initial capacities are sized by bitLen to avoid resizing in modPow hot paths
-    val q = BigIntAccumulator.withInitialBitCapacity(2 * kBits + 32)
-    val r = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-    val r1 = BigIntAccumulator.withInitialBitCapacity(kBits + 32)
-    val r2 = BigIntAccumulator.withInitialBitCapacity(2*kBits + 32)
+    val q = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
+    val r = BigIntAccumulator.Companion.withInitialBitCapacity(kBits + 1)
+    val r1 = BigIntAccumulator.Companion.withInitialBitCapacity(kBits + 32)
+    val r2 = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
 
     companion object {
         operator fun invoke(m: BigInt): Barrett {
@@ -30,7 +33,7 @@ class Barrett private constructor (val m: BigInt,
         private fun calcMuBits(m: BigInt): BigInt {
             check (m.isNormalized())
             val mBitLen = m.magnitudeBitLen()
-            val x = BigInt.withSetBit(2 * mBitLen)
+            val x = BigInt.Companion.withSetBit(2 * mBitLen)
             val mu = x / m
             return mu
         }
@@ -38,14 +41,14 @@ class Barrett private constructor (val m: BigInt,
         private fun calcMuLimbs(m: BigInt): BigInt {
             check (m.isNormalized())
             val mLimbLen = m.meta.normLen
-            val x = BigInt.withSetBit(2 * mLimbLen * 32)
+            val x = BigInt.Companion.withSetBit(2 * mLimbLen * 32)
             val mu = x / m
             return mu
         }
 
     }
 
-    fun remainder(x: BigInt): BigInt {
+    fun reduce(x: BigInt): BigInt {
         val bitsAnswer = reduceBits(x)
         val limbsAnswer = reduceLimbs(x)
         check (bitsAnswer == limbsAnswer)
@@ -86,9 +89,9 @@ class Barrett private constructor (val m: BigInt,
         // q3 = floor(q2 / b**(k + 1))
         val q3 = q2 ushr ((kLimbs + 1) * 32)
         // r1 = x % b**(k + 1)
-        val r1 = x and BigInt.withBitMask((kLimbs + 1) * 32)
+        val r1 = x and BigInt.Companion.withBitMask((kLimbs + 1) * 32)
         // r2 = (q3 * m) % b**(k + 1)
-        val r2 = (q3 * m) and BigInt.withBitMask((kLimbs + 1) * 32)
+        val r2 = (q3 * m) and BigInt.Companion.withBitMask((kLimbs + 1) * 32)
         // r = r1 - r2
         var r = r1 - r2
         if (r.isNegative())
@@ -110,9 +113,9 @@ class Barrett private constructor (val m: BigInt,
         // q3 = floor(q2 / b**(k + 1))
         val q3 = q2 ushr shiftKPlus1Bits
         // r1 = x % b**(k + 1)
-        val r1 = x and BigInt.withBitMask(shiftKPlus1Bits)
+        val r1 = x and BigInt.Companion.withBitMask(shiftKPlus1Bits)
         // r2 = (q3 * m) % b**(k + 1)
-        val r2 = (q3 * m) and BigInt.withBitMask(shiftKPlus1Bits)
+        val r2 = (q3 * m) and BigInt.Companion.withBitMask(shiftKPlus1Bits)
         // r = r1 - r2
         var r = r1 - r2
         if (r.isNegative())
@@ -159,5 +162,56 @@ class Barrett private constructor (val m: BigInt,
         return r.toBigInt()
     }
 
+    fun reduceInto(x: BigIntAccumulator, out: BigIntAccumulator) {
+        require (x >= 0)
+        require (x < mSquared)
+        if (x < m) {
+            out.set(x)
+            return
+        }
+
+        // q1 = floor(x / b**(k - 1))
+        //val q1 = x ushr ((kLimbs - 1) * 32)
+        q.set(x)
+        q.mutShr(shiftKMinus1Bits)
+        // q2 = q1 * mu
+        //val q2 = q1 * muLimbs
+        q *= muLimbs
+        // q3 = floor(q2 / b**(k + 1))
+        //val q3 = q2 ushr ((kLimbs + 1) * 32)
+        q.mutShr(shiftKPlus1Bits)
+
+        // r1 = x % b**(k + 1)
+        //val r1 = x and BigInt.withBitMask((kLimbs + 1) * 32)
+        r1.set(x)
+        r1.applyBitMask(shiftKPlus1Bits)
+        // r2 = (q3 * m) % b**(k + 1)
+        //val r2 = (q3 * m) and BigInt.withBitMask((kLimbs + 1) * 32)
+        r2.setMul(q, m)
+        r2.applyBitMask(shiftKPlus1Bits)
+        //var r = r1 - r2
+        r.setSub(r1, r2)
+        //if (r.isNegative())
+        //    r = r + BigInt.withSetBit((kLimbs + 1) * 32)
+        if (r.isNegative())
+            r += bPowKPlus1
+
+        if (r >= m) r -= m
+        if (r >= m) r -= m
+
+        out.set(r)
+    }
+
+    fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) {
+        val tmp: BigIntAccumulator = this.q
+        tmp.setMul(a, b)
+        reduceInto(tmp, out)
+    }
+
+    fun modSqr(a: BigInt, out: BigIntAccumulator) {
+        val tmp: BigIntAccumulator = this.q
+        tmp.setSqr(a)
+        reduceInto(tmp, out)
+    }
 
 }

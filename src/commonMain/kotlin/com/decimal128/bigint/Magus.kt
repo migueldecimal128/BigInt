@@ -999,6 +999,8 @@ object Magus {
                 check (isNormalized(z, zNormLen))
                 return zNormLen
             }
+        } else if (xNormLen == 0) {
+            return 0
         }
         throw IllegalArgumentException()
     }
