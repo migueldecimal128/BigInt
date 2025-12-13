@@ -1860,6 +1860,25 @@ object Magus {
         return qNormLen
     }
 
+    fun setDiv(z: Magia,
+               x: Magia, xNormLen: Int, xTmp: Magia,
+               y: Magia, yNormLen: Int, yTmp: Magia): Int {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
+        check (xTmp.size >= xNormLen + 1)
+        check (yTmp.size >= yNormLen)
+        val m = xNormLen
+        val n = yNormLen
+        val u = x
+        val v = y
+        if (z.size < m - n + 1)
+            throw IllegalArgumentException()
+        val q = z
+        val r = null
+        val qNormLen = knuthDivide(q, r, u, v, m, n, xTmp, yTmp)
+        return qNormLen
+    }
+
     /**
      * Computes `x mod w` for the normalized range `x[0‥xNormLen)` and returns the
      * remainder as a new normalized single-limb array. Uses a fast path for values
@@ -2002,14 +2021,30 @@ object Magus {
         u: IntArray,
         v: IntArray,
         m: Int,
-        n: Int
+        n: Int,
+        unBuf: IntArray? = null,
+        vnBuf: IntArray? = null
     ): Int {
         if (m < n || n < 2 || v[n - 1] == 0)
             throw IllegalArgumentException()
+        check (r !== q)
 
         // Step D1: Normalize
-        val un = newCopyWithExactLimbLen(u, m, m + 1)
-        val vn = newCopyWithExactLimbLen(v, n, n)
+        val un = when {
+            unBuf != null && unBuf.size < m + 1 -> throw IllegalArgumentException()
+            unBuf != null -> unBuf
+            r != null && r.size >= m + 1 && r !== v -> r
+            else -> IntArray(m + 1)
+        }
+        u.copyInto(un, 0, 0, m)
+        un[m] = 0
+        val vn = when {
+            vnBuf != null && vnBuf.size < n -> throw IllegalArgumentException()
+            vnBuf != null -> vnBuf
+            else -> IntArray(n)
+        }
+        v.copyInto(vn, 0, 0, n)
+
         val shift = vn[n - 1].countLeadingZeroBits()
         if (shift > 0) {
             setShiftLeft(vn, vn, n, shift)
