@@ -7,8 +7,9 @@ class Barrett private constructor (val m: BigInt,
     val mSquared = m.sqr()
     val kBits = m.magnitudeBitLen()
     val kLimbs = (kBits + 0x1F) ushr 5
-    val kLimbsMinus1 = kLimbs - 1
-    val kLimbsPlus1 = kLimbs + 1
+    val shiftKMinus1Bits = (kLimbs - 1) * 32
+    val shiftKPlus1Bits  = (kLimbs + 1) * 32
+    val bPowKPlus1 = BigInt.withSetBit(shiftKPlus1Bits)
 
     val q = BigIntAccumulator()
     val r = BigIntAccumulator()
@@ -90,7 +91,7 @@ class Barrett private constructor (val m: BigInt,
         // r = r1 - r2
         var r = r1 - r2
         if (r.isNegative())
-            r = r + BigInt.withSetBit((kLimbs + 1) * 32)
+            r += bPowKPlus1
         while (r >= m)
             r = r - m
         return r
@@ -102,19 +103,19 @@ class Barrett private constructor (val m: BigInt,
         if (x < m) return x
 
         // q1 = floor(x / b**(k - 1))
-        val q1 = x ushr (kLimbsMinus1 * 32)
+        val q1 = x ushr shiftKMinus1Bits
         // q2 = q1 * mu
         val q2 = q1 * muLimbs
         // q3 = floor(q2 / b**(k + 1))
-        val q3 = q2 ushr (kLimbsPlus1 * 32)
+        val q3 = q2 ushr shiftKPlus1Bits
         // r1 = x % b**(k + 1)
-        val r1 = x and BigInt.withBitMask(kLimbsPlus1 * 32)
+        val r1 = x and BigInt.withBitMask(shiftKPlus1Bits)
         // r2 = (q3 * m) % b**(k + 1)
-        val r2 = (q3 * m) and BigInt.withBitMask(kLimbsPlus1 * 32)
+        val r2 = (q3 * m) and BigInt.withBitMask(shiftKPlus1Bits)
         // r = r1 - r2
         var r = r1 - r2
         if (r.isNegative())
-            r = r + BigInt.withSetBit(kLimbsPlus1 * 32)
+            r += r + bPowKPlus1
         while (r >= m)
             r = r - m
         return r
@@ -128,28 +129,28 @@ class Barrett private constructor (val m: BigInt,
         // q1 = floor(x / b**(k - 1))
         //val q1 = x ushr ((kLimbs - 1) * 32)
         q.set(x)
-        q.mutShr(kLimbsMinus1 * 32)
+        q.mutShr(shiftKMinus1Bits)
         // q2 = q1 * mu
         //val q2 = q1 * muLimbs
         q *= muLimbs
         // q3 = floor(q2 / b**(k + 1))
         //val q3 = q2 ushr ((kLimbs + 1) * 32)
-        q.mutShr(kLimbsPlus1 * 32)
+        q.mutShr(shiftKPlus1Bits)
 
         // r1 = x % b**(k + 1)
         //val r1 = x and BigInt.withBitMask((kLimbs + 1) * 32)
         r1.set(x)
-        r1.applyBitMask(kLimbsPlus1 * 32)
+        r1.applyBitMask(shiftKPlus1Bits)
         // r2 = (q3 * m) % b**(k + 1)
         //val r2 = (q3 * m) and BigInt.withBitMask((kLimbs + 1) * 32)
         r2.setMul(q, m)
-        r2.applyBitMask(kLimbsPlus1 * 32)
+        r2.applyBitMask(shiftKPlus1Bits)
         //var r = r1 - r2
         r.setSub(r1, r2)
         //if (r.isNegative())
         //    r = r + BigInt.withSetBit((kLimbs + 1) * 32)
         if (r.isNegative())
-            r += BigInt.withSetBit(kLimbsPlus1 * 32)
+            r += bPowKPlus1
 
         if (r >= m) r -= m
         if (r >= m) r -= m
