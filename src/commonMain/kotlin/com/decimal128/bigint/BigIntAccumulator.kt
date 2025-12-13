@@ -143,6 +143,14 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    fun setOne(): BigIntAccumulator {
+        validate()
+        meta = Meta(1)
+        magia[0] = 1
+        validate()
+        return this
+    }
+
     fun mutAbs(): BigIntAccumulator {
         meta = meta.abs()
         return this
@@ -636,7 +644,7 @@ class BigIntAccumulator private constructor (
      *
      * Example usage:
      * ```
-     * val acc = BigIntAccumulator().set(1) // must start at 1 for multiplication
+     * val acc = BigIntAccumulator().setOne() // must start at 1 for multiplication
      * acc *= 10
      * acc *= anotherBigInt
      * ```
@@ -666,7 +674,7 @@ class BigIntAccumulator private constructor (
      *
      * Example usage:
      * ```
-     * val acc = BigIntAccumulator().set(1) // must start at 1 for multiplication
+     * val acc = BigIntAccumulator().setOne() // must start at 1 for multiplication
      * acc *= 10L
      * ```
      *

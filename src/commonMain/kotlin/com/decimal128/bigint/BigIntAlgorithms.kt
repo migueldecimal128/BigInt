@@ -158,7 +158,7 @@ object BigIntAlgorithms {
             else -> {
                 val maxBitLen = base.magnitudeBitLen() * exp
                 val b = BigIntAccumulator.withInitialBitCapacity(maxBitLen).set(base)
-                val r = BigIntAccumulator.withInitialBitCapacity(maxBitLen).set(1)
+                val r = BigIntAccumulator.withInitialBitCapacity(maxBitLen).setOne()
 
                 var e = exp
                 while (true) {

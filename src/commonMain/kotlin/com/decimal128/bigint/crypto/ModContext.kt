@@ -3,14 +3,62 @@ package com.decimal128.bigint.crypto
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntAccumulator
 
-class ModContext(m: BigInt) {
+class ModContext(val m: BigInt) {
+    init {
+        if (m < 1)
+            throw IllegalArgumentException()
+    }
+    val kBits = m.magnitudeBitLen()
+
     private val impl = Barrett(m)
+
+    // modInv scratch for EEA Extended Euclidean Algorithm
+
+    private var invR    = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private var invNewR = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private var invTmpR  = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private var invT    = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private var invNewT = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private var invTmpT  = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+
+    private val invQ     = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private val invQNewR = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private val invQNewT = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
 
     fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) =
         impl.modMul(a, b, out)
 
     fun modSqr(a: BigInt, out: BigIntAccumulator) =
         impl.modSqr(a, out)
+
+    fun modInv(a: BigInt, out: BigIntAccumulator) {
+        require(a >= 0 && a < m)
+
+        invR.set(m)
+        invNewR.set(a)
+        invT.setZero()
+        invNewT.setOne()
+
+        while (invNewR.isNotZero()) {
+            invQ.setDiv(invR, invNewR)
+
+            invQNewR.setMul(invQ, invNewR)
+            invTmpR.setSub(invR, invQNewR)
+            val rotateR = invR; invR = invNewR; invNewR = invTmpR; invTmpR = rotateR
+
+            invQNewT.setMul(invQ, invNewT)
+            invTmpT.setSub(invT, invQNewT)
+            val rotateT = invT; invT = invNewT; invNewT = invTmpT; invTmpT = rotateT
+        }
+
+        if (!invR.isOne())
+            throw ArithmeticException("not invertible")
+
+        if (invT.isNegative())
+            invT += m
+
+        out.set(invT)
+    }
 
     private class Barrett(val m: BigInt,
                           val mu: BigInt

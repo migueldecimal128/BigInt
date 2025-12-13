@@ -119,7 +119,7 @@ val sumOfSquares = BigInt.from(s2)
 
 ```factorial
 
-val f = BigIntAccumulator().set(1) // start at 1
+val f = BigIntAccumulator().setOne() // start at 1
 for (i in 2..n)
     f *= i
 val factorial = BigInt.from(f)

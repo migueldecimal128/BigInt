@@ -14,7 +14,7 @@ class TestFactorial {
     @Test
     fun testSmall() {
         assertEquals(BigInt.ONE, BigInt.factorial(0))
-        val accum = BigIntAccumulator().set(1)
+        val accum = BigIntAccumulator().setOne()
         var f = 1uL
         for (i in 1..20) {
             f *= i.toULong()
@@ -50,7 +50,7 @@ class TestFactorial {
                 mul *= i
         }
 
-        val accum = BigIntAccumulator().set(1)
+        val accum = BigIntAccumulator().setOne()
         val accumTime = measureTime {
             for (i in 2..bigNum)
                 accum *= i

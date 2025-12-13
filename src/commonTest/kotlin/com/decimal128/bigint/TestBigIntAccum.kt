@@ -130,7 +130,7 @@ class TestBigIntAccum {
 
     @Test
     fun testMul() {
-        val hia = BigIntAccumulator().set(1)
+        val hia = BigIntAccumulator().setOne()
         var hi = BigInt.ONE
 
         for (i in 0..<200) {

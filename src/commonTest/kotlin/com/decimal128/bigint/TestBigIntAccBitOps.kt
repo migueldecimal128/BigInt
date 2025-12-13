@@ -48,7 +48,7 @@ class TestBigIntAccBitOps {
     @Test
     fun testClearThenSetSameBit() {
         for (i in 0..150) {
-            val acc = BigIntAccumulator().set(1L).clearBit(0).setBit(0)
+            val acc = BigIntAccumulator().setOne().clearBit(0).setBit(0)
             assertEquals(BigInt.ONE, acc.toBigInt(), "clearBit(0) then setBit(0)")
         }
     }
