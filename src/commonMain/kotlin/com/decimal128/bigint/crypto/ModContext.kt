@@ -12,6 +12,15 @@ class ModContext(val m: BigInt) {
 
     private val impl = Barrett(m)
 
+    fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) =
+        impl.modMul(a, b, out)
+
+    fun modSqr(a: BigInt, out: BigIntAccumulator) =
+        impl.modSqr(a, out)
+
+    fun modPow(base: BigInt, exp: BigInt, out: BigIntAccumulator) =
+        impl.modPow(base, exp, out)
+
     // modInv scratch for EEA Extended Euclidean Algorithm
 
     private var invR    = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
@@ -24,12 +33,6 @@ class ModContext(val m: BigInt) {
     private val invQ     = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
     private val invQNewR = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
     private val invQNewT = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-
-    fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) =
-        impl.modMul(a, b, out)
-
-    fun modSqr(a: BigInt, out: BigIntAccumulator) =
-        impl.modSqr(a, out)
 
     fun modInv(a: BigInt, out: BigIntAccumulator) {
         require(a >= 0 && a < m)
@@ -76,6 +79,7 @@ class ModContext(val m: BigInt) {
         val r2 = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
 
         val mulTmp = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
+        val baseTmp = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
 
         companion object {
             operator fun invoke(m: BigInt): Barrett {
@@ -143,10 +147,43 @@ class ModContext(val m: BigInt) {
             reduceInto(mulTmp, out)
         }
 
+        fun modMul(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) {
+            check (a !== mulTmp && b !== mulTmp && out !== mulTmp)
+            mulTmp.setMul(a, b)
+            reduceInto(mulTmp, out)
+        }
+
         fun modSqr(a: BigInt, out: BigIntAccumulator) {
             mulTmp.setSqr(a)
             reduceInto(mulTmp, out)
         }
 
+        fun modSqr(a: BigIntAccumulator, out: BigIntAccumulator) {
+            check (a !== mulTmp && out !== mulTmp)
+            mulTmp.setSqr(a)
+            reduceInto(mulTmp, out)
+        }
+
+        fun modPow(base: BigInt, exp: BigInt, out: BigIntAccumulator) {
+            if (exp < 0)
+                throw IllegalArgumentException()
+            out.setOne()
+            if (exp.isZero())
+                return
+            baseTmp.set(base)
+            if (base >= m) {
+                if (base < mSquared)
+                    reduceInto(baseTmp, baseTmp)
+                else
+                    baseTmp.setRem(base, m)
+            }
+            for (i in exp.magnitudeBitLen() - 1 downTo 0) {
+                // result = result^2 mod m
+                modSqr(out, out)
+
+                if (exp.testBit(i))
+                    modMul(out, baseTmp, out)
+            }
+        }
     }
 }
