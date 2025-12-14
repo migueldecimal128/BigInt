@@ -6,6 +6,8 @@ import kotlin.test.assertTrue
 
 class TestBigIntMulDivRem {
 
+    val verbose = true
+
     private fun bi(v: Long) = BigInt.from(v)
     private fun acc(v: BigInt) = BigIntAccumulator().set(v)
 
@@ -262,8 +264,25 @@ class TestBigIntMulDivRem {
     fun testRem_knuth_multiLimb() {
         val x = BigInt.randomWithBitLen(500)
         val y = BigInt.randomWithBitLen(300)
+        if (verbose)
+            println("x:$x y:$y")
         val acc = BigIntAccumulator().set(x)
         acc.setRem(x, y)
+        assertEquals(x % y, acc.toBigInt())
+    }
+
+    @Test
+    fun testProblem() {
+        val x = "2693898200269885236149444911153".toBigInt()
+        val y = "874066428351266532052357330140".toBigInt()
+        if (verbose)
+            println("x:$x y:$y")
+        val acc = BigIntAccumulator().set(x)
+        acc.setRem(x, y)
+        val biRem = x % y
+        val accRem = acc.toBigInt()
+        if (verbose)
+            println("biRem:$biRem accRem:$accRem")
         assertEquals(x % y, acc.toBigInt())
     }
 

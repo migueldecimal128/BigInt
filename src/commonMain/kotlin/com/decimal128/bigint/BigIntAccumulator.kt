@@ -604,10 +604,9 @@ class BigIntAccumulator private constructor (
             throw ArithmeticException("div by zero")
         check (this.magia !== xMagia)
         check (this.magia !== yMagia)
-        swapTmp1()
         ensureCapacityDiscard(yMeta.normLen)
-        meta = Meta(xMeta.signBit,
-            Magus.setRem(magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen))
+        val rNormLen = Magus.setRem(magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        meta = Meta(xMeta.signBit, rNormLen)
         return this
     }
 

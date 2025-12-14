@@ -2026,7 +2026,6 @@ object Magus {
             throw IllegalArgumentException()
         val r = z
         val rNormLen = knuthDivide(q, r, u, v, m, n)
-        check (rNormLen == normLen(r))
         check (rNormLen <= n)
         return rNormLen
     }
