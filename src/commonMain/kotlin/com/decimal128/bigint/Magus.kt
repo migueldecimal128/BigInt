@@ -1720,11 +1720,11 @@ object Magus {
                     return 0
                 if (xBitLen == yBitLen) {
                     val cmp = compare(xMagia, xNormLen, yMagia, yNormLen)
-                    if (cmp < 0)
-                        return 0
-                    if (cmp == 0) {
+                    return if (cmp < 0) {
+                        0
+                    } else {
                         zMagia[0] = 1
-                        return 1
+                        1
                     }
                 }
             }
@@ -2028,6 +2028,60 @@ object Magus {
         val rNormLen = knuthDivide(q, r, u, v, m, n)
         check (rNormLen == normLen(r))
         check (rNormLen <= n)
+        return rNormLen
+    }
+
+    fun trySetRemFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
+        when {
+            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            xNormLen < yNormLen -> {
+                xMagia.copyInto(zMagia, 0, 0, xNormLen)
+                return xNormLen
+            }
+            yNormLen == 2 && xNormLen <= 2 ->
+                return setULong(zMagia, toRawULong(xMagia, xNormLen) % toRawULong(yMagia, yNormLen))
+            yNormLen == 1 -> return setRem(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
+            // note that this will handle aliasing
+            // when x === yMeta,yMagia
+            xNormLen == yNormLen -> {
+                val xBitLen = bitLen(xMagia, xNormLen)
+                val yBitLen = bitLen(yMagia, yNormLen)
+                if (xBitLen < yBitLen) {
+                    xMagia.copyInto(zMagia, 0, 0, xNormLen)
+                    return xNormLen
+                }
+                if (xBitLen == yBitLen) {
+                    val cmp = compare(xMagia, xNormLen, yMagia, yNormLen)
+                    return when {
+                        cmp < 0 -> {
+                            xMagia.copyInto(zMagia, 0, 0, xNormLen)
+                            xNormLen
+                        }
+                        cmp == 0 -> 0
+                        else -> setSub(zMagia, xMagia, xNormLen, yMagia, yNormLen)
+                    }
+                }
+            }
+        }
+        return -1
+    }
+
+    fun setRem(z: Magia,
+               x: Magia, xNormLen: Int, xTmp: Magia,
+               y: Magia, yNormLen: Int, yTmp: Magia?): Int {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
+        check (xTmp.size >= xNormLen + 1)
+        check (yTmp == null || yTmp.size >= yNormLen)
+        val m = xNormLen
+        val n = yNormLen
+        val u = x
+        val v = y
+        val q = null
+        if (z.size < yNormLen)
+            throw IllegalArgumentException()
+        val r = z
+        val rNormLen = knuthDivide(q, r, u, v, m, n, xTmp, yTmp)
         return rNormLen
     }
 

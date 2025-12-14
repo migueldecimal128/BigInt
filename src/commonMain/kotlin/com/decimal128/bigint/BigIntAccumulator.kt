@@ -576,6 +576,16 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    private fun trySetRemFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
+        val rSignFlag = xMeta.signFlag
+        val rNormLen = Magus.trySetRemFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        if (rNormLen < 0)
+            return false
+        meta = Meta(rSignFlag, rNormLen)
+        return true
+    }
+
+
 
     /**
      * Adds the given Int value to this accumulator.
