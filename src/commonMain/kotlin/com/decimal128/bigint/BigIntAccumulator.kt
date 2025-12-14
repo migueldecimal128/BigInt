@@ -548,10 +548,19 @@ class BigIntAccumulator private constructor (
 
     private fun trySetDivFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
         val qSignFlag = xMeta.signFlag xor yMeta.signFlag
-        val normLen = Magus.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
-        if (normLen < 0)
+        val qNormLen = Magus.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        if (qNormLen < 0)
             return false
-        meta = Meta(qSignFlag, normLen)
+        meta = Meta(qSignFlag, qNormLen)
+        return true
+    }
+
+    private fun trySetRemFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
+        val rSignFlag = xMeta.signFlag
+        val rNormLen = Magus.trySetRemFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        if (rNormLen < 0)
+            return false
+        meta = Meta(rSignFlag, rNormLen)
         return true
     }
 
@@ -564,6 +573,32 @@ class BigIntAccumulator private constructor (
     fun setRem(x: BigIntAccumulator, y: BigIntAccumulator) =
         setRemImpl(x.meta, x.magia, y.meta, y.magia)
 
+    private fun setRemImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
+        val yMagia = y.magia
+        ensureCapacityDiscard(y.meta.normLen)
+        if (trySetRemFastPath(xMeta, xMagia, y.meta, yMagia))
+            return this
+        check (xMagia !== yMagia)
+        this.ensureTmpCapacityDiscard(max(xMagia.size, xMeta.normLen + 1))
+        y.ensureTmpCapacityDiscard(y.meta.normLen)
+        meta = Meta(xMeta.signBit,
+            Magus.setRem(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, y.meta.normLen, y.tmp1))
+        return this
+    }
+
+    private fun setRemImpl(x: BigIntAccumulator, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
+        val xMagia = x.magia
+        ensureCapacityDiscard(yMeta.normLen)
+        if (trySetRemFastPath(x.meta, xMagia, yMeta, yMagia))
+            return this
+        check (xMagia !== yMagia)
+        x.ensureTmpCapacityDiscard(max(xMagia.size, x.meta.normLen + 1))
+        this.ensureTmpCapacityDiscard(yMeta.normLen)
+        meta = Meta(x.meta.signBit,
+            Magus.setRem(magia, xMagia, x.meta.normLen, x.tmp1, yMagia, yMeta.normLen, this.tmp1))
+        return this
+    }
+
     private fun setRemImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
@@ -575,17 +610,6 @@ class BigIntAccumulator private constructor (
             Magus.setRem(magia, x, xNormLen, y, yNormLen))
         return this
     }
-
-    private fun trySetRemFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
-        val rSignFlag = xMeta.signFlag
-        val rNormLen = Magus.trySetRemFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
-        if (rNormLen < 0)
-            return false
-        meta = Meta(rSignFlag, rNormLen)
-        return true
-    }
-
-
 
     /**
      * Adds the given Int value to this accumulator.
