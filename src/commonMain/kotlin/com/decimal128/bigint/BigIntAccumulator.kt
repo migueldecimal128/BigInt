@@ -511,7 +511,7 @@ class BigIntAccumulator private constructor (
     private fun setDivImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
         val yMagia = y.magia
         ensureCapacityDiscard(xMeta.normLen - y.meta.normLen + 1)
-        if (isSetSmallDiv(xMeta, xMagia, y.meta, yMagia))
+        if (trySetDivFastPath(xMeta, xMagia, y.meta, yMagia))
             return this
         check (xMagia !== yMagia)
         this.ensureTmpCapacityDiscard(max(xMagia.size, xMeta.normLen + 1))
@@ -526,7 +526,7 @@ class BigIntAccumulator private constructor (
         // when we resize the quotient ... in case of aliasing
         val xMagia = x.magia
         ensureCapacityDiscard(x.meta.normLen - yMeta.normLen + 1)
-        if (isSetSmallDiv(x.meta, x.magia, yMeta, yMagia))
+        if (trySetDivFastPath(x.meta, x.magia, yMeta, yMagia))
             return this
         check (xMagia !== yMagia)
         x.ensureTmpCapacityDiscard(max(xMagia.size, x.meta.normLen + 1))
@@ -536,48 +536,17 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun isSetSmallDiv(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
+    private fun trySetDivFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
         val qSignFlag = xMeta.signFlag xor yMeta.signFlag
-        when {
-            yMeta.normLen == 0 -> throw ArithmeticException("div by zero")
-            xMeta.normLen == 0 || xMeta.normLen < yMeta.normLen -> {
-                setZero()
-                return true
-            }
-            yMeta.normLen == 1 -> {
-                meta = Meta(
-                    qSignFlag,
-                    Magus.setDiv(magia, xMagia, xMeta.normLen, yMagia[0].toUInt())
-                )
-                return true
-            }
-            // note that this will handle aliasing
-            // when x === yMeta,yMagia
-            xMeta.normLen == yMeta.normLen -> {
-                val xBitLen = Magus.bitLen(xMagia, xMeta.normLen)
-                val yBitLen = Magus.bitLen(yMagia, yMeta.normLen)
-                if (xBitLen < yBitLen) {
-                    setZero()
-                    return true
-                }
-                if (xBitLen == yBitLen) {
-                    val cmp = Magus.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen)
-                    if (cmp < 0) {
-                        setZero()
-                        return true
-                    }
-                    if (cmp == 0) {
-                        setOne(qSignFlag)
-                        return true
-                    }
-                }
-            }
-        }
-        return false
+        val normLen = Magus.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        if (normLen < 0)
+            return false
+        meta = Meta(qSignFlag, normLen)
+        return true
     }
 
     private fun setDivImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
-        if (isSetSmallDiv(xMeta, x, yMeta, y))
+        if (trySetDivFastPath(xMeta, x, yMeta, y))
             return this
         ensureCapacityDiscard(xMeta.normLen - yMeta.normLen + 1)
         ensureTmpCapacityDiscard(xMeta.normLen + 1)

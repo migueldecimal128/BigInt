@@ -1704,6 +1704,32 @@ object Magus {
         throw IllegalArgumentException()
     }
 
+    fun trySetDivFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
+        when {
+            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            xNormLen == 0 || xNormLen < yNormLen -> return 0
+            yNormLen == 1 -> return setDiv(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
+            // note that this will handle aliasing
+            // when x === yMeta,yMagia
+            xNormLen == yNormLen -> {
+                val xBitLen = bitLen(xMagia, xNormLen)
+                val yBitLen = bitLen(yMagia, yNormLen)
+                if (xBitLen < yBitLen)
+                    return 0
+                if (xBitLen == yBitLen) {
+                    val cmp = compare(xMagia, xNormLen, yMagia, yNormLen)
+                    if (cmp < 0)
+                        return 0
+                    if (cmp == 0) {
+                        zMagia[0] = 1
+                        return 1
+                    }
+                }
+            }
+        }
+        return -1
+    }
+
     /**
      * Computes `x mod w` for the normalized limb array `x[0‥xNormLen)`, returning
      * the remainder as a `UInt`. Throws `ArithmeticException` if `w == 0u`.
