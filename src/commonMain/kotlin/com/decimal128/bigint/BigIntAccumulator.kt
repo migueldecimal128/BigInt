@@ -600,14 +600,12 @@ class BigIntAccumulator private constructor (
     }
 
     private fun setRemImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
-        val xNormLen = xMeta.normLen
-        val yNormLen = yMeta.normLen
-        if (yNormLen == 0)
+        if (yMeta.normLen == 0)
             throw ArithmeticException("div by zero")
         swapTmp1()
-        ensureCapacityDiscard(xNormLen)
+        ensureCapacityDiscard(xMeta.normLen)
         meta = Meta(xMeta.signBit,
-            Magus.setRem(magia, x, xNormLen, y, yNormLen))
+            Magus.setRem(magia, x, xMeta.normLen, y, yMeta.normLen))
         return this
     }
 
