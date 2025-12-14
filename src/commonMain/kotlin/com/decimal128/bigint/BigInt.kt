@@ -1794,7 +1794,7 @@ class BigInt private constructor(
         if (n == 0)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magus.newDiv(this.magia, n.absoluteValue.toUInt())
+            val quot = Magus.newDiv(magia, meta.normLen, n.absoluteValue.toUInt())
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag xor (n < 0), quot)
         }
@@ -1805,7 +1805,7 @@ class BigInt private constructor(
         if (w == 0u)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magus.newDiv(this.magia, w)
+            val quot = Magus.newDiv(magia, meta.normLen, w)
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag, quot)
         }
@@ -1816,7 +1816,7 @@ class BigInt private constructor(
         if (l == 0L)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magus.newDiv(this.magia, l.absoluteValue.toULong())
+            val quot = Magus.newDiv(magia, meta.normLen, l.absoluteValue.toULong())
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag xor (l < 0), quot)
         }
@@ -1827,7 +1827,7 @@ class BigInt private constructor(
         if (dw == 0uL)
             throw ArithmeticException("div by zero")
         if (isNotZero()) {
-            val quot = Magus.newDiv(this.magia, dw)
+            val quot = Magus.newDiv(magia, meta.normLen, dw)
             if (quot.isNotEmpty())
                 return BigInt(this.meta.signFlag, quot)
         }

@@ -1485,6 +1485,13 @@ class BigIntAccumulator private constructor (
         validate()
     }
 
+    private fun mutateDivImpl(wSign: Boolean, dw: ULong) {
+        validate()
+        meta = Meta(meta.signFlag xor wSign,
+            Magus.setDiv(magia, magia, meta.normLen, dw))
+        validate()
+    }
+
     // <<<<<<<<<<<<<<<<<< BEGINNING OF SHARED TEXT SOURCE CODE >>>>>>>>>>>>>>>>>>>>>>
 
     /**

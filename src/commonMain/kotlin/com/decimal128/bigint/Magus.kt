@@ -1705,6 +1705,28 @@ object Magus {
         throw IllegalArgumentException()
     }
 
+    fun setDiv(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
+            check (isNormalized(x, xNormLen))
+            when {
+                (dw shr 32) == 0uL -> return setDiv(z, x, xNormLen, dw.toUInt())
+                xNormLen <= 2 -> {
+                    val dwX = toRawULong(x, xNormLen)
+                    return setULong(z, dwX / dw)
+                }
+                dw.countOneBits() == 1 -> return setShiftRight(z, x, xNormLen, dw.countTrailingZeroBits())
+            }
+            val u = x
+            val m = xNormLen
+            val vnDw = dw
+            val q = Magia(m - 2 + 1)
+            val r = null
+            knuthDivide64(q, r, u, vnDw, m)
+            return normLen(q)
+        }
+        throw IllegalArgumentException()
+    }
+
 
     fun trySetDivFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
         when {
@@ -1766,8 +1788,8 @@ object Magus {
      * @return a new [Magia] containing the quotient of the division.
      * @throws ArithmeticException if [w] is zero.
      */
-    fun newDiv(x: Magia, w: UInt): Magia {
-        val xNormLen = normLen(x)
+    fun newDiv(x: Magia, xNormLen: Int, w: UInt): Magia {
+        check (isNormalized(x, xNormLen))
         if (xNormLen > 0) {
             val z = Magia(xNormLen)
             val zNormLen = setDiv(z, x, xNormLen, w)
@@ -1787,17 +1809,16 @@ object Magus {
      * - [ONE]  if `x == dw`
      * - the normalized quotient otherwise.
      */
-    fun newDiv(x: Magia, dw: ULong): Magia {
+    fun newDiv(x: Magia, xNormLen: Int, dw: ULong): Magia {
         if ((dw shr 32) == 0uL)
-            return newDiv(x, dw.toUInt())
-        val xLen = normLen(x)
-        val cmp = compare(x, xLen, dw)
+            return newDiv(x, xNormLen, dw.toUInt())
+        val cmp = compare(x, xNormLen, dw)
         when {
             cmp < 0 -> return ZERO
             cmp == 0 -> return ONE
         }
         val u = x
-        val m = xLen
+        val m = xNormLen
         val vnDw = dw
         val q = Magia(m - 2 + 1)
         val r = null
@@ -1821,7 +1842,7 @@ object Magus {
         check (isNormalized(x, xNormLen))
         check (isNormalized(y, yNormLen))
         when {
-            yNormLen < 2 -> return newDiv(x, y[0].toUInt())
+            yNormLen < 2 -> return newDiv(x, xNormLen, y[0].toUInt())
             xNormLen < yNormLen -> return ZERO
             xNormLen == yNormLen -> {
                 val xMswBitLen = bitLen(x[xNormLen-1])
