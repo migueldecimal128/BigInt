@@ -848,6 +848,8 @@ class BigIntAccumulator private constructor (
             mutateMulImpl(acc.meta, acc.magia)
     }
 
+    operator fun divAssign(n: Int) = mutateDivImpl(n < 0, n.absoluteValue.toUInt())
+
     /**
      * Sets this accumulator to `x << bitCount`. Allocates space for the
      * resulting bit length. Throws if [bitCount] is negative.
@@ -1474,6 +1476,13 @@ class BigIntAccumulator private constructor (
             meta = Meta(0,
                 Magus.setSqr(magia, tmp1, normLen))
         }
+    }
+
+    private fun mutateDivImpl(wSign: Boolean, w: UInt) {
+        validate()
+        meta = Meta(meta.signFlag xor wSign,
+            Magus.setDiv(magia, magia, meta.normLen, w))
+        validate()
     }
 
     // <<<<<<<<<<<<<<<<<< BEGINNING OF SHARED TEXT SOURCE CODE >>>>>>>>>>>>>>>>>>>>>>

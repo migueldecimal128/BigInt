@@ -1684,10 +1684,11 @@ object Magus {
     fun setDiv(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
             check (isNormalized(x, xNormLen))
-            if (w == 0u)
-                throw ArithmeticException("div by zero")
-            if (xNormLen == 0)
-                return 0
+            when {
+                w == 0u -> throw ArithmeticException("div by zero")
+                xNormLen == 0 -> return 0
+                w.countOneBits() == 1 -> setShiftRight(z, x, xNormLen, w.countTrailingZeroBits())
+            }
             val dw = w.toULong()
             var carry = 0uL
             for (i in xNormLen - 1 downTo 0) {
@@ -1703,6 +1704,7 @@ object Magus {
         }
         throw IllegalArgumentException()
     }
+
 
     fun trySetDivFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
         when {

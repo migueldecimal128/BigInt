@@ -45,14 +45,20 @@ value class Meta internal constructor(val meta: Int) {
         }
 
         /**
-         * Creates a `Meta` value from a sign flag and magnitude bit-length.
+         * Creates a packed `Meta` value from a sign flag and a normalized limb length.
          *
-         * @param signFlag true for negative
-         * @param limbLen  non-negative limb-length stored in the lower 31 bits.
+         * The sign is stored in the MSB and the limb length in the low 31 bits.
+         * A zero limb length always produces the canonical zero representation
+         * (with the sign bit cleared), regardless of `signFlag`.
+         *
+         * @param signFlag `true` for a negative value
+         * @param normLen  non-negative normalized limb length
+         * @throws IllegalStateException if `normLen` is negative
          */
         operator fun invoke(signFlag: Boolean, normLen: Int): Meta {
-            check (normLen >= 0)
-            return Meta(normLen xor (if (signFlag) Int.MIN_VALUE else 0))
+            if (normLen >= 0)
+                return Meta((normLen or (if (signFlag) Int.MIN_VALUE else 0)) and (-normLen shr 31))
+            throw IllegalStateException()
         }
 
         operator fun invoke(signFlag: Boolean, x: IntArray, xLen: Int): Meta =
