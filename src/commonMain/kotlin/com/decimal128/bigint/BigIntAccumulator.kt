@@ -338,9 +338,22 @@ class BigIntAccumulator private constructor (
     private fun ensureBitLen(newBitLen: Int) = ensureLimbLen((newBitLen + 0x1F) ushr 5)
 
 
-    private inline fun swapTmp1() {
+    private inline fun clearTmpCapacity(minLimbLen: Int) {
+        if (tmp1.size < minLimbLen)
+            tmp1 = Magus.newWithFloorLen(minLimbLen)
+        else
+            tmp1.fill(0, 0, minLimbLen)
+    }
+
+    private inline fun swapTmp() {
         val t = tmp1; tmp1 = magia; magia = t
     }
+
+    private inline fun swapTmpCopy() {
+        val t = tmp1; tmp1 = magia; magia = t
+        tmp1.copyInto(magia, 0, 0, meta.normLen)
+    }
+
 
     /**
      * Sets this accumulator’s value from a raw limb array.
@@ -454,7 +467,7 @@ class BigIntAccumulator private constructor (
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
 
     private fun setMulImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
-        swapTmp1()
+        swapTmp()
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
         ensureCapacityDiscard(xNormLen + yNormLen)
@@ -486,7 +499,7 @@ class BigIntAccumulator private constructor (
 
     private fun setSqrImpl(xMeta: Meta, x: Magia): BigIntAccumulator {
         check(Magus.isNormalized(x, xMeta.normLen))
-        swapTmp1()
+        swapTmp()
         val xNormLen = xMeta.normLen
         ensureCapacityClear(xNormLen + xNormLen)
         meta = Meta(
@@ -540,7 +553,7 @@ class BigIntAccumulator private constructor (
     }
 
     private fun mutDivImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        swapTmp1()
+        swapTmp()
         this.ensureCapacityDiscard(meta.normLen - yMeta.normLen + 1)
         if (trySetDivFastPath(meta, tmp1, yMeta, yMagia))
             return this
@@ -630,7 +643,7 @@ class BigIntAccumulator private constructor (
     }
 
     private fun mutRemImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        swapTmp1()
+        swapTmp()
         this.ensureCapacityDiscard(yMeta.normLen)
         if (trySetRemFastPath(meta, tmp1, yMeta, yMagia))
             return this
@@ -1449,8 +1462,8 @@ class BigIntAccumulator private constructor (
             setZero()
             return
         }
-        swapTmp1()
-        ensureCapacityCopy(normLen + yMeta.normLen + 1)
+        ensureTmpCapacityDiscard(normLen + yMeta.normLen + 1)
+        swapTmpCopy()
         val normLen = Magus.setMul(magia, tmp1, normLen, y, yMeta.normLen)
         meta = Meta(signBit xor yMeta.signBit, normLen)
         validate()
@@ -1466,15 +1479,12 @@ class BigIntAccumulator private constructor (
      * aliasing safely when the source and destination are the same object.
      */
     private fun mutateSquare() {
-        if (normLen > 0) {
+        if (meta.normLen > 0) {
             val newLimbLenMax = normLen * 2
-            if (tmp1.size < newLimbLenMax)
-                tmp1 = Magus.newWithFloorLen(newLimbLenMax)
-            else
-                tmp1.fill(0, 0, newLimbLenMax)
-            swapTmp1()
+            clearTmpCapacity(newLimbLenMax)
+            swapTmp()
             meta = Meta(0,
-                Magus.setSqr(magia, tmp1, normLen))
+                Magus.setSqr(magia, tmp1, meta.normLen))
         }
     }
 
