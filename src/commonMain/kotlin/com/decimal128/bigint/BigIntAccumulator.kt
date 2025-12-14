@@ -108,9 +108,11 @@ class BigIntAccumulator private constructor (
 
 
     private inline fun validate() {
-        check (normLen <= magia.size &&
-                magia.size >= 4 &&
-                (normLen == 0 || magia[normLen - 1] != 0))
+        check(
+            normLen <= magia.size &&
+                    magia.size >= 4 &&
+                    (normLen == 0 || magia[normLen - 1] != 0)
+        )
     }
 
     /**
@@ -379,19 +381,25 @@ class BigIntAccumulator private constructor (
 
     fun setAdd(x: BigInt, y: BigInt) =
         setAddImpl(x.meta, x.magia, y.meta, y.magia)
+
     fun setAdd(x: BigInt, y: BigIntAccumulator) =
         setAddImpl(x.meta, x.magia, y.meta, y.magia)
+
     fun setAdd(x: BigIntAccumulator, y: BigInt) =
         setAddImpl(x.meta, x.magia, y.meta, y.magia)
+
     fun setAdd(x: BigIntAccumulator, y: BigIntAccumulator) =
         setAddImpl(x.meta, x.magia, y.meta, y.magia)
 
     fun setSub(x: BigInt, y: BigInt) =
         setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
+
     fun setSub(x: BigInt, y: BigIntAccumulator) =
         setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
+
     fun setSub(x: BigIntAccumulator, y: BigInt) =
         setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
+
     fun setSub(x: BigIntAccumulator, y: BigIntAccumulator) =
         setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
 
@@ -401,22 +409,31 @@ class BigIntAccumulator private constructor (
             xMeta.isZero -> set(yMeta, y)
             xMeta.signBit == yMeta.signBit -> {
                 ensureCapacityDiscard(xMeta.normLen + yMeta.normLen + 1)
-                meta = Meta(xMeta.signBit,
-                    Magus.setAdd(magia, x, xMeta.normLen, y, yMeta.normLen))
+                meta = Meta(
+                    xMeta.signBit,
+                    Magus.setAdd(magia, x, xMeta.normLen, y, yMeta.normLen)
+                )
             }
+
             else -> {
                 val cmp: Int = Magus.compare(x, xMeta.normLen, y, yMeta.normLen)
                 when {
                     cmp > 0 -> {
                         ensureCapacityDiscard(xMeta.normLen)
-                        meta = Meta(xMeta.signBit,
-                            Magus.setSub(magia, x, xMeta.normLen, y, yMeta.normLen))
+                        meta = Meta(
+                            xMeta.signBit,
+                            Magus.setSub(magia, x, xMeta.normLen, y, yMeta.normLen)
+                        )
                     }
+
                     cmp < 0 -> {
                         ensureCapacityDiscard(yMeta.normLen)
-                        meta = Meta(yMeta.signBit,
-                            Magus.setSub(magia, y, yMeta.normLen, x, xMeta.normLen))
+                        meta = Meta(
+                            yMeta.signBit,
+                            Magus.setSub(magia, y, yMeta.normLen, x, xMeta.normLen)
+                        )
                     }
+
                     else -> setZero()
                 }
             }
@@ -426,10 +443,13 @@ class BigIntAccumulator private constructor (
 
     fun setMul(x: BigInt, y: BigInt) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
+
     fun setMul(x: BigInt, y: BigIntAccumulator) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
+
     fun setMul(x: BigIntAccumulator, y: BigInt) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
+
     fun setMul(x: BigIntAccumulator, y: BigIntAccumulator) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
 
@@ -438,20 +458,25 @@ class BigIntAccumulator private constructor (
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
         ensureCapacityDiscard(xNormLen + yNormLen)
-        meta = Meta(xMeta.signBit xor yMeta.signBit,
-            Magus.setMul(magia, x, xNormLen, y, yNormLen))
+        meta = Meta(
+            xMeta.signBit xor yMeta.signBit,
+            Magus.setMul(magia, x, xNormLen, y, yNormLen)
+        )
         return this
     }
 
     fun setSqr(x: BigInt): BigIntAccumulator =
         setSqrImpl(x.meta, x.magia)
+
     fun setSqr(x: BigIntAccumulator): BigIntAccumulator =
         setSqrImpl(x.meta, x.magia)
+
     fun setSqr(n: Int): BigIntAccumulator = setSqr(n.absoluteValue.toUInt())
     fun setSqr(w: UInt): BigIntAccumulator {
         val abs = w.toULong()
         return set(abs * abs)
     }
+
     fun setSqr(l: Long): BigIntAccumulator = setSqr(l.absoluteValue.toULong())
     fun setSqr(dw: ULong): BigIntAccumulator {
         val lo = dw * dw
@@ -460,72 +485,104 @@ class BigIntAccumulator private constructor (
     }
 
     private fun setSqrImpl(xMeta: Meta, x: Magia): BigIntAccumulator {
-        check (Magus.isNormalized(x, xMeta.normLen))
+        check(Magus.isNormalized(x, xMeta.normLen))
         swapTmp1()
         val xNormLen = xMeta.normLen
         ensureCapacityClear(xNormLen + xNormLen)
-        meta = Meta(0,
-            Magus.setSqr(magia, x, xNormLen))
+        meta = Meta(
+            0,
+            Magus.setSqr(magia, x, xNormLen)
+        )
         return this
     }
 
     fun setDiv(x: BigInt, y: BigInt) =
         setDivImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setDiv(x: BigInt, y: BigIntAccumulator) =
-        setDivImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setDiv(x: BigIntAccumulator, y: BigInt) =
-        setDivImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator {
-        // save these early so that they won't be lost
-        // when we resize the quotient ... in case of aliasing
-        val xMagia = x.magia
+
+    fun setDiv(x: BigInt, y: BigIntAccumulator): BigIntAccumulator =
+        setDivImpl(x.meta, x.magia, y)
+
+    fun setDiv(x: BigIntAccumulator, y: BigInt): BigIntAccumulator =
+        setDivImpl(x, y.meta, y.magia)
+
+    fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
+        setDivImpl(x, y.meta, y.magia)
+
+    private fun setDivImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
         val yMagia = y.magia
-        val qSignFlag = x.meta.signFlag xor y.meta.signFlag
-        ensureCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
-        when {
-            y.normLen == 0 -> throw ArithmeticException("div by zero")
-            x.normLen == 0 || x.normLen < y.normLen -> return setZero()
-            y.normLen == 1 -> {
-                meta = Meta(
-                    qSignFlag,
-                    Magus.setDiv(magia, xMagia, x.meta.normLen, y.magia[0].toUInt())
-                )
-                return this
-            }
-            // note that this will handle aliasing
-            // when x === y
-            x.normLen == y.normLen -> {
-                val xBitLen = x.magnitudeBitLen()
-                val yBitLen = y.magnitudeBitLen()
-                if (xBitLen < yBitLen)
-                    return setZero()
-                if (xBitLen == yBitLen) {
-                    val cmp = x.compareTo(y)
-                    if (cmp < 0)
-                        return setZero()
-                    if (cmp == 0)
-                        return setOne(qSignFlag)
-                }
-            }
-        }
-        check (x !== y)
-        x.ensureTmpCapacityDiscard(max(xMagia.size, x.meta.normLen + 1))
-        y.ensureTmpCapacityDiscard(yMagia.size)
-        meta = Meta(qSignFlag,
-            Magus.setDiv(magia, xMagia, x.meta.normLen, x.tmp1, yMagia, y.meta.normLen, y.tmp1))
+        ensureCapacityDiscard(xMeta.normLen - y.meta.normLen + 1)
+        if (isSetSmallDiv(xMeta, xMagia, y.meta, yMagia))
+            return this
+        check (xMagia !== yMagia)
+        this.ensureTmpCapacityDiscard(max(xMagia.size, xMeta.normLen + 1))
+        y.ensureTmpCapacityDiscard(y.meta.normLen)
+        meta = Meta(xMeta.signFlag xor y.meta.signFlag,
+            Magus.setDiv(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, y.meta.normLen, y.tmp1))
         return this
     }
 
+    private fun setDivImpl(x: BigIntAccumulator, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
+        // save these early so that they won't be lost
+        // when we resize the quotient ... in case of aliasing
+        val xMagia = x.magia
+        ensureCapacityDiscard(x.meta.normLen - yMeta.normLen + 1)
+        if (isSetSmallDiv(x.meta, x.magia, yMeta, yMagia))
+            return this
+        check (xMagia !== yMagia)
+        x.ensureTmpCapacityDiscard(max(xMagia.size, x.meta.normLen + 1))
+        this.ensureTmpCapacityDiscard(yMagia.size)
+        meta = Meta(x.meta.signFlag xor yMeta.signFlag,
+            Magus.setDiv(magia, xMagia, x.meta.normLen, x.tmp1, yMagia, yMeta.normLen, this.tmp1))
+        return this
+    }
+
+    private fun isSetSmallDiv(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
+        val qSignFlag = xMeta.signFlag xor yMeta.signFlag
+        when {
+            yMeta.normLen == 0 -> throw ArithmeticException("div by zero")
+            xMeta.normLen == 0 || xMeta.normLen < yMeta.normLen -> {
+                setZero()
+                return true
+            }
+            yMeta.normLen == 1 -> {
+                meta = Meta(
+                    qSignFlag,
+                    Magus.setDiv(magia, xMagia, xMeta.normLen, yMagia[0].toUInt())
+                )
+                return true
+            }
+            // note that this will handle aliasing
+            // when x === yMeta,yMagia
+            xMeta.normLen == yMeta.normLen -> {
+                val xBitLen = Magus.bitLen(xMagia, xMeta.normLen)
+                val yBitLen = Magus.bitLen(yMagia, yMeta.normLen)
+                if (xBitLen < yBitLen) {
+                    setZero()
+                    return true
+                }
+                if (xBitLen == yBitLen) {
+                    val cmp = Magus.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+                    if (cmp < 0) {
+                        setZero()
+                        return true
+                    }
+                    if (cmp == 0) {
+                        setOne(qSignFlag)
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
 
     private fun setDivImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
-        val xNormLen = xMeta.normLen
-        val yNormLen = yMeta.normLen
-        if (yNormLen == 0)
-            throw ArithmeticException("div by zero")
-        swapTmp1()
-        ensureCapacityDiscard(xNormLen)
+        if (isSetSmallDiv(xMeta, x, yMeta, y))
+            return this
+        ensureCapacityDiscard(xMeta.normLen - yMeta.normLen + 1)
+        ensureTmpCapacityDiscard(xMeta.normLen + 1)
         meta = Meta(xMeta.signBit xor yMeta.signBit,
-            Magus.setDiv(magia, x, xNormLen, y, yNormLen))
+            Magus.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, null))
         return this
     }
 
