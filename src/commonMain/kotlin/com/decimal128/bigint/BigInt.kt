@@ -1945,8 +1945,7 @@ class BigInt private constructor(
      */
     fun sqr(): BigInt {
         if (this.isNotZero()) {
-            check(Magus.normLen(this.magia) > 0)
-            val magiaSqr = Magus.newSqr(this.magia)
+            val magiaSqr = Magus.newSqr(this.magia, this.meta.normLen)
             return BigInt(magiaSqr)
         }
         return ZERO

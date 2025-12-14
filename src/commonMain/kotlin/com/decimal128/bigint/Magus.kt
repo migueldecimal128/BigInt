@@ -884,15 +884,26 @@ object Magus {
     }
 
     /**
-     * Returns a new limb array representing the square of [x].
+     * Returns a new limb array containing the square of a normalized magnitude.
      *
-     * Returns [ZERO] if [x] is zero.
+     * The result represents `x²`, computed from the first [xNormLen] limbs of [x].
+     * If `xNormLen == 0` (canonical zero), this function returns [ZERO].
+     *
+     * The returned array is freshly allocated, large enough to hold the full
+     * square, and is guaranteed to be in normalized form.
+     *
+     * Preconditions:
+     * - [x] must be normalized for [xNormLen]
+     *
+     * @param x the source limb array (least-significant limb first)
+     * @param xNormLen number of significant limbs in [x]
+     * @return a normalized limb array representing `x²`
      */
-    fun newSqr(x: Magia): Magia {
-        val bitLen = bitLen(x)
+    fun newSqr(x: Magia, xNormLen: Int): Magia {
+        check (isNormalized(x, xNormLen))
+        val bitLen = bitLen(x, xNormLen)
         if (bitLen == 0)
             return ZERO
-        val xNormLen = normLenFromBitLen(bitLen)
         val sqrBitLen = 2 * bitLen
         val z = newWithBitLen(sqrBitLen)
         val zNormLen = setSqr(z, x, xNormLen)
@@ -1244,18 +1255,6 @@ object Magus {
     inline fun normLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
 
     /**
-     * Overload of [bitLengthBigIntegerStyle] that considers all limbs in [x].
-     *
-     * Equivalent to calling [bitLengthBigIntegerStyle] with `xLen = x.size`.
-     *
-     * @param sign `true` if the value is negative, `false` otherwise.
-     * @param x the array of 32-bit limbs representing the magnitude.
-     * @return the bit length following BigInteger’s definition.
-     */
-    fun bitLengthBigIntegerStyle(sign: Boolean, x: Magia): Int =
-        bitLengthBigIntegerStyle(sign, x, normLen(x))
-
-    /**
      * Returns the bit length using Java's BigInteger-style semantics.
      *
      * This represents the number of bits required to encode the value in
@@ -1580,15 +1579,15 @@ object Magus {
     }
 
     /**
-     * Checks whether the unsigned integer represented by [x] is equal to the single 32-bit value [y].
+     * Returns `true` if the normalized magnitude [x] equals the single 32-bit value [y].
      *
-     * Only the significant limbs of [x] are considered. Trailing zero limbs in [x] are ignored.
+     * Only the first [xNormLen] limbs are considered.
      *
-     * @param x the array of 32-bit limbs representing the integer.
-     * @param y the 32-bit integer to compare against.
-     * @return `true` if [x] equals [y], `false` otherwise.
+     * @param x the limb array (least-significant limb first)
+     * @param xNormLen number of significant limbs in [x]
+     * @param y the 32-bit value to compare against
      */
-    fun EQ(x: Magia, y: Int) = normLen(x) == 1 && x[0] == y
+    fun EQ(x: Magia, xNormLen: Int, y: Int) = xNormLen == 1 && x[0] == y
 
     /**
      * Checks whether the unsigned integers represented by [x] and [y] are equal.
@@ -1599,18 +1598,8 @@ object Magus {
      * @param y the second array of 32-bit limbs representing an unsigned integer.
      * @return `true` if [x] and [y] represent the same value, `false` otherwise.
      */
-    fun EQ(x: Magia, y: Magia): Boolean = compare(x, normLen(x), y, normLen(y)) == 0
-
-    /**
-     * Compares two arbitrary-precision integers represented as arrays of 32-bit limbs.
-     *
-     * Comparison is performed over the full lengths of both arrays.
-     *
-     * @param x the first integer array (least significant limb first).
-     * @param y the second integer array (least significant limb first).
-     * @return -1 if x < y, 0 if x == y, 1 if x > y.
-     */
-    fun compare(x: Magia, y: Magia): Int = compare(x, normLen(x), y, normLen(y))
+    fun EQ(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Boolean =
+        compare(x, xNormLen, y, yNormLen) == 0
 
     /**
      * Compares two arbitrary-precision integers represented as arrays of 32-bit limbs,
@@ -1644,13 +1633,20 @@ object Magus {
         }
     }
 
+    /**
+     * Compares the normalized magnitude [x] with the unsigned 64-bit value [dw].
+     *
+     * @param x the limb array (least-significant limb first)
+     * @param xNormLen number of significant limbs in [x]
+     * @param dw the unsigned value to compare against
+     * @return a negative value if `x < dw`, zero if `x == dw`, or a positive value if `x > dw`
+     */
     fun compare(x: Magia, xNormLen: Int, dw: ULong): Int {
         check (isNormalized(x, xNormLen))
         if (xNormLen >= 0 && xNormLen <= x.size) {
             return if (xNormLen > 2) 1 else toRawULong(x, xNormLen).compareTo(dw)
-        } else {
-            throw IllegalArgumentException()
         }
+        throw IllegalArgumentException()
     }
 
     /**

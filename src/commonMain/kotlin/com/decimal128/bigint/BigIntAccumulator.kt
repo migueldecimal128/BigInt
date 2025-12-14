@@ -1160,10 +1160,10 @@ class BigIntAccumulator private constructor (
     /**
      * Adds the square of the given BigInt value to this accumulator.
      *
-     * @param hi the value to square and add.
+     * @param bi the value to square and add.
      * @see addSquareOf(ULong)
      */
-    fun addSquareOf(hi: BigInt) = addSquareOfImpl(hi.magia, Magus.normLen(hi.magia))
+    fun addSquareOf(bi: BigInt) = addSquareOfImpl(bi.magia, bi.meta.normLen)
 
     /**
      * Adds the square of the given BigIntAccumulator value to this accumulator.

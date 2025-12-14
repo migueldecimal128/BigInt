@@ -599,7 +599,7 @@ internal object Zoro {
      */
     // FIXME - move bitLengthBigIntegerStyle out of Magus and into Zoro
     fun bitLengthBigIntegerStyle(meta: Meta, magia: Magia): Int =
-        Magus.bitLengthBigIntegerStyle(meta.isNegative, magia)
+        Magus.bitLengthBigIntegerStyle(meta.isNegative, magia, meta.normLen)
 
     /**
      * Returns the number of 32-bit integers required to store the binary magnitude.

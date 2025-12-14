@@ -58,7 +58,7 @@ class TestMagia {
         Assertions.assertEquals(str, str2)
 
         val car3 = Magus.from(str)
-        assert(Magus.EQ(car, car3))
+        assert(Magus.EQ(car, Magus.normLen(car), car3, Magus.normLen(car3)))
         val str3 = Magus.toString(car3)
         Assertions.assertEquals(str, str3)
     }
