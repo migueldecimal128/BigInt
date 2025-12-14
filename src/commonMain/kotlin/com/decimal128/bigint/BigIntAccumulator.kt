@@ -599,13 +599,13 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun setRemImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
+    private fun setRemImpl(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
         if (yMeta.normLen == 0)
             throw ArithmeticException("div by zero")
         swapTmp1()
-        ensureCapacityDiscard(xMeta.normLen)
+        ensureCapacityDiscard(yMeta.normLen)
         meta = Meta(xMeta.signBit,
-            Magus.setRem(magia, x, xMeta.normLen, y, yMeta.normLen))
+            Magus.setRem(magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen))
         return this
     }
 
