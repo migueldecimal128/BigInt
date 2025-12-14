@@ -496,7 +496,7 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    fun setDiv(x: BigInt, y: BigInt) =
+    fun setDiv(x: BigInt, y: BigInt): BigIntAccumulator =
         setDivImpl(x.meta, x.magia, y.meta, y.magia)
 
     fun setDiv(x: BigInt, y: BigIntAccumulator): BigIntAccumulator =
@@ -564,14 +564,14 @@ class BigIntAccumulator private constructor (
         return true
     }
 
-    fun setRem(x: BigInt, y: BigInt) =
+    fun setRem(x: BigInt, y: BigInt): BigIntAccumulator =
         setRemImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setRem(x: BigInt, y: BigIntAccumulator) =
-        setRemImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setRem(x: BigIntAccumulator, y: BigInt) =
-        setRemImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setRem(x: BigIntAccumulator, y: BigIntAccumulator) =
-        setRemImpl(x.meta, x.magia, y.meta, y.magia)
+    fun setRem(x: BigInt, y: BigIntAccumulator): BigIntAccumulator =
+        setRemImpl(x.meta, x.magia, y)
+    fun setRem(x: BigIntAccumulator, y: BigInt): BigIntAccumulator =
+        setRemImpl(x, y.meta, y.magia)
+    fun setRem(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
+        setRemImpl(x, y.meta, y.magia)
 
     private fun setRemImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
         val yMagia = y.magia
