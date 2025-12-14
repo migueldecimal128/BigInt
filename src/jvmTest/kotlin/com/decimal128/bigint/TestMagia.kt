@@ -68,7 +68,7 @@ class TestMagia {
         val magia = MagiaTransducer.magiaFromBi(jbi)
 
         val jbiLeft = jbi.shiftLeft(shift)
-        val carLeft = Magus.newShiftLeft(magia, shift)
+        val carLeft = Magus.newShiftLeft(magia, Magus.normLen(magia, magia.size), shift)
         assert(MagiaTransducer.EQ(carLeft, jbiLeft))
 
         Magus.mutateShiftRight(carLeft, carLeft.size, shift)

@@ -129,20 +129,25 @@ object Magus {
     fun toRawUInt(x: Magia): UInt = if (x.size == 0) 0u else x[0].toUInt()
 
     /**
-     * Converts the first one or two limbs of [x] into a single [ULong] value.
+     * Returns the low 64 bits of a limb array as an unsigned value.
      *
-     * - If [x] is empty, returns 0.
-     * - If [x] has one limb, returns its value as an unsigned 64-bit integer.
-     * - If [x] has two or more limbs, returns the combined value of the first two limbs
-     *   with [x[0]] as the low 32 bits and [x[1]] as the high 32 bits.
+     * Interprets up to the first two 32-bit limbs of [x], using [xNormLen] to
+     * determine how many limbs are significant:
      *
-     * Any limbs beyond the first two are ignored.
+     * - `xNormLen == 0` → returns `0uL`
+     * - `xNormLen == 1` → returns `x[0]` as an unsigned 64-bit value
+     * - `xNormLen >= 2` → returns `(x[1] << 32) | x[0]`
      *
-     * @param x the array of 32-bit limbs representing the magnitude (not necessarily normalized).
-     * @return the unsigned 64-bit value represented by the first one or two limbs of [x].
+     * Limbs beyond the first two are ignored. The result is **not** a full numeric
+     * conversion if the magnitude exceeds 64 bits; it simply exposes the low
+     * 64 bits of the magnitude.
+     *
+     * @param x the limb array (least-significant limb first)
+     * @param xNormLen normalized number of significant limbs in [x]
+     * @return the low 64 bits of the magnitude as a [ULong]
      */
-    fun toRawULong(x: Magia, xLen: Int = x.size): ULong {
-        return when (xLen) {
+    fun toRawULong(x: Magia, xNormLen: Int): ULong {
+        return when (xNormLen) {
             0 -> 0uL
             1 -> dw32(x[0])
             else -> (dw32(x[1]) shl 32) or dw32(x[0])
@@ -182,6 +187,7 @@ object Magus {
      * Returns the normalized limb length of **x**—the index of the highest
      * non-zero limb plus one. If all limbs are zero, returns `0`.
      */
+    // FIXME -- this is suspicious ... I don't think anyone should call this
     inline fun normLen(x: Magia): Int {
         for (i in x.size - 1 downTo 0)
             if (x[i] != 0)
@@ -201,52 +207,31 @@ object Magus {
                 if (x[i] != 0)
                     return i + 1
             return 0
-        } else {
-            throw IllegalArgumentException()
         }
+        throw IllegalArgumentException()
     }
 
     /**
-     * Returns `true` if this limb array is in normalized form.
+     * Returns `true` if the prefix of the limb array is in normalized form.
      *
-     * A limb array is considered *normalized* when:
+     * A limb sequence is considered *normalized* when:
      *
-     *  - it is empty (representing the canonical zero), or
-     *  - its most significant limb (the last element) is non-zero.
+     *  - `xLen == 0`, representing the canonical zero, or
+     *  - the most significant limb `x[xLen - 1]` is non-zero.
      *
-     * In other words, a normalized array contains no unused leading zero limbs.
+     * In other words, the first [xLen] limbs contain no unused leading zero limbs
+     * at the most significant end. Limbs at indices ≥ `xLen` are ignored.
+     *
      * This check does not modify the array.
      *
-     * @param x the limb array to test
-     * @return `true` if `x` has no trailing zero limbs; `false` otherwise
-     */
-    fun isNormalized(x: Magia) = x.isEmpty() || x[x.lastIndex] != 0
-
-    /**
-     * Same as above, but checks only the first `xLen` limbs.
+     * @param x the limb array (least-significant limb first)
+     * @param xLen number of significant limbs to test
+     * @return `true` if the limb sequence is normalized; `false` otherwise
      */
     fun isNormalized(x: Magia, xLen: Int): Boolean {
         check (xLen >= 0 && xLen <= x.size)
         return xLen == 0 || x[xLen - 1] != 0
     }
-
-    /**
-     * Returns `x` if it is already in normalized limb form; otherwise returns
-     * a new `Magia` containing the normalized representation.
-     *
-     * Normalization removes any unused most-significant zero limbs so that:
-     *
-     *  - either the array is a single zero limb, or
-     *  - the most significant limb is non-zero.
-     *
-     * This function never modifies the input array. If normalization is required,
-     * a trimmed copy is produced; otherwise the original array is returned
-     * unchanged.
-     *
-     * @param x the limb array to check
-     * @return `x` if it is already normalized, or a newly allocated normalized copy
-     */
-    fun normalizedCopyIfNeeded(x: Magia) = if (isNormalized(x)) x else newNormalizedCopy(x)
 
     /**
      * Allocates a new limb array large enough to represent a value whose
@@ -1098,16 +1083,16 @@ object Magus {
      * @return a new [Magia] containing the shifted value.
      * @throws IllegalArgumentException if [bitCount] is negative.
      */
-    fun newShiftLeft(x: Magia, bitCount: Int): Magia {
-        val xBitLen = bitLen(x)
+    fun newShiftLeft(x: Magia, xNormLen: Int, bitCount: Int): Magia {
+        val xBitLen = bitLen(x, xNormLen)
         if (xBitLen == 0)
             return ZERO
         if (bitCount == 0)
             return newNormalizedCopy(x)
-        val zBitLen = bitLen(x) + bitCount
+        val zBitLen = xBitLen + bitCount
         val zNormLen = normLenFromBitLen(zBitLen)
         val z = Magia(zNormLen)
-        val zNormLen2 = setShiftLeft(z, x, x.size, bitCount)
+        val zNormLen2 = setShiftLeft(z, x, xNormLen, bitCount)
         check (zNormLen == zNormLen2)
         check (isNormalized(z, zNormLen))
         return z
@@ -1553,7 +1538,7 @@ object Magus {
         val loLimb = bitIndex ushr 5
         val innerShift = bitIndex and 0x1F
         if (bitIndex == 0)
-            return toRawULong(x)
+            return toRawULong(x, xNormLen)
         if (loLimb >= xNormLen)
             return 0uL
         val lo = x[loLimb].toUInt().toULong()

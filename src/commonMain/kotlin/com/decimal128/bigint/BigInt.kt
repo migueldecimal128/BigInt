@@ -2058,7 +2058,7 @@ class BigInt private constructor(
             isZero() || bitCount == 0 -> this
             bitCount > 0 -> BigInt(
                 this.meta.signFlag,
-                Magus.newShiftLeft(this.magia, bitCount)
+                Magus.newShiftLeft(magia, meta.normLen, bitCount)
             )
 
             else -> throw IllegalArgumentException("bitCount < 0")
