@@ -2066,11 +2066,11 @@ object Magus {
     }
 
     fun setRem(z: Magia,
-               x: Magia, xNormLen: Int, xTmp: Magia,
+               x: Magia, xNormLen: Int, xTmp: Magia?,
                y: Magia, yNormLen: Int, yTmp: Magia?): Int {
         check (isNormalized(x, xNormLen))
         check (isNormalized(y, yNormLen))
-        check (xTmp.size >= xNormLen + 1)
+        check (xTmp == null || xTmp.size >= xNormLen + 1)
         check (yTmp == null || yTmp.size >= yNormLen)
         val m = xNormLen
         val n = yNormLen

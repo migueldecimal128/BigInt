@@ -569,7 +569,10 @@ class BigIntAccumulator private constructor (
     fun setRem(x: BigInt, y: BigIntAccumulator): BigIntAccumulator =
         setRemImpl(x.meta, x.magia, y)
     fun setRem(x: BigIntAccumulator, y: BigInt): BigIntAccumulator =
-        setRemImpl(x, y.meta, y.magia)
+        if (this !== x)
+            setRemImpl(x, y.meta, y.magia)
+        else
+            mutRemImpl(y.meta, y.magia)
     fun setRem(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
         setRemImpl(x, y.meta, y.magia)
 
@@ -587,6 +590,8 @@ class BigIntAccumulator private constructor (
     }
 
     private fun setRemImpl(x: BigIntAccumulator, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
+        // NOTE: Aliasing where this === y is not a problem in this case
+        // because r does not get written until the end
         val xMagia = x.magia
         ensureCapacityDiscard(yMeta.normLen)
         if (trySetRemFastPath(x.meta, xMagia, yMeta, yMagia))
@@ -600,15 +605,27 @@ class BigIntAccumulator private constructor (
     }
 
     private fun setRemImpl(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        if (yMeta.normLen == 0)
-            throw ArithmeticException("div by zero")
+        ensureCapacityDiscard(yMeta.normLen)
+        if (trySetRemFastPath(xMeta, xMagia, yMeta, yMagia))
+            return this
         check (this.magia !== xMagia)
         check (this.magia !== yMagia)
-        ensureCapacityDiscard(yMeta.normLen)
-        val rNormLen = Magus.setRem(magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        ensureTmpCapacityDiscard(xMeta.normLen + 1)
+        val rNormLen = Magus.setRem(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, yMeta.normLen, null)
         meta = Meta(xMeta.signBit, rNormLen)
         return this
     }
+
+    private fun mutRemImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
+        swapTmp1()
+        this.ensureCapacityDiscard(yMeta.normLen)
+        if (trySetRemFastPath(meta, tmp1, yMeta, yMagia))
+            return this
+        meta = Meta(meta.signBit,
+            Magus.setRem(magia, tmp1, meta.normLen, null, yMagia, yMeta.normLen, null))
+        return this
+    }
+
 
     /**
      * Adds the given Int value to this accumulator.
@@ -2143,3 +2160,5 @@ class BigIntAccumulator private constructor (
 private inline fun dw32(n: Int) = n.toUInt().toULong()
 
 fun BigInt.toBigIntAccumulator() = BigIntAccumulator.from(this)
+
+fun String.toBigIntAccumulator() = this.toBigInt().toBigIntAccumulator()
