@@ -536,6 +536,16 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    private fun setDivImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
+        ensureCapacityDiscard(xMeta.normLen - yMeta.normLen + 1)
+        if (trySetDivFastPath(xMeta, x, yMeta, y))
+            return this
+        ensureTmpCapacityDiscard(xMeta.normLen + 1)
+        meta = Meta(xMeta.signBit xor yMeta.signBit,
+            Magus.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, null))
+        return this
+    }
+
     private fun trySetDivFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
         val qSignFlag = xMeta.signFlag xor yMeta.signFlag
         val normLen = Magus.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
@@ -543,16 +553,6 @@ class BigIntAccumulator private constructor (
             return false
         meta = Meta(qSignFlag, normLen)
         return true
-    }
-
-    private fun setDivImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
-        if (trySetDivFastPath(xMeta, x, yMeta, y))
-            return this
-        ensureCapacityDiscard(xMeta.normLen - yMeta.normLen + 1)
-        ensureTmpCapacityDiscard(xMeta.normLen + 1)
-        meta = Meta(xMeta.signBit xor yMeta.signBit,
-            Magus.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, null))
-        return this
     }
 
     fun setRem(x: BigInt, y: BigInt) =
