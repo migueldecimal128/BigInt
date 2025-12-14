@@ -1,0 +1,96 @@
+package com.decimal128.bigint
+
+import kotlin.random.Random
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class TestBigIntAccSetDiv {
+
+    @Test
+    fun setDiv_basic() {
+        val xBi = "16943852051772892430707956759219".toBigInt()
+        val x = xBi.toBigIntAccumulator()
+        val y = 16883797134507450982uL.toBigInt()
+
+        val out = BigIntAccumulator()
+        out.setDiv(x, y)
+
+        assertEquals(xBi / y, out.toBigInt())
+    }
+
+    @Test
+    fun setDiv_alias_out_is_x() {
+        val xBi = "16943852051772892430707956759219".toBigInt()
+        val x = xBi.toBigIntAccumulator()
+        val y = 16883797134507450982uL.toBigInt()
+
+        x.setDiv(x, y)
+
+        assertEquals(xBi / y, x.toBigInt())
+    }
+
+    @Test
+    fun setDiv_alias_out_is_divisor() {
+        val xBi = "123456789012345678901234567890".toBigInt()
+        val x = xBi.toBigIntAccumulator()
+
+        val yBi = "9876543210987654321".toBigInt()
+        val y = yBi.toBigIntAccumulator()
+
+        y.setDiv(x, y)
+
+        assertEquals(xBi / yBi, y.toBigInt())
+        assertEquals(xBi, x.toBigInt())
+    }
+
+    @Test
+    fun setDiv_alias_small_divisor() {
+        val xBi = "987654321098765432109876543210".toBigInt()
+        val x = xBi.toBigIntAccumulator()
+        val y = 97.toBigInt()
+
+        x.setDiv(x, y)
+
+        assertEquals(xBi / y, x.toBigInt())
+    }
+
+    @Test
+    fun setDiv_invariant_reconstruction() {
+        val xBi = "16943852051772892430707956759219".toBigInt()
+        val x = xBi.toBigIntAccumulator()
+        val y = "16883797134507450982".toBigInt()
+
+        val q = BigIntAccumulator()
+        q.setDiv(x, y)
+
+        val r = BigIntAccumulator()
+        r.setRem(x, y)
+
+        assertEquals(xBi, q.toBigInt() * y + r.toBigInt())
+    }
+
+    @Test
+    fun setDiv_random_aliasing() {
+        val rnd = Random(2)
+
+        repeat(1_000) {
+            val a =
+                rnd.nextLong().toBigInt().abs() +
+                        rnd.nextLong().toBigInt().abs().shl(64)
+
+            val b = rnd.nextLong()
+                .let { if (it == 0L) 1L else it }
+                .toBigInt()
+                .abs()
+
+            val x = a.toBigIntAccumulator()
+            val ref = a / b
+
+            // out === x
+            x.setDiv(x, b)
+
+            assertEquals(ref, x.toBigInt())
+        }
+    }
+
+}

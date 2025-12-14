@@ -503,7 +503,10 @@ class BigIntAccumulator private constructor (
         setDivImpl(x.meta, x.magia, y)
 
     fun setDiv(x: BigIntAccumulator, y: BigInt): BigIntAccumulator =
-        setDivImpl(x, y.meta, y.magia)
+        if (this !== x)
+            setDivImpl(x, y.meta, y.magia)
+        else
+            mutDivImpl(y.meta, y.magia)
 
     fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
         setDivImpl(x, y.meta, y.magia)
@@ -533,6 +536,16 @@ class BigIntAccumulator private constructor (
         this.ensureTmpCapacityDiscard(yMagia.size)
         meta = Meta(x.meta.signFlag xor yMeta.signFlag,
             Magus.setDiv(magia, xMagia, x.meta.normLen, x.tmp1, yMagia, yMeta.normLen, this.tmp1))
+        return this
+    }
+
+    private fun mutDivImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
+        swapTmp1()
+        this.ensureCapacityDiscard(meta.normLen - yMeta.normLen + 1)
+        if (trySetDivFastPath(meta, tmp1, yMeta, yMagia))
+            return this
+        meta = Meta(meta.signBit,
+            Magus.setDiv(magia, tmp1, meta.normLen, null, yMagia, yMeta.normLen, null))
         return this
     }
 
