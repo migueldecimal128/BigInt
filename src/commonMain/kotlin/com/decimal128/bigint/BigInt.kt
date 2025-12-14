@@ -855,8 +855,18 @@ class BigInt private constructor(
          * Converts a Little-Endian IntArray to a BigInt with the specified sign.
          */
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray, len: Int): BigInt {
-            val magia = Magus.newNormalizedCopy(littleEndianIntArray, len)
-            return BigInt(sign, magia)
+            if (len >= 0) {
+                var normLen = len
+                while (normLen > 0 && littleEndianIntArray[normLen-1] == 0)
+                    --normLen
+                if (normLen > 0) {
+                    val magia = IntArray(normLen)
+                    littleEndianIntArray.copyInto(magia, 0, 0, normLen)
+                    return BigInt(sign, magia)
+                }
+                return ZERO
+            }
+            throw IllegalArgumentException()
         }
 
         /**

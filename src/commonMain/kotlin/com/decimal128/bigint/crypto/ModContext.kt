@@ -2,6 +2,7 @@ package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntAccumulator
+import com.decimal128.bigint.Magus.isNormalized
 
 class ModContext(val m: BigInt) {
     init {
@@ -87,15 +88,12 @@ class ModContext(val m: BigInt) {
             operator fun invoke(m: BigInt): Barrett {
                 if (m.isNegative() || m <= 1)
                     throw ArithmeticException("Barrett divisor must be >1")
-                val mNormalized = m.normalize()
-                val muLimbs = calcMuLimbs(mNormalized).normalize()
-                return Barrett(mNormalized, muLimbs)
+                val muLimbs = calcMuLimbs(m).normalize()
+                return Barrett(m, muLimbs)
             }
 
             private fun calcMuLimbs(m: BigInt): BigInt {
-                check (m.isNormalized())
-                val mLimbLen = m.meta.normLen
-                val x = BigInt.Companion.withSetBit(2 * mLimbLen * 32)
+                val x = BigInt.withSetBit(2 * m.meta.normLen * 32)
                 val mu = x / m
                 return mu
             }

@@ -281,22 +281,16 @@ object Magus {
         throw IllegalArgumentException("invalid allocation length:$floorLen")
     }
 
-    /**
-     * Returns a normalized copy of of [x] with any leading
-     * zero limbs removed.
-     *
-     * If all limbs are zero, returns [ZERO].
-     */
-    inline fun newNormalizedCopy(x: Magia): Magia = newNormalizedCopy(x, x.size)
-
-    /**
-     * Returns a normalized copy of the first [len] limbs of [x],
-     * with any leading zero limbs removed.
-     *
-     * If all limbs are zero, returns [ZERO].
-     *
-     * @throws IllegalArgumentException if [len] is out of range for [x].
-     */
+     /**
+      * Returns a normalized copy of the first [len] limbs of [x],
+      * with any leading zero limbs removed.
+      *
+      * Note that len is not necessarily normalized.
+      *
+      * If all limbs are zero, returns [ZERO].
+      *
+      * @throws IllegalArgumentException if [len] is out of range for [x].
+      */
     fun newNormalizedCopy(x: Magia, len: Int): Magia {
         val normLen = normLen(x, len)
         if (normLen > 0) {
@@ -1088,7 +1082,7 @@ object Magus {
         if (xBitLen == 0)
             return ZERO
         if (bitCount == 0)
-            return newNormalizedCopy(x)
+            return newNormalizedCopy(x, xNormLen)
         val zBitLen = xBitLen + bitCount
         val zNormLen = normLenFromBitLen(zBitLen)
         val z = Magia(zNormLen)
