@@ -1707,10 +1707,28 @@ object Magus {
     fun trySetDivFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
         when {
             yNormLen == 0 -> throw ArithmeticException("div by zero")
-            xNormLen < yNormLen -> return 0
-            xNormLen <= 2 ->
-                return setULong(zMagia,
-                    toRawULong(xMagia, xNormLen) / toRawULong(yMagia, yNormLen))
+            xNormLen == 0 || xNormLen < yNormLen -> return 0
+            xNormLen == 1 -> {
+                val lX = xMagia[0].toUInt().toLong()
+                val lY = yMagia[0].toUInt().toLong()
+                val q = (lX / lY).toInt()
+                zMagia[0] = q
+                return if (q == 0) 0 else 1
+            }
+            xNormLen <= 2 -> {
+                val dwX = xMagia[0].toUInt().toULong() or
+                        (xMagia[1].toUInt().toULong() shl 32)
+                val dwY = yMagia[0].toUInt().toULong() or
+                        if (yNormLen == 1) 0uL else (yMagia[1].toUInt().toULong() shl 32)
+                val dwQ = dwX / dwY
+                zMagia[0] = dwQ.toInt()
+                zMagia[1] = (dwQ shr 32).toInt()
+                if (dwQ == 0uL)
+                    return 0
+                if ((dwQ shr 32) == 0uL)
+                    return 1
+                return 2
+            }
             yNormLen == 1 -> return setDiv(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
             // note that this will handle aliasing
             // when x === yMeta,yMagia
@@ -2029,58 +2047,6 @@ object Magus {
         val rNormLen = knuthDivide(q, r, u, v, m, n)
         check (rNormLen == normLen(r))
         check (rNormLen <= n)
-        return rNormLen
-    }
-
-    fun trySetRemFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
-        when {
-            yNormLen == 0 -> throw ArithmeticException("div by zero")
-            xNormLen < yNormLen -> {
-                xMagia.copyInto(zMagia, 0, 0, xNormLen)
-                return xNormLen
-            }
-            yNormLen == 2 && xNormLen <= 2 ->
-                return setULong(zMagia, toRawULong(xMagia, xNormLen) % toRawULong(yMagia, yNormLen))
-            yNormLen == 1 -> return setRem(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
-            // note that this will handle aliasing
-            // when x === yMeta,yMagia
-            xNormLen == yNormLen -> {
-                val xBitLen = bitLen(xMagia, xNormLen)
-                val yBitLen = bitLen(yMagia, yNormLen)
-                if (xBitLen < yBitLen) {
-                    xMagia.copyInto(zMagia, 0, 0, xNormLen)
-                    return xNormLen
-                }
-                if (xBitLen == yBitLen) {
-                    val cmp = compare(xMagia, xNormLen, yMagia, yNormLen)
-                    if (cmp < 0) {
-                        xMagia.copyInto(zMagia, 0, 0, xNormLen)
-                        return xNormLen
-                    }
-                    if (cmp == 0)
-                        return 0
-                }
-            }
-        }
-        return -1
-    }
-
-    fun setRem(z: Magia,
-               x: Magia, xNormLen: Int, xTmp: Magia,
-               y: Magia, yNormLen: Int, yTmp: Magia?): Int {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
-        check (xTmp.size >= xNormLen + 1)
-        check (yTmp == null || yTmp.size >= yNormLen)
-        val m = xNormLen
-        val n = yNormLen
-        val u = x
-        val v = y
-        val q = null
-        if (z.size < yNormLen)
-            throw IllegalArgumentException()
-        val r = z
-        val rNormLen = knuthDivide(q, r, u, v, m, n, xTmp, yTmp)
         return rNormLen
     }
 

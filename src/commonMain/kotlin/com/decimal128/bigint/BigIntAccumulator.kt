@@ -521,18 +521,6 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun setRemImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
-        val yMagia = y.magia
-        ensureCapacityDiscard(y.meta.normLen)
-        if (trySetRemFastPath(xMeta, xMagia, y.meta, yMagia))
-            return this
-        check (xMagia !== yMagia)
-        this.ensureTmpCapacityDiscard(max(xMagia.size, xMeta.normLen + 1))
-        y.ensureTmpCapacityDiscard(y.meta.normLen)
-        meta = Meta(xMeta.signBit,
-            Magus.setRem(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, y.meta.normLen, y.tmp1))
-        return this
-    }
     private fun setDivImpl(x: BigIntAccumulator, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
         // save these early so that they won't be lost
         // when we resize the quotient ... in case of aliasing
@@ -548,6 +536,15 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    private fun trySetDivFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
+        val qSignFlag = xMeta.signFlag xor yMeta.signFlag
+        val normLen = Magus.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        if (normLen < 0)
+            return false
+        meta = Meta(qSignFlag, normLen)
+        return true
+    }
+
     private fun setDivImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
         if (trySetDivFastPath(xMeta, x, yMeta, y))
             return this
@@ -557,26 +554,6 @@ class BigIntAccumulator private constructor (
             Magus.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, null))
         return this
     }
-
-    private fun trySetDivFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
-        val qSignFlag = xMeta.signFlag xor yMeta.signFlag
-        val qNormLen = Magus.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
-        if (qNormLen < 0)
-            return false
-        meta = Meta(qSignFlag, qNormLen)
-        return true
-    }
-
-    private fun trySetRemFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
-        val rSignFlag = xMeta.signFlag
-        val rNormLen = Magus.trySetRemFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
-        if (rNormLen < 0)
-            return false
-        meta = Meta(rSignFlag, rNormLen)
-        return true
-    }
-
-
 
     fun setRem(x: BigInt, y: BigInt) =
         setRemImpl(x.meta, x.magia, y.meta, y.magia)
