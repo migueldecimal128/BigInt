@@ -602,6 +602,8 @@ class BigIntAccumulator private constructor (
     private fun setRemImpl(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
         if (yMeta.normLen == 0)
             throw ArithmeticException("div by zero")
+        check (this.magia !== xMagia)
+        check (this.magia !== yMagia)
         swapTmp1()
         ensureCapacityDiscard(yMeta.normLen)
         meta = Meta(xMeta.signBit,
