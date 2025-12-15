@@ -478,12 +478,14 @@ class BigIntAccumulator private constructor (
         setSqrImpl(x.meta, x.magia)
 
     fun setSqr(n: Int): BigIntAccumulator = setSqr(n.absoluteValue.toUInt())
+
     fun setSqr(w: UInt): BigIntAccumulator {
         val abs = w.toULong()
         return set(abs * abs)
     }
 
     fun setSqr(l: Long): BigIntAccumulator = setSqr(l.absoluteValue.toULong())
+
     fun setSqr(dw: ULong): BigIntAccumulator {
         val lo = dw * dw
         val hi = unsignedMulHi(dw, dw)
@@ -512,7 +514,7 @@ class BigIntAccumulator private constructor (
         if (this !== x)
             setDivImpl(x, y.meta, y.magia)
         else
-            mutDivImpl(y.meta, y.magia)
+            mutateDivImpl(y.meta, y.magia)
 
     fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
         setDivImpl(x, y.meta, y.magia)
@@ -545,7 +547,7 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun mutDivImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
+    private fun mutateDivImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
         this.ensureTmpCapacity(meta.normLen - yMeta.normLen + 1)
         swapTmp()
         if (trySetDivFastPath(meta, tmp, yMeta, yMagia))
@@ -592,6 +594,7 @@ class BigIntAccumulator private constructor (
             setRemImpl(x, y.meta, y.magia)
         else
             mutRemImpl(y.meta, y.magia)
+
     fun setRem(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
         setRemImpl(x, y.meta, y.magia)
 
@@ -855,6 +858,28 @@ class BigIntAccumulator private constructor (
     }
 
     operator fun divAssign(n: Int) = mutateDivImpl(n < 0, n.absoluteValue.toUInt())
+
+    operator fun divAssign(w: UInt) = mutateDivImpl(false, w)
+
+    operator fun divAssign(l: Long) = mutateDivImpl(l < 0, l.absoluteValue.toULong())
+
+    operator fun divAssign(dw: ULong) = mutateDivImpl(false, dw)
+
+    operator fun divAssign(bi: BigInt) { mutateDivImpl(bi.meta, bi.magia) }
+
+    operator fun divAssign(acc: BigIntAccumulator) { setDiv(this, acc) }
+
+    operator fun remAssign(n: Int) = mutateRemImpl(n.absoluteValue.toUInt())
+
+    operator fun remAssign(w: UInt) = mutateRemImpl(w)
+
+    operator fun remAssign(l: Long) = mutateRemImpl(l.absoluteValue.toULong())
+
+    operator fun remAssign(dw: ULong) = mutateRemImpl(dw)
+
+    operator fun remAssign(bi: BigInt) { setRem(this, bi) }
+
+    operator fun remAssign(acc: BigIntAccumulator) { setRem(this, acc) }
 
     /**
      * Sets this accumulator to `x << bitCount`. Allocates space for the
@@ -1491,6 +1516,20 @@ class BigIntAccumulator private constructor (
         validate()
         meta = Meta(meta.signFlag xor wSign,
             Mago.setDiv(magia, magia, meta.normLen, dw))
+        validate()
+    }
+
+    private fun mutateRemImpl(w: UInt) {
+        validate()
+        meta = Meta(meta.signFlag,
+            Mago.setRem(magia, magia, meta.normLen, w))
+        validate()
+    }
+
+    private fun mutateRemImpl(dw: ULong) {
+        validate()
+        meta = Meta(meta.signFlag,
+            Mago.setRem(magia, magia, meta.normLen, dw))
         validate()
     }
 

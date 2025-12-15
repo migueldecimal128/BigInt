@@ -1803,7 +1803,7 @@ internal object Mago {
      * Computes `x mod w` for the normalized limb array `x[0‥xNormLen)`, returning
      * the remainder as a `UInt`. Throws `ArithmeticException` if `w == 0u`.
      */
-    fun calcRem(x: Magia, xNormLen: Int, w: UInt): UInt {
+    fun calcRem32(x: Magia, xNormLen: Int, w: UInt): UInt {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
             if (w == 0u)
@@ -1976,7 +1976,7 @@ internal object Mago {
                 if (xNormLen <= 2)
                     (toRawULong(x, xNormLen) % w.toULong()).toUInt()
                 else
-                    calcRem(x, xNormLen, w)
+                    calcRem32(x, xNormLen, w)
             if (rem > 0u)
                 return intArrayOf(rem.toInt())
         }
@@ -1997,7 +1997,7 @@ internal object Mago {
                 if (xNormLen <= 2)
                     (toRawULong(x, xNormLen) % w.toULong()).toUInt()
                 else
-                    calcRem(x, xNormLen, w)
+                    calcRem32(x, xNormLen, w)
             if (rem > 0u) {
                 z[0] = rem.toInt()
                 return 1
@@ -2025,6 +2025,16 @@ internal object Mago {
         if (xNormLen <= 2)
             return newFromULong(toRawULong(x, xNormLen) % dw)
         return newRem(x, xNormLen, intArrayOf(lo.toInt(), hi.toInt()), 2)
+    }
+
+    fun setRem(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
+        check (isNormalized(x, xNormLen))
+        return when {
+            (dw shr 32) == 0uL -> setRem(z, x, xNormLen, dw.toUInt())
+            xNormLen == 0 -> 0
+            xNormLen <= 2 -> setULong(z, toRawULong(x, xNormLen) % dw)
+            else -> setRem(z, x, xNormLen, intArrayOf(dw.toInt(), (dw shr 32).toInt()), 2)
+        }
     }
 
     /**
