@@ -2264,17 +2264,19 @@ internal object Mago {
 
         // -- main loop --
         for (j in m - n downTo 0) {
-
+            val jn = j + n
+            val jn1 = jn -1
+            val jn2 = jn - 2
             // estimate q̂ = (un[j+n]*B + un[j+n-1]) / vn[n-1]
-            val hi = dw32(un[j + n])
-            val lo = dw32(un[j + n - 1])
+            val hi = dw32(un[jn])
+            val lo = dw32(un[jn1])
             //if (hi == 0L && lo < vn_1) // this would short-circuit,
             //    continue               // but probability is astronomically small
             val num = (hi shl 32) or lo
             var qhat = num / vn_1
             var rhat = num % vn_1
 
-            val un_j = dw32(un[j + n - 2])
+            val un_j = dw32(un[jn2])
             // correct estimate
             while ((qhat shr 32) != 0uL ||
                 qhat * vn_2 > (rhat shl 32) + un_j) {
@@ -2295,8 +2297,8 @@ internal object Mago {
                 un[j + i] = t.toInt()
                 carry = prodHi - (t.toLong() shr 32).toULong() // yes, this is a signed shift right
             }
-            val t = dw32(un[j + n]) - carry
-            un[j + n] = t.toInt()
+            val t = dw32(un[jn]) - carry
+            un[jn] = t.toInt()
             if (q != null) {
                 val borrow = t shr 63
                 q[j] = (qhat - borrow).toInt()
@@ -2375,8 +2377,7 @@ internal object Mago {
         vnDw: ULong,
         m: Int
     ) {
-        val n = 2
-        if (m < n || n < 2 || (vnDw shr 63) != 1uL)
+        if (m < 2 || (vnDw shr 63) != 1uL)
             throw IllegalArgumentException()
 
         //val vn_1 = dw32(vn[n - 1])
@@ -2385,11 +2386,12 @@ internal object Mago {
         val vn0 = vnDw and 0xFFFF_FFFFuL
 
         // -- main loop --
-        for (j in m - n downTo 0) {
-
+        for (j in m - 2 downTo 0) {
+            val j1 = j + 1
+            val j2 = j + 2
             // estimate q̂ = (un[j+n]*B + un[j+n-1]) / vn[n-1]
-            val hi = dw32(un[j + n])
-            val lo = dw32(un[j + n - 1])
+            val hi = dw32(un[j2])
+            val lo = dw32(un[j1])
             //if (hi == 0L && lo < vn_1) // this would short-circuit,
             //    continue               // but probability is astronomically small
             val num = (hi shl 32) or lo
@@ -2413,7 +2415,7 @@ internal object Mago {
                 val prod = qhat * vn0
                 val prodHi = prod shr 32
                 val prodLo = prod and 0xFFFF_FFFFuL
-                val un0 = dw32(un[j])
+                val un0 = un_j
                 val t0 = un0 - prodLo - carry
                 un[j] = t0.toInt()
                 carry = prodHi - (t0.toLong() shr 32).toULong()
@@ -2424,14 +2426,14 @@ internal object Mago {
                 val prod = qhat * vn1
                 val prodHi = prod shr 32
                 val prodLo = prod and 0xFFFF_FFFFuL
-                val un1 = dw32(un[j + 1])
+                val un1 = dw32(un[j1])
                 val t1 = un1 - prodLo - carry
-                un[j + 1] = t1.toInt()
+                un[j1] = t1.toInt()
                 carry = prodHi - (t1.toLong() shr 32).toULong()
             }
 
-            val t = dw32(un[j + n]) - carry
-            un[j + n] = t.toInt()
+            val t = dw32(un[j2]) - carry
+            un[j2] = t.toInt()
             if (q != null) {
                 val borrow = t shr 63
                 q[j] = (qhat - borrow).toInt()
@@ -2451,7 +2453,7 @@ internal object Mago {
                     c2 = sum1 shr 32
                 }
 
-                un[j + n] += c2.toInt()
+                un[j2] += c2.toInt()
             }
         }
     }
