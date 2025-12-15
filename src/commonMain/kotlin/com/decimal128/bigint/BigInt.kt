@@ -1858,12 +1858,14 @@ class BigInt private constructor(
         if (this.isZero())
             throw ArithmeticException("div by zero")
         val cmp = this.magnitudeCompareTo(numerator)
+        val qSign = this.meta.signFlag xor signNumerator
         return when {
             cmp > 0 -> ZERO
+            cmp == 0 && qSign -> NEG_ONE
             cmp == 0 -> ONE
             else -> {
-                val quotient = numerator / this.toULongMagnitude()
-                from(this.meta.signFlag xor signNumerator, quotient)
+                val qMag = numerator / this.toULongMagnitude()
+                from(qSign, qMag)
             }
         }
     }
@@ -1885,13 +1887,15 @@ class BigInt private constructor(
     fun remInverse(signNumerator: Boolean, numerator: ULong): BigInt {
         if (this.isZero())
             throw ArithmeticException("div by zero")
-        if (this.magnitudeCompareTo(numerator) > 0)
-            return BigInt(signNumerator, Magus.newFromULong(numerator))
-        val remainder = numerator % this.toULongMagnitude()
-        if (remainder == 0uL)
-            return ZERO
-        else
-            return BigInt(signNumerator, Magus.newFromULong(remainder))
+        val cmp = this.magnitudeCompareTo(numerator)
+        return when {
+            cmp > 0 -> from(signNumerator, numerator)
+            cmp == 0 -> ZERO
+            else -> {
+                val remainder = numerator % this.toULongMagnitude()
+                from(signNumerator, remainder)
+            }
+        }
     }
 
     /**
