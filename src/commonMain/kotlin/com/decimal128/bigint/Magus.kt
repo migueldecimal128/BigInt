@@ -1689,6 +1689,8 @@ object Magus {
      *
      * Returns the normalized limb length of the quotient, or throws
      * `ArithmeticException` if `w == 0u`.
+     *
+     * @return the normalized length
      */
     fun setDiv(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
@@ -1809,7 +1811,7 @@ object Magus {
      *
      * @param x the integer array (least significant limb first) to be divided.
      * @param w the 32-bit unsigned divisor.
-     * @return a new [Magia] containing the quotient of the division.
+     * @return a new non-normalized [Magia] containing the quotient of the division.
      * @throws ArithmeticException if [w] is zero.
      */
     fun newDiv(x: Magia, xNormLen: Int, w: UInt): Magia {
@@ -1825,13 +1827,13 @@ object Magus {
 
     /**
      * Divides the normalized limb array `x` by the 64-bit unsigned divisor `dw`
-     * (which may exceed 32 bits) and returns a new normalized quotient array.
+     * and returns a new non-normalized quotient array.
      *
      * Uses a specialized Knuth division routine for 64-bit divisors.
      * Returns:
      * - [ZERO] if `x < dw`
      * - [ONE]  if `x == dw`
-     * - the normalized quotient otherwise.
+     * - the non-normalized quotient otherwise.
      */
     fun newDiv(x: Magia, xNormLen: Int, dw: ULong): Magia {
         if ((dw shr 32) == 0uL)
@@ -1846,13 +1848,13 @@ object Magus {
         val vnDw = dw
         val q = Magia(m - 2 + 1)
         val r = null
-        knuthDivide64(q, r, u, vnDw, m)
-        return if (normLen(q) > 0) q else ZERO
+        val qNormLen = knuthDivide64(q, r, u, vnDw, m)
+        return if (qNormLen > 0) q else ZERO
     }
 
     /**
      * Divides the normalized limb array `x` by the normalized limb array `y` and
-     * returns a new normalized quotient array.
+     * returns a new non-normalized quotient array.
      *
      * Handles all size relations:
      * - If `y` fits in one limb, delegates to the 32-bit divisor path.
@@ -1860,7 +1862,7 @@ object Magus {
      * - If `x == y`, returns `[1]`.
      * - Otherwise performs full Knuth division on `x` by `y`.
      *
-     * @return the normalized quotient, or [ZERO] if the quotient is zero.
+     * @return the non-normalized quotient, or [ZERO] if the quotient is zero.
      */
     fun newDiv(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
         check (isNormalized(x, xNormLen))
@@ -2275,6 +2277,8 @@ object Magus {
      * @param u dividend limbs (least-significant limb first)
      * @param vDw 64-bit unsigned divisor (high 32 bits must be non-zero)
      * @param m number of significant limbs in `u` (≥ 2)
+     * @return qNormLen if q != null, rNormLen if r != null, else -1
+     *
      * @throws IllegalArgumentException if `m < 2` or the high 32 bits of `vDw` are zero
      * @see knuthDivide
      */
@@ -2284,12 +2288,12 @@ object Magus {
         u: IntArray,
         vDw: ULong,
         m: Int,
-    ) {
+    ): Int {
         if (m < 2 || (vDw shr 32) == 0uL)
             throw IllegalArgumentException()
 
         val v = intArrayOf(vDw.toInt(), (vDw shr 32).toInt())
-        knuthDivide(q, r, u, v, m, 2)
+        return knuthDivide(q, r, u, v, m, 2)
     }
 
     /**

@@ -1803,60 +1803,25 @@ class BigInt private constructor(
         fromNonNormalizedOrZero(this.meta.signFlag,
             Magus.newMul(this.magia, this.meta.normLen, dw))
 
-    operator fun div(other: BigInt): BigInt {
-        if (other.isZero())
-            throw ArithmeticException("div by zero")
-        if (isNotZero()) {
-            val quot = Magus.newDiv(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-            if (quot.isNotEmpty())
-                return BigInt(this.meta.signFlag xor other.meta.signFlag, quot)
-        }
-        return ZERO
-    }
+    operator fun div(other: BigInt): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag xor other.meta.signFlag,
+            Magus.newDiv(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
 
-    operator fun div(n: Int): BigInt {
-        if (n == 0)
-            throw ArithmeticException("div by zero")
-        if (isNotZero()) {
-            val quot = Magus.newDiv(magia, meta.normLen, n.absoluteValue.toUInt())
-            if (quot.isNotEmpty())
-                return BigInt(this.meta.signFlag xor (n < 0), quot)
-        }
-        return ZERO
-    }
+    operator fun div(n: Int): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag xor (n < 0),
+            Magus.newDiv(magia, meta.normLen, n.absoluteValue.toUInt()))
 
-    operator fun div(w: UInt): BigInt {
-        if (w == 0u)
-            throw ArithmeticException("div by zero")
-        if (isNotZero()) {
-            val quot = Magus.newDiv(magia, meta.normLen, w)
-            if (quot.isNotEmpty())
-                return BigInt(this.meta.signFlag, quot)
-        }
-        return ZERO
-    }
+    operator fun div(w: UInt): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag,
+            Magus.newDiv(magia, meta.normLen, w))
 
-    operator fun div(l: Long): BigInt {
-        if (l == 0L)
-            throw ArithmeticException("div by zero")
-        if (isNotZero()) {
-            val quot = Magus.newDiv(magia, meta.normLen, l.absoluteValue.toULong())
-            if (quot.isNotEmpty())
-                return BigInt(this.meta.signFlag xor (l < 0), quot)
-        }
-        return ZERO
-    }
+    operator fun div(l: Long): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag xor (l < 0),
+            Magus.newDiv(magia, meta.normLen, l.absoluteValue.toULong()))
 
-    operator fun div(dw: ULong): BigInt {
-        if (dw == 0uL)
-            throw ArithmeticException("div by zero")
-        if (isNotZero()) {
-            val quot = Magus.newDiv(magia, meta.normLen, dw)
-            if (quot.isNotEmpty())
-                return BigInt(this.meta.signFlag, quot)
-        }
-        return ZERO
-    }
+    operator fun div(dw: ULong): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag,
+            Magus.newDiv(magia, meta.normLen, dw))
 
     operator fun rem(other: BigInt): BigInt {
         val rem = Magus.newRem(magia, meta.normLen, other.magia, other.meta.normLen)
