@@ -2142,14 +2142,16 @@ class BigInt private constructor(
      * @return a new BigInt representing the result
      */
     private fun addImpl(isSub: Boolean, other: BigInt): BigInt {
-        if (other === ZERO)
-            return this
-        if (this === ZERO)
-            return if (isSub) other.negate() else other
         val otherSign = isSub xor other.meta.isNegative
-        if (this.meta.isNegative == otherSign)
-            return BigInt(this.meta.signFlag,
-                Magus.newAdd(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+        when {
+            other.isZero() -> return this
+            this.isZero() && isSub -> return other.negate()
+            this.isZero() -> other
+            this.meta.signFlag == otherSign ->
+                return BigInt(this.meta.signFlag,
+                    Magus.newAdd(this.magia, this.meta.normLen,
+                        other.magia, other.meta.normLen))
+        }
         val cmp = this.magnitudeCompareTo(other)
         val ret = when {
             cmp > 0 -> BigInt(this.meta.signFlag,
@@ -2184,15 +2186,15 @@ class BigInt private constructor(
      * @return a new BigInt representing the result
      */
     fun addImpl(signFlipThis: Boolean, otherSign: Boolean, w: UInt): BigInt {
-        if (w == 0u)
-            return if (signFlipThis) this.negate() else this
-        if (isZero()) {
-            val magia = intArrayOf(w.toInt())
-            return BigInt(otherSign, magia)
-        }
         val thisSign = this.meta.signFlag xor signFlipThis
-        if (thisSign == otherSign)
-            return BigInt(thisSign, Magus.newAdd(this.magia, this.meta.normLen, w.toULong()))
+        when {
+            w == 0u && signFlipThis -> return this.negate()
+            w == 0u -> return this
+            this.isZero() -> return BigInt(otherSign, intArrayOf(w.toInt()))
+            thisSign == otherSign ->
+                return BigInt(thisSign,
+                    Magus.newAdd(this.magia, this.meta.normLen, w.toULong()))
+        }
         val cmp = this.magnitudeCompareTo(w)
         val ret = when {
             cmp > 0 -> BigInt(thisSign, Magus.newSub(this.magia, this.meta.normLen, w.toULong()))
@@ -2225,15 +2227,13 @@ class BigInt private constructor(
      * @return a new BigInt representing the result
      */
     fun addImpl(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
-        if ((dw shr 32) == 0uL)
-            return addImpl(signFlipThis, otherSign, dw.toUInt())
-        if (isZero()) {
-            val magia = intArrayOf(dw.toInt(), (dw shr 32).toInt())
-            return BigInt(otherSign, magia)
-        }
         val thisSign = this.meta.signFlag xor signFlipThis
-        if (thisSign == otherSign)
-            return BigInt(thisSign, Magus.newAdd(this.magia, this.meta.normLen, dw))
+        when {
+            (dw shr 32) == 0uL -> return addImpl(signFlipThis, otherSign, dw.toUInt())
+            this.isZero() -> return BigInt(otherSign, intArrayOf(dw.toInt(), (dw shr 32).toInt()))
+            thisSign == otherSign ->
+                return BigInt(thisSign, Magus.newAdd(this.magia, this.meta.normLen, dw))
+        }
         val cmp = this.magnitudeCompareTo(dw)
         val ret = when {
             cmp > 0 -> BigInt(thisSign, Magus.newSub(this.magia, this.meta.normLen, dw))
