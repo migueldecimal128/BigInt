@@ -1904,10 +1904,8 @@ class BigInt private constructor(
      * @return a non-negative BigInt representing the square, or `ZERO` if this is zero.
      */
     fun sqr(): BigInt {
-        if (this.isNotZero()) {
-            val magiaSqr = Magus.newSqr(this.magia, this.meta.normLen)
-            return BigInt(magiaSqr)
-        }
+        if (this.isNotZero())
+            return fromNonNormalizedNonZero(Magus.newSqr(this.magia, this.meta.normLen))
         return ZERO
     }
 
@@ -1920,6 +1918,13 @@ class BigInt private constructor(
         if (bitIndex >= 0) {
             if (! (testBit(bitIndex) xor isSetOp))
                 return this
+            if (isMagnitudePowerOfTwo() && magnitudeBitLen() - 1 == bitIndex) {
+                // if we were setting a power of 2 then that was just
+                // handled
+                // this is only for clearing
+                check (!isSetOp)
+                return ZERO
+            }
             val newBitLen = max(bitIndex + 1, Magus.bitLen(this.magia, this.meta.normLen))
             val magia = Magus.newCopyWithExactBitLen(this.magia, this.meta.normLen, newBitLen)
             val wordIndex = bitIndex ushr 5
@@ -1930,7 +1935,7 @@ class BigInt private constructor(
                     limb or isolatedBit
                 else
                     limb and isolatedBit.inv()
-            return BigInt(this.meta.signFlag, magia)
+            return fromNonNormalizedNonZero(this.meta.signFlag, magia)
         }
         throw IllegalArgumentException()
     }

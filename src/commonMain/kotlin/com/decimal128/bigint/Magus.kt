@@ -924,14 +924,14 @@ object Magus {
      * If `xNormLen == 0` (canonical zero), this function returns [ZERO].
      *
      * The returned array is freshly allocated, large enough to hold the full
-     * square, and is guaranteed to be in normalized form.
+     * square estimated from bit length.
      *
      * Preconditions:
      * - [x] must be normalized for [xNormLen]
      *
      * @param x the source limb array (least-significant limb first)
      * @param xNormLen number of significant limbs in [x]
-     * @return a normalized limb array representing `x²`
+     * @return a non-normalized limb array representing `x²`
      */
     fun newSqr(x: Magia, xNormLen: Int): Magia {
         check (isNormalized(x, xNormLen))
