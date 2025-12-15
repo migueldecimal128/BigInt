@@ -1089,9 +1089,9 @@ internal object Mago {
      *
      * @throws IllegalArgumentException if [xLen] or [bitCount] is out of range.
      */
-    fun setShiftRight(z: Magia, x: Magia, xLen: Int, bitCount: Int): Int {
-        require(bitCount >= 0 && xLen >= 0 && xLen <= x.size)
-        val xNormLen = normLen(x, xLen)
+    fun setShiftRight(z: Magia, x: Magia, xNormLen: Int, bitCount: Int): Int {
+        require(bitCount >= 0 && xNormLen >= 0 && xNormLen <= x.size)
+        check (isNormalized(x, xNormLen))
         if (xNormLen == 0)
             return 0
         require(x[xNormLen - 1] != 0)
@@ -1108,7 +1108,7 @@ internal object Mago {
                 z[i] = (x[i + wordShift + 1] shl (32-innerShift)) or (x[i + wordShift] ushr innerShift)
             val srcIndex = iLast + wordShift + 1
             z[iLast] = (
-                    if (srcIndex < xLen)
+                    if (srcIndex < xNormLen)
                         (x[iLast + wordShift + 1] shl (32 - innerShift))
                     else
                         0) or
@@ -1715,7 +1715,8 @@ internal object Mago {
             when {
                 w == 0u -> throw ArithmeticException("div by zero")
                 xNormLen == 0 -> return 0
-                w.countOneBits() == 1 -> setShiftRight(z, x, xNormLen, w.countTrailingZeroBits())
+                w.countOneBits() == 1 ->
+                    return setShiftRight(z, x, xNormLen, w.countTrailingZeroBits())
             }
             val dw = w.toULong()
             var carry = 0uL
@@ -1755,7 +1756,7 @@ internal object Mago {
             val u = x
             val m = xNormLen
             val vnDw = dw
-            val q = Magia(m - 2 + 1)
+            val q = z
             val r = null
             knuthDivide64(q, r, u, vnDw, m)
             return normLen(q)

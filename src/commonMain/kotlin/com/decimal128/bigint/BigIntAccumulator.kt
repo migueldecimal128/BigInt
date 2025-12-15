@@ -107,7 +107,7 @@ class BigIntAccumulator private constructor (
         get() = meta.signFlag
 
 
-    private inline fun validate() {
+    private fun validate() {
         check(
             normLen <= magia.size &&
                     magia.size >= 4 &&
@@ -327,7 +327,7 @@ class BigIntAccumulator private constructor (
 
 
     private inline fun ensureTmpCapacity(minLimbLen: Int) {
-        if (tmp.size < minLimbLen)
+        if (tmp.size < minLimbLen + 1 - (-minLimbLen ushr 31))
             tmp = Mago.newWithFloorLen(minLimbLen)
     }
 
@@ -1513,29 +1513,31 @@ class BigIntAccumulator private constructor (
 
     private fun mutateDivImpl(wSign: Boolean, w: UInt) {
         validate()
-        meta = Meta(meta.signFlag xor wSign,
-            Mago.setDiv(magia, magia, meta.normLen, w))
+        val normLen = Mago.setDiv(magia, magia, meta.normLen, w)
+        meta = Meta(meta.signFlag xor wSign, normLen)
         validate()
     }
 
     private fun mutateDivImpl(wSign: Boolean, dw: ULong) {
         validate()
-        meta = Meta(meta.signFlag xor wSign,
-            Mago.setDiv(magia, magia, meta.normLen, dw))
+        ensureTmpCapacity(meta.normLen - 2 + 1)
+        val normLen = Mago.setDiv(tmp, magia, meta.normLen, dw)
+        magia = tmp
+        meta = Meta(meta.signFlag xor wSign, normLen)
         validate()
     }
 
     private fun mutateRemImpl(w: UInt) {
         validate()
-        meta = Meta(meta.signFlag,
-            Mago.setRem(magia, magia, meta.normLen, w))
+        val normLen = Mago.setRem(magia, magia, meta.normLen, w)
+        meta = Meta(meta.signFlag, normLen)
         validate()
     }
 
     private fun mutateRemImpl(dw: ULong) {
         validate()
-        meta = Meta(meta.signFlag,
-            Mago.setRem(magia, magia, meta.normLen, dw))
+        val normLen = Mago.setRem(magia, magia, meta.normLen, dw)
+        meta = Meta(meta.signFlag, normLen)
         validate()
     }
 
