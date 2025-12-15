@@ -2,9 +2,9 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Magus.bitLen
-import com.decimal128.bigint.Magus.isNormalized
-import com.decimal128.bigint.Magus.normLen
+import com.decimal128.bigint.Mago.bitLen
+import com.decimal128.bigint.Mago.isNormalized
+import com.decimal128.bigint.Mago.normLen
 import kotlin.math.absoluteValue
 import kotlin.math.max
 
@@ -31,7 +31,7 @@ internal object Zoro {
      * (exactly one bit set).
      */
     fun isMagnitudePowerOfTwo(meta: Meta, magia: Magia): Boolean =
-        Magus.isPowerOfTwo(magia, meta.normLen)
+        Mago.isPowerOfTwo(magia, meta.normLen)
 
     /**
      * Returns `true` if this value is exactly representable as a 32-bit
@@ -110,7 +110,7 @@ internal object Zoro {
      * Values less than `Int.MIN_VALUE` return `Int.MIN_VALUE`.
      */
     fun toIntClamped(meta: Meta, magia: Magia): Int {
-        val bitLen = Magus.bitLen(magia)
+        val bitLen = Mago.bitLen(magia)
         if (bitLen == 0)
             return 0
         val mag = magia[0]
@@ -146,7 +146,7 @@ internal object Zoro {
      */
     fun toUIntClamped(meta: Meta, magia: Magia): UInt {
         if (meta.isPositive) {
-            val bitLen = Magus.bitLen(magia)
+            val bitLen = Mago.bitLen(magia)
             if (bitLen > 0) {
                 val magnitude = magia[0]
                 return if (bitLen <= 32) magnitude.toUInt() else UInt.MAX_VALUE
@@ -190,7 +190,7 @@ internal object Zoro {
      * Values less than `Long.MIN_VALUE` return `Long.MIN_VALUE`.
      */
     fun toLongClamped(meta: Meta, magia: Magia): Long {
-        val bitLen = Magus.bitLen(magia)
+        val bitLen = Mago.bitLen(magia)
         val magnitude = when (magia.size) {
             0 -> 0L
             1 -> magia[0].toLong() and 0xFFFF_FFFFL
@@ -228,7 +228,7 @@ internal object Zoro {
      */
     fun toULongClamped(meta: Meta, magia: Magia): ULong {
         if (meta.isPositive) {
-            val bitLen = Magus.bitLen(magia)
+            val bitLen = Mago.bitLen(magia)
             val magnitude = when (magia.size) {
                 0 -> 0L
                 1 -> magia[0].toLong() and 0xFFFF_FFFFL
@@ -269,7 +269,7 @@ internal object Zoro {
      */
     fun extractULongAtBitIndex(meta: Meta, magia: Magia, bitIndex: Int): ULong {
         if (bitIndex >= 0)
-            return Magus.extractULongAtBitIndex(magia, meta.normLen, bitIndex)
+            return Mago.extractULongAtBitIndex(magia, meta.normLen, bitIndex)
         throw IllegalArgumentException("invalid bitIndex:$bitIndex")
     }
 
@@ -284,13 +284,13 @@ internal object Zoro {
      * @return bit index of the lowest set bit, or -1 if ZERO
      */
     fun countTrailingZeroBits(meta: Meta, magia: Magia): Int =
-        Magus.ctz(magia, meta.normLen)
+        Mago.ctz(magia, meta.normLen)
 
     /**
      * Returns the number of bits set in the magnitude, ignoring the sign.
      */
     fun magnitudeCountOneBits(meta: Meta, magia: Magia): Int =
-        Magus.bitPopulationCount(magia, meta.normLen)
+        Mago.bitPopulationCount(magia, meta.normLen)
 
     /**
      * Tests whether the magnitude bit at [bitIndex] is set.
@@ -299,7 +299,7 @@ internal object Zoro {
      * @return true if the bit is set, false otherwise
      */
     fun testBit(meta: Meta, magia: Magia, bitIndex: Int): Boolean =
-        Magus.testBit(magia, meta.normLen, bitIndex)
+        Mago.testBit(magia, meta.normLen, bitIndex)
 
 
     /**
@@ -318,7 +318,7 @@ internal object Zoro {
     fun compare(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Int {
         if (xMeta.signMask != yMeta.signMask)
             return xMeta.signMask or 1
-        val cmp = Magus.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        val cmp = Mago.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen)
         return xMeta.negateIfNegative(cmp)
     }
 
@@ -394,7 +394,7 @@ internal object Zoro {
     fun compareHelper(meta: Meta, magia: Magia, dwSign: Boolean, dwMag: ULong): Int {
         if (meta.isNegative != dwSign)
             return meta.signMask or 1
-        val cmp = Magus.compare(magia, meta.normLen, dwMag)
+        val cmp = Mago.compare(magia, meta.normLen, dwMag)
         return if (dwSign) -cmp else cmp
     }
 
@@ -406,14 +406,14 @@ internal object Zoro {
      * @return -1,0,1
      */
     fun magnitudeCompare(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia) =
-        Magus.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        Mago.compare(xMagia, xMeta.normLen, yMagia, yMeta.normLen)
     fun magnitudeCompare(xMeta: Meta, xMagia: Magia, w: UInt) =
-        Magus.compare(xMagia, xMeta.normLen, w.toULong())
+        Mago.compare(xMagia, xMeta.normLen, w.toULong())
     fun magnitudeCompare(xMeta: Meta, xMagia: Magia, dw: ULong) =
-        Magus.compare(xMagia, xMeta.normLen, dw)
+        Mago.compare(xMagia, xMeta.normLen, dw)
     fun magnitudeCompare(xMeta: Meta, xMagia: Magia, littleEndianIntArray: IntArray) =
-        Magus.compare(xMagia, xMeta.normLen,
-            littleEndianIntArray, Magus.normLen(littleEndianIntArray))
+        Mago.compare(xMagia, xMeta.normLen,
+            littleEndianIntArray, Mago.normLen(littleEndianIntArray))
 
     /**
      * Returns the decimal string representation of this BigInt.
@@ -424,7 +424,7 @@ internal object Zoro {
      * @return a decimal string representing the value of this BigInt
      */
     fun toString(meta: Meta, magia: Magia): String =
-        Magus.toString(meta.isNegative, magia, meta.normLen)
+        Mago.toString(meta.isNegative, magia, meta.normLen)
 
     private val HEX_PREFIX_UTF8_0x = byteArrayOf('0'.code.toByte(), 'x'.code.toByte())
     private val HEX_SUFFIX_UTF8_nada = ByteArray(0)
@@ -466,7 +466,7 @@ internal object Zoro {
             utf8[ich] = b
             ++ich
         }
-        Magus.toHexUtf8(magia, meta.normLen, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
+        Mago.toHexUtf8(magia, meta.normLen, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
         ich += nybbleCount
         for (b in suffixUtf8) {
             utf8[ich] = b
@@ -501,7 +501,7 @@ internal object Zoro {
      * @return a new [ByteArray] containing the binary representation
      */
     fun toBinaryByteArray(meta: Meta, magia: Magia, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray =
-        Magus.toBinaryByteArray(meta.isNegative, magia, meta.normLen, isTwosComplement, isBigEndian)
+        Mago.toBinaryByteArray(meta.isNegative, magia, meta.normLen, isTwosComplement, isBigEndian)
 
     /**
      * Writes this [BigInt] into the provided [bytes] array in the requested binary format.
@@ -537,7 +537,7 @@ internal object Zoro {
         isTwosComplement: Boolean, isBigEndian: Boolean,
         bytes: ByteArray, offset: Int = 0, requestedLength: Int = -1
     ): Int =
-        Magus.toBinaryBytes(
+        Mago.toBinaryBytes(
             magia, isTwosComplement && meta.isNegative, isBigEndian,
             bytes, offset, requestedLength
         )
@@ -550,7 +550,7 @@ internal object Zoro {
      *
      * @return a new IntArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianIntArray(meta: Meta, magia: Magia): IntArray = Magus.newNormalizedCopy(magia, meta.normLen)
+    fun magnitudeToLittleEndianIntArray(meta: Meta, magia: Magia): IntArray = Mago.newNormalizedCopy(magia, meta.normLen)
 
     /**
      * Returns a copy of the magnitude as a little-endian LongArray.
@@ -585,7 +585,7 @@ internal object Zoro {
      * Equivalent to the number of bits required to represent the absolute value.
      */
     fun magnitudeBitLen(meta: Meta, magia: Magia): Int =
-        Magus.bitLen(magia, meta.normLen)
+        Mago.bitLen(magia, meta.normLen)
 
     /**
      * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
@@ -599,7 +599,7 @@ internal object Zoro {
      */
     // FIXME - move bitLengthBigIntegerStyle out of Magus and into Zoro
     fun bitLengthBigIntegerStyle(meta: Meta, magia: Magia): Int =
-        Magus.bitLengthBigIntegerStyle(meta.isNegative, magia, meta.normLen)
+        Mago.bitLengthBigIntegerStyle(meta.isNegative, magia, meta.normLen)
 
     /**
      * Returns the number of 32-bit integers required to store the binary magnitude.
@@ -641,7 +641,7 @@ internal object Zoro {
      * representation avoids unnecessary high-order zero limbs.
      */
     fun isNormalized(meta: Meta, magia: Magia): Boolean =
-        Magus.isNormalized(magia, meta.normLen)
+        Mago.isNormalized(magia, meta.normLen)
 
     /**
      * A superNormal value is one where there are no unused limbs in the
@@ -653,7 +653,7 @@ internal object Zoro {
      * that normalization is working correctly.
      */
     fun isSuperNormalized(meta: Meta, magia: Magia): Boolean =
-        meta.normLen == magia.size && Magus.isNormalized(magia, meta.normLen)
+        meta.normLen == magia.size && Mago.isNormalized(magia, meta.normLen)
 
 
     /**

@@ -10,6 +10,7 @@ import kotlin.math.max
 
 
 // magia == MAGnitude IntArray ... it's magic!
+// Mago = MAGnitude Operations
 
 typealias Magia = IntArray
 
@@ -48,6 +49,8 @@ private const val ERROR_SHL_OVERFLOW = "shl overflow ... destination too small"
  * Kotlin unsigned primitives ([UInt], [ULong]) are used for temporary scalar values.
  *
  * `Magia` stands for Magnitude IntArray. [Magia] is a kotlin typealias for [IntArray].
+ * `Mago` stands for Magnitude Operations ... el mago hace magia ...
+ * the magician does magic.
  *
  * ### Design Overview
  * - The bit-length (`bitLen`) is restricted to the non-negative range of an `Int`
@@ -87,7 +90,7 @@ private const val ERROR_SHL_OVERFLOW = "shl overflow ... destination too small"
  *
  * Magus ... ancient Latin word for a Persian magician who works with Magia
   */
-object Magus {
+internal object Mago {
 
     private inline fun bitLen(n: Int) = 32 - n.countLeadingZeroBits()
 
@@ -1475,7 +1478,7 @@ object Magus {
      */
     inline fun newWithSetBit(bitIndex: Int): Magia {
         if (bitIndex >= 0) {
-            val magia = Magus.newWithBitLen(bitIndex + 1)
+            val magia = Mago.newWithBitLen(bitIndex + 1)
             magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
             return magia
         }
@@ -2836,7 +2839,7 @@ object Magus {
     }
 
     /**
-     * Constructs a [Magus] magnitude from a sequence of raw binary bytes.
+     * Constructs a [Mago] magnitude from a sequence of raw binary bytes.
      *
      * The input bytes represent a non-negative magnitude if [isNegative] is `false`,
      * or a two’s-complement negative number if [isNegative] is `true`. In the latter case,

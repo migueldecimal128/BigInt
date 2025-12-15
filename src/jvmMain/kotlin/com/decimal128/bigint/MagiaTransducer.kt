@@ -38,7 +38,7 @@ object MagiaTransducer {
     }
 
     fun compare(magia: IntArray, bi: BigInteger): Int {
-        val magiaBitLen = Magus.bitLen(magia)
+        val magiaBitLen = Mago.bitLen(magia)
         val cmpBitLen = magiaBitLen.compareTo(bi.bitLength())
         if (cmpBitLen != 0)
             return cmpBitLen

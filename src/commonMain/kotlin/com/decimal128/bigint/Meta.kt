@@ -62,7 +62,7 @@ value class Meta internal constructor(val meta: Int) {
         }
 
         operator fun invoke(signFlag: Boolean, x: IntArray, xLen: Int): Meta =
-            Meta(signFlag, Magus.normLen(x, xLen))
+            Meta(signFlag, Mago.normLen(x, xLen))
 
         operator fun invoke(signFlag: Boolean, x: IntArray): Meta {
             var normLen = x.size

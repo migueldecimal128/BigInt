@@ -2,7 +2,6 @@ package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntAccumulator
-import com.decimal128.bigint.Magus.isNormalized
 
 class ModContext(val m: BigInt) {
     init {

@@ -82,7 +82,7 @@ class TestShiftLeft {
         val biBitLen = bi.magnitudeBitLen()
         val limbCount = if (biBitLen == 0) 0 else (biBitLen + shiftLeft + 31) / 32
         val magiaLeft = IntArray(limbCount)
-        val limbCount2 = Magus.setShiftLeft(magiaLeft, magia, magia.size, shiftLeft)
+        val limbCount2 = Mago.setShiftLeft(magiaLeft, magia, magia.size, shiftLeft)
         val bi2Left = BigInt.fromLittleEndianIntArray(bi.isNegative(), magiaLeft)
         assertEquals(limbCount, limbCount2)
         assertTrue(biLeft EQ bi2Left)
