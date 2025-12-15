@@ -2056,12 +2056,13 @@ class BigInt private constructor(
 
     /**
      * Returns this value masked to the `bitWidth` consecutive bits starting at
-     * `bitIndex`. Bits outside the mask range are cleared. The sign of this value
-     * is preserved.
+     * `bitIndex`. Bits outside the mask range are cleared.
+     *
+     * The sign of the returned value is always non-negative.
      *
      * This is equivalent to:
      *
-     *     result = this & ((2^bitWidth - 1) << bitIndex)
+     *     result = abs(this) & ((2**bitWidth - 1) << bitIndex)
      *
      * @throws IllegalArgumentException if `bitWidth` or `bitIndex` is negative.
      */
@@ -2071,13 +2072,9 @@ class BigInt private constructor(
             bitIndex < 0 || bitWidth < 0 ->
                 throw IllegalArgumentException(
                     "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
-            bitWidth == 0 ||
-                    bitIndex >= myBitLen ||
-                    bitWidth == 1 && !testBit(bitIndex) -> return ZERO
-            bitWidth == 1 -> {
-                val magia = Magus.newWithSetBit(bitIndex)
-                return BigInt(meta.signFlag, magia)
-            }
+            bitWidth == 0 || bitIndex >= myBitLen -> return ZERO
+            bitWidth == 1 && !testBit(bitIndex) -> return ZERO
+            bitWidth == 1 -> return BigInt.withSetBit(bitIndex)
         }
         // more than 1 bit wide and some overlap
         val clampedBitLen = min(bitWidth + bitIndex, myBitLen)
@@ -2088,7 +2085,7 @@ class BigInt private constructor(
         ret.fill(0, 0, loIndex)
         val ctz = bitIndex and 0x1F
         ret[loIndex] = ret[loIndex] and (-1 shl ctz)
-        return BigInt(meta.signFlag, ret)
+        return BigInt(ret)
     }
 
     /**

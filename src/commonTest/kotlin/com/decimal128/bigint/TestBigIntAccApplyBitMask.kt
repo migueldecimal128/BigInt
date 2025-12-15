@@ -13,9 +13,7 @@ class TestBigIntAccApplyBitMask {
 
             // --- Generate random BigInt value (positive or negative) ---
             val bitLen = rnd.nextInt(1, 400)
-            val x = BigInt.randomWithBitLen(bitLen).let {
-                if (rnd.nextBoolean()) it.negate() else it
-            }
+            val x = BigInt.randomWithBitLen(bitLen, withRandomSign = true)
 
             // Create accumulator version
             val acc = BigIntAccumulator().set(x)

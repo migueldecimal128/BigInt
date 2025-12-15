@@ -1049,11 +1049,11 @@ class BigIntAccumulator private constructor (
     /**
      * Applies a bit mask of `bitWidth` consecutive 1-bits starting at `bitIndex`
      * to this accumulator, clearing all bits outside that range. The sign is
-     * preserved. Operates in place and returns this.
+     * always cleared to non-negative. Operates in place and returns this.
      *
      * Equivalent to:
      *
-     *     this = sign(this) * (abs(this) & ((2^bitWidth - 1) << bitIndex))
+     *     this = abs(this) & ((2^bitWidth - 1) << bitIndex)
      *
      * @throws IllegalArgumentException if `bitWidth` or `bitIndex` is negative.
      */
@@ -1063,14 +1063,13 @@ class BigIntAccumulator private constructor (
             bitIndex < 0 || bitWidth < 0 ->
                 throw IllegalArgumentException(
                     "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
-            bitWidth == 0 ||
-                    bitIndex >= myBitLen ||
-                    bitWidth == 1 && !testBit(bitIndex) -> return setZero()
+            bitWidth == 0 || bitIndex >= myBitLen -> return setZero()
+            bitWidth == 1 && !testBit(bitIndex) -> return setZero()
             bitWidth == 1 -> {
                 val limbIndex = (bitIndex ushr 5)
                 magia.fill(0, 0, limbIndex)
                 magia[limbIndex] = 1 shl (bitIndex and 0x1F)
-                meta = Meta(meta.signBit, limbIndex + 1)
+                meta = Meta(limbIndex + 1)
                 return this
             }
         }
@@ -1083,7 +1082,7 @@ class BigIntAccumulator private constructor (
         magia.fill(0, 0, loIndex)
         val ctz = bitIndex and 0x1F
         magia[loIndex] = magia[loIndex] and (-1 shl ctz)
-        meta = Meta(meta.signBit, normLen)
+        meta = Meta(normLen)
         return this
     }
 
