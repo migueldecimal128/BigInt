@@ -77,14 +77,6 @@ class BigInt private constructor(
 
         val TEN = BigInt(Meta(4), intArrayOf(10))
 
-        internal operator fun invoke(sign: Sign, magia: Magia): BigInt {
-            if (magia.isEmpty())
-                return ZERO
-            val signBit = sign.bit
-            val meta = Meta(signBit, magia)
-            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
-        }
-
         internal operator fun invoke(sign: Boolean, magia: Magia): BigInt {
             if (magia.isEmpty()) {
                 check(magia === Magus.ZERO)
