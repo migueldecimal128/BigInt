@@ -1680,6 +1680,14 @@ object Magus {
         throw IllegalArgumentException()
     }
 
+    /**
+     * Divides the unsigned integer represented by [x] by the 64-bit unsigned divisor [dw],
+     * storing the quotient in [z].
+     *
+     * Only the normalized limbs `[0, xNormLen)` of [x] are used.
+     *
+     * @return the normalized limb length of the quotient stored in [z].
+     */
     fun setDiv(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
             check (isNormalized(x, xNormLen))
@@ -1702,7 +1710,14 @@ object Magus {
         throw IllegalArgumentException()
     }
 
-
+    /**
+     * Attempts to compute `x / y` using fast paths for small or simple cases.
+     *
+     * On success, writes the quotient to [zMagia] and returns its normalized limb length.
+     * Returns `-1` if no fast path applies and a full division is required.
+     *
+     * @throws ArithmeticException if `y == 0`.
+     */
     fun trySetDivFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
         when {
             yNormLen == 0 -> throw ArithmeticException("div by zero")
@@ -1854,38 +1869,25 @@ object Magus {
      * @throws ArithmeticException if `yNormLen == 0` (division by zero)
      * @throws IllegalArgumentException if `z` is too small to hold the quotient
      */
-    fun setDiv(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
-        when {
-            yNormLen == 0 -> throw ArithmeticException("div by zero")
-            yNormLen == 1 -> return setDiv(z, x, xNormLen, y[0].toUInt())
-            xNormLen < yNormLen -> return 0
-            xNormLen == yNormLen -> {
-                val xMswBitLen = bitLen(x[xNormLen - 1])
-                val yMswBitLen = bitLen(y[yNormLen - 1])
-                if (xMswBitLen < yMswBitLen)
-                    return 0
-                if (xMswBitLen == yMswBitLen) {
-                    if (compare(x, xNormLen, y, yNormLen) < 0)
-                        return 0
-                    z[0] = 1
-                    return 1
-                }
-            }
-        }
-        val m = xNormLen
-        val n = yNormLen
-        val u = x
-        val v = y
-        if (z.size < m - n + 1)
-            throw IllegalArgumentException()
-        val q = z
-        val r = null
-        val qNormLen = knuthDivide(q, r, u, v, m, n)
-        return qNormLen
-    }
+    fun setDiv(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int =
+        setDiv(z, x, xNormLen, null, y, yNormLen, null)
 
+    /**
+     * Divides the normalized integer [x] by [y] using Knuth division.
+     *
+     * @param z destination limb array for the quotient; must have size ≥ `xNormLen - yNormLen + 1`.
+     * @param x source limb array representing the dividend.
+     * @param xNormLen normalized limb length of [x].
+     * @param xTmp optional temporary array of size ≥ `xNormLen + 1`, used for normalization.
+     * @param y source limb array representing the divisor.
+     * @param yNormLen normalized limb length of [y].
+     * @param yTmp optional temporary array of size ≥ `yNormLen`, used for normalization.
+     *
+     * @return the normalized limb length of the quotient written to [z].
+     *
+     * @throws ArithmeticException if `yNormLen == 0`.
+     * @throws IllegalArgumentException if [z], [xTmp], or [yTmp] are too small.
+     */
     fun setDiv(z: Magia,
                x: Magia, xNormLen: Int, xTmp: Magia?,
                y: Magia, yNormLen: Int, yTmp: Magia?): Int {
