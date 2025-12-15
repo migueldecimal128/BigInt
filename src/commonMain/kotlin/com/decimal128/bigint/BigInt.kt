@@ -2134,11 +2134,6 @@ class BigInt private constructor(
         return result
     }
 
-    // FIXME
-    //  who is calling this?
-    fun normalize(): BigInt =
-        if (isNormalized()) this else BigInt(meta.signFlag, Magus.newNormalizedCopy(magia, meta.normLen))
-
     /**
      * Internal helper for addition or subtraction between two BigInts.
      *

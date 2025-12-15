@@ -12,7 +12,7 @@ class Barrett private constructor (val m: BigInt,
     val kLimbs = (kBits + 0x1F) ushr 5
     val shiftKMinus1Bits = (kLimbs - 1) * 32
     val shiftKPlus1Bits  = (kLimbs + 1) * 32
-    val bPowKPlus1 = BigInt.Companion.withSetBit(shiftKPlus1Bits)
+    val bPowKPlus1 = BigInt.withSetBit(shiftKPlus1Bits)
 
     // Initial capacities are sized by bitLen to avoid resizing in modPow hot paths
     val q = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
@@ -24,16 +24,15 @@ class Barrett private constructor (val m: BigInt,
         operator fun invoke(m: BigInt): Barrett {
             if (m.isNegative() || m <= 1)
                 throw ArithmeticException("Barrett divisor must be >1")
-            val mNormalized = m.normalize()
-            val muBits = calcMuBits(mNormalized).normalize()
-            val muLimbs = calcMuLimbs(mNormalized).normalize()
-            return Barrett(mNormalized, muBits, muLimbs)
+            val muBits = calcMuBits(m)
+            val muLimbs = calcMuLimbs(m)
+            return Barrett(m, muBits, muLimbs)
         }
 
         private fun calcMuBits(m: BigInt): BigInt {
             check (m.isNormalized())
             val mBitLen = m.magnitudeBitLen()
-            val x = BigInt.Companion.withSetBit(2 * mBitLen)
+            val x = BigInt.withSetBit(2 * mBitLen)
             val mu = x / m
             return mu
         }
@@ -41,7 +40,7 @@ class Barrett private constructor (val m: BigInt,
         private fun calcMuLimbs(m: BigInt): BigInt {
             check (m.isNormalized())
             val mLimbLen = m.meta.normLen
-            val x = BigInt.Companion.withSetBit(2 * mLimbLen * 32)
+            val x = BigInt.withSetBit(2 * mLimbLen * 32)
             val mu = x / m
             return mu
         }

@@ -88,7 +88,7 @@ class ModContext(val m: BigInt) {
             operator fun invoke(m: BigInt): Barrett {
                 if (m.isNegative() || m <= 1)
                     throw ArithmeticException("Barrett divisor must be >1")
-                val muLimbs = calcMuLimbs(m).normalize()
+                val muLimbs = calcMuLimbs(m)
                 return Barrett(m, muLimbs)
             }
 
