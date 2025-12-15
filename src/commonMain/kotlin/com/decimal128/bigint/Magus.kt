@@ -393,14 +393,17 @@ object Magus {
     }
 
     /**
-     * Adds the 32-bit unsigned value `w` to the limb array `x` in place and returns
-     * the resulting array.
+     * Increments normalized limb array [x] in place and
+     * returns the resulting normalized [Magia].
      *
      * If the addition overflows all limbs a new array with one
      * extra limb is returned.
+     *
+     * @return the normalized input [x] or a new normalized [Magia]
      */
-    fun newOrMutateAdd(x: Magia, w: UInt): Magia {
-        var carry = w.toULong()
+    fun newOrMutateIncrement(x: Magia): Magia {
+        check (isNormalized(x, x.size))
+        var carry = 1uL
         var i = 0
         while (carry != 0uL && i < x.size) {
             val t = dw32(x[i]) + carry

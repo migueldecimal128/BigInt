@@ -2008,8 +2008,8 @@ class BigInt private constructor(
                 var magia = Magus.newShiftRight(this.magia, this.meta.normLen, bitCount)
                 check (Magus.normLen(magia) > 0)
                 if (willNeedIncrement)
-                    magia = Magus.newOrMutateAdd(magia, 1u)
-                return BigInt(meta.signFlag, magia)
+                    magia = Magus.newOrMutateIncrement(magia)
+                return fromNormalizedNonZero(meta.signFlag, magia)
             }
 
             bitCount == 0 -> this
@@ -2026,11 +2026,9 @@ class BigInt private constructor(
     infix fun shl(bitCount: Int): BigInt {
         return when {
             isZero() || bitCount == 0 -> this
-            bitCount > 0 -> BigInt(
-                this.meta.signFlag,
-                Magus.newShiftLeft(magia, meta.normLen, bitCount)
-            )
-
+            bitCount > 0 ->
+                fromNormalizedNonZero(this.meta.signFlag,
+                    Magus.newShiftLeft(magia, meta.normLen, bitCount))
             else -> throw IllegalArgumentException("bitCount < 0")
         }
     }
@@ -2066,7 +2064,7 @@ class BigInt private constructor(
         ret.fill(0, 0, loIndex)
         val ctz = bitIndex and 0x1F
         ret[loIndex] = ret[loIndex] and (-1 shl ctz)
-        return BigInt(ret)
+        return fromNonNormalizedOrZero(ret)
     }
 
     /**
