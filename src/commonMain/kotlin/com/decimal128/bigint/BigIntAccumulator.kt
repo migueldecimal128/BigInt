@@ -517,7 +517,10 @@ class BigIntAccumulator private constructor (
             mutateDivImpl(y.meta, y.magia)
 
     fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
-        setDivImpl(x, y.meta, y.magia)
+        if (this !== x)
+            setDivImpl(x, y.meta, y.magia)
+        else
+            setDivImpl(x.meta, x.magia, y)
 
     private fun setDivImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
         val yMagia = y.magia
@@ -596,7 +599,10 @@ class BigIntAccumulator private constructor (
             mutRemImpl(y.meta, y.magia)
 
     fun setRem(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
-        setRemImpl(x, y.meta, y.magia)
+        if (this !== x)
+            setRemImpl(x, y.meta, y.magia)
+        else
+            setRemImpl(x.meta, x.magia, y)
 
     private fun setRemImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
         val yMagia = y.magia

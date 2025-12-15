@@ -20,13 +20,26 @@ class TestBigIntAccSetDiv {
 
     @Test
     fun setDiv_alias_out_is_x() {
-        val xBi = "16943852051772892430707956759219".toBigInt()
-        val x = xBi.toBigIntAccumulator()
-        val y = 16883797134507450982uL.toBigInt()
+        val biX = "16943852051772892430707956759219".toBigInt()
+        val x = BigIntAccumulator()
+        val biY = 16883797134507450982uL.toBigInt()
+        val y = biY.toBigIntAccumulator()
 
+        x.set(biX)
+        x.setDiv(x, biY)
+        assertEquals(biX / biY, x.toBigInt())
+
+        x.set(biX)
+        x /= biY
+        assertEquals(biX / biY, x.toBigInt())
+
+        x.set(biX)
         x.setDiv(x, y)
+        assertEquals(biX/ biY, x.toBigInt())
 
-        assertEquals(xBi / y, x.toBigInt())
+        x.set(biX)
+        x /= y
+        assertEquals(biX/ biY, x.toBigInt())
     }
 
     @Test
