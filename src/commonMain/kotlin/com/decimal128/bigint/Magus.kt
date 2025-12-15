@@ -794,7 +794,7 @@ object Magus {
      * - [xLen] and [yLen] must be greater than zero and within the array bounds.
      * - For efficiency, if one array is longer, it is preferable to use it as [y].
      *
-     * @return the number of limbs actually used in [z].
+     * @return the normalized number of limbs actually used in [z].
      * @throws IllegalArgumentException if preconditions on array sizes or lengths are violated.
      */
     fun setMul(z: Magia, x: Magia, xLen: Int, y: Magia, yLen: Int): Int {

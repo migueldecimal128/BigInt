@@ -896,7 +896,7 @@ class BigInt private constructor(
             if (bitIndex == 0)
                 return ONE
             val magia = Magus.newWithSetBit(bitIndex)
-            return BigInt(magia)
+            return fromNormalizedNonZero(magia)
         }
 
         /**
@@ -931,9 +931,25 @@ class BigInt private constructor(
             magia[magia.lastIndex] = -1 ushr nlz
             val ctz = bitIndex and 0x1F
             magia[loIndex] = magia[loIndex] and (-1 shl ctz)
-            return BigInt(magia)
+            return fromNormalizedNonZero(magia)
         }
 
+        /**
+         * Constructs a `BigInt` equal to `(dw << shiftLeftCount)` with the given sign.
+         *
+         * The 64-bit unsigned value [dw] is shifted left by [shiftLeftCount] bits to form the
+         * magnitude. The result is created without intermediate normalization; the generated
+         * limb array is canonical for all non-zero values. If [dw] is zero, [ZERO] is returned
+         * regardless of [shiftLeftCount] or [sign].
+         *
+         * @param dw the unsigned 64-bit value to shift.
+         * @param shiftLeftCount number of bits to shift left; must be non-negative.
+         * @param sign whether the resulting value is negative.
+         *
+         * @return a `BigInt` representing `(dw << shiftLeftCount)` with the specified sign.
+         *
+         * @throws IllegalArgumentException if [shiftLeftCount] is negative.
+         */
         fun fromULongShiftLeft(dw: ULong, shiftLeftCount: Int, sign: Boolean = false): BigInt {
             if (shiftLeftCount >= 0) {
                 val dwBitLen = 64 - dw.countLeadingZeroBits()
@@ -973,7 +989,7 @@ class BigInt private constructor(
                                 else -> magia[magia.size - 1] = lo
                             }
                         }
-                        BigInt(sign, magia)
+                        fromNormalizedNonZero(sign, magia)
                     }
                 }
             }
@@ -1721,7 +1737,7 @@ class BigInt private constructor(
      *
      *@see absoluteValue
      */
-    fun abs() = if (meta.isNegative) BigInt(magia) else this
+    fun abs() = if (isNegative()) BigInt(meta.abs(), magia) else this
 
     /**
      * Kotlin-style property for the absolute value of this BigInt.
@@ -1735,7 +1751,7 @@ class BigInt private constructor(
      *
      * Zero always returns the singleton `BigInt.ZERO`.
      */
-    fun negate() = if (isNotZero()) BigInt(meta.negate(), magia) else ZERO
+    fun negate() = if (isZero()) ZERO else BigInt(meta.negate(), magia)
 
     /**
      * Standard plus/minus/times/div/rem operators for BigInt.
