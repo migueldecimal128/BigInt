@@ -1832,15 +1832,16 @@ object Magus {
         check (isNormalized(x, xNormLen))
         check (isNormalized(y, yNormLen))
         when {
-            yNormLen < 2 -> return newDiv(x, xNormLen, y[0].toUInt())
-            xNormLen < yNormLen -> return ZERO
-            xNormLen == yNormLen -> {
-                val xMswBitLen = bitLen(x[xNormLen-1])
-                val yMswBitLen = bitLen(y[yNormLen-1])
-                if (xMswBitLen < yMswBitLen)
+            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 1 -> return newDiv(x, xNormLen, y[0].toUInt())
+            xNormLen <= yNormLen -> {
+                val xBitLen = bitLen(x, xNormLen)
+                val yBitLen = bitLen(y, yNormLen)
+                if (xBitLen < yBitLen)
                     return ZERO
-                if (xMswBitLen == yMswBitLen) {
-                    if (compare(x, xNormLen, y, yNormLen) < 0) ZERO else intArrayOf(1)
+                if (xBitLen == yBitLen) {
+                    val cmp = compare(x, xNormLen, y, yNormLen)
+                    return if (cmp < 0) ZERO else ONE
                 }
             }
         }
@@ -1977,15 +1978,29 @@ object Magus {
      * and trims the result. Returns [ZERO] if the remainder is zero.
      */
     fun newRem(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
+        check(isNormalized(x, xNormLen))
         check(isNormalized(y, yNormLen))
-        if (yNormLen <= 1) {
-            if (yNormLen == 0)
-                throw ArithmeticException("div by zero")
-            return newRem(x, xNormLen, y[0].toUInt())
+        when {
+            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 1 -> return newRem(x, xNormLen, y[0].toUInt())
+            xNormLen <= yNormLen -> {
+                val xBitLen = bitLen(x, xNormLen)
+                val yBitLen = bitLen(y, yNormLen)
+                if (xBitLen < yBitLen)
+                    return x.copyOf(xNormLen)
+                if (xBitLen == yBitLen) {
+                    val cmp = compare(x, xNormLen, y, yNormLen)
+                    if (cmp < 0)
+                        return x.copyOf(xNormLen)
+                    if (cmp == 0)
+                        return ZERO
+                    return newSub(x, xNormLen, y, yNormLen)
+                }
+            }
         }
         val z = Magia(yNormLen)
         val zNormLen = setRem(z, x, xNormLen, y, yNormLen)
-        return if (zNormLen == 0) ZERO else z.copyOf(zNormLen)
+        return if (zNormLen == 0) ZERO else z
     }
 
     /**
