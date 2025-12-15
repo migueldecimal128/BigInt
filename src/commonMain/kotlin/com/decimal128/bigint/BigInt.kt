@@ -854,7 +854,7 @@ class BigInt private constructor(
             if (length > 0) {
                 val ibSign = offset - 1 + (if (isBigEndian) 1 else length)
                 val isNegative = isTwosComplement && bytes[ibSign] < 0
-                val magia = Mago.fromBinaryBytes(
+                val magia = Zoro.fromBinaryBytes(
                     isNegative, isBigEndian, bytes, offset,
                     length
                 )

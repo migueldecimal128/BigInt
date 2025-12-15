@@ -503,44 +503,34 @@ internal object Zoro {
     }
 
     /**
-     * Converts this [BigInt] to a **big-endian two's-complement** byte array.
+     * Converts the value described by [meta] and [magia] to a big-endian two’s-complement
+     * byte array.
      *
-     * - Negative values use standard two's-complement representation.
-     * - The returned array has the minimal length needed to represent the value,
-     *   **but always at least 1 byte**.
-     * - For other binary formats, see [toBinaryByteArray] or [toBinaryBytes].
+     * The result uses the minimal number of bytes required to represent the value,
+     * but is always at least one byte long. Negative values are encoded using standard
+     * two’s-complement form.
      *
-     * @return a new [ByteArray] containing the two's-complement representation
+     * @param meta metadata providing the sign and normalized limb length.
+     * @param magia magnitude limb array in little-endian order.
+     * @return a big-endian two’s-complement byte array.
      */
     fun toTwosComplementBigEndianByteArray(meta: Meta, magia: Magia): ByteArray =
         toBinaryByteArray(meta, magia, isTwosComplement = true, isBigEndian = true)
 
-
     /**
-     * Converts this [BigInt] to a [ByteArray] in the requested binary format.
+     * Converts the value described by [meta] and [magia] to a binary [ByteArray].
      *
-     * - The format is determined by [isTwosComplement] and [isBigEndian].
-     * - Negative values are represented in two's-complement form if [isTwosComplement] is true.
-     * - The returned array has the minimal length needed, **but always at least 1 byte**.
+     * The output format is controlled by [isTwosComplement] and [isBigEndian]. The returned
+     * array uses the minimal number of bytes required to represent the value, but is always
+     * at least one byte long.
      *
-     * @param isTwosComplement whether to use two's-complement representation for negative numbers
-     * @param isBigEndian whether the bytes are written in big-endian or little-endian order
-     * @return a new [ByteArray] containing the binary representation
-     */
-    /**
-     * Converts an arbitrary-precision integer into a binary representation as a [ByteArray].
+     * @param meta metadata providing the sign and normalized limb length.
+     * @param magia magnitude limb array in little-endian order.
+     * @param isTwosComplement whether to encode negative values using two’s-complement form.
+     * @param isBigEndian whether the output byte order is big-endian (`true`) or little-endian (`false`).
+     * @return a [ByteArray] containing the binary representation of the value.
      *
-     * The integer is represented by an array of 32-bit limbs, optionally in two's-complement form.
-     *
-     * @param sign `true` if the number is negative, `false` otherwise.
-     * @param x the array of 32-bit limbs representing the integer, least-significant limb first.
-     * @param xNormLen the number of significant limbs to consider; must be normalized (trailing zeros ignored).
-     * @param isTwosComplement if `true`, the number is converted to two's-complement form.
-     *                        Otherwise, magnitude-only representation is used.
-     * @param isBigEndian if `true`, the most significant byte is first in the output array;
-     *                    if `false`, least significant byte is first.
-     * @return a [ByteArray] containing the binary representation of the integer.
-     * @throws IllegalArgumentException if [xNormLen] is out of bounds (negative or greater than x.size).
+     * @throws IllegalArgumentException if the magnitude is not normalized.
      */
     fun toBinaryByteArray(meta: Meta, magia: Magia, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
         check (isNormalized(magia, meta.normLen))
@@ -556,35 +546,27 @@ internal object Zoro {
             throw IllegalArgumentException()
         }
     }
+
     /**
-     * Writes this [BigInt] into the provided [bytes] array in the requested binary format.
+     * Writes the value described by [meta] and [magia] into [bytes] using the requested
+     * binary format, without allocating.
      *
-     * - No heap allocation takes place.
-     * - If [isTwosComplement] is true, values use two's-complement representation
-     *   with the most significant bit indicating the sign.
-     * - If [isTwosComplement] is false, the unsigned magnitude is written,
-     *   possibly with the most significant bit set.
-     * - Bytes are written in big-endian order if [isBigEndian] is true,
-     *   otherwise little-endian order.
-     * - If [requestedLength] is 0, the minimal number of bytes needed is calculated
-     *   and written, **but always at least 1 byte**.
-     * - If [requestedLength] > 0, exactly that many bytes will be written:
-     *   - If the requested length is greater than the minimum required, the sign will
-     *     be extended into the extra bytes.
-     *   - If the requested length is insufficient… you will have a bad day.
-     * - In all cases, the actual number of bytes written is returned.
-     * - May throw [IndexOutOfBoundsException] if the supplied [bytes] array is too small.
+     * The encoding is controlled by [isTwosComplement] and [isBigEndian]. If
+     * [requestedLen] ≤ 0, the minimal number of bytes required is written (always at
+     * least one). If [requestedLen] > 0, exactly that many bytes are written, with
+     * sign-extension applied if needed.
      *
-     * For a standard **two's-complement big-endian** version, see [toTwosComplementBigEndianByteArray].
-     * For a version that allocates a new array automatically, see [toBinaryByteArray].
+     * @param meta metadata providing the sign and normalized limb length.
+     * @param magia magnitude limb array in little-endian order.
+     * @param isTwosComplement whether to encode negative values using two’s-complement form.
+     * @param isBigEndian whether bytes are written in big-endian (`true`) or little-endian (`false`) order.
+     * @param bytes destination array to write into.
+     * @param offset start index in [bytes].
+     * @param requestedLen number of bytes to write, or ≤ 0 to write the minimal length.
+     * @return the number of bytes written.
      *
-     * @param isTwosComplement whether to use two's-complement representation for negative numbers
-     * @param isBigEndian whether bytes are written in big-endian (true) or little-endian (false) order
-     * @param bytes the target array to write into
-     * @param offset the start index in [bytes] to begin writing
-     * @param requestedLength number of bytes to write (<= 0 means minimal required, but always at least 1)
-     * @return the number of bytes actually written
-     * @throws IndexOutOfBoundsException if [bytes] is too small
+     * @throws IndexOutOfBoundsException if [bytes] is too small.
+     * @throws IllegalStateException if [meta] normLen does not fit size of [magia]
      */
     fun toBinaryBytes(meta: Meta, magia: Magia,
         isTwosComplement: Boolean, isBigEndian: Boolean,
@@ -653,10 +635,94 @@ internal object Zoro {
             check (iw == meta.normLen)
             check(ib - step1LoToHi == ibMsb)
             return actualLen
-        } else {
-            throw IllegalArgumentException()
         }
+        throw IllegalStateException()
     }
+
+    /**
+     * Constructs a [Mago] magnitude from a sequence of raw binary bytes.
+     *
+     * The input bytes represent a non-negative magnitude if [isNegative] is `false`,
+     * or a two’s-complement negative number if [isNegative] is `true`. In the latter case,
+     * the bytes are complemented and incremented during decoding to produce the corresponding
+     * positive magnitude. The sign itself is handled by the caller.
+     *
+     * The bytes may be in either big-endian or little-endian order, as indicated by [isBigEndian].
+     *
+     * The return value will be canonical ZERO or a normalized Magia
+     *
+     * @param isNegative  `true` if bytes encode a negative value in two’s-complement form.
+     * @param isBigEndian `true` if bytes are in big-endian order, `false` for little-endian.
+     * @param bytes       Source byte array.
+     * @param off         Starting offset in [bytes].
+     * @param len         Number of bytes to read.
+     * @return a normalized [Magia] or ZERO
+     * @throws IllegalArgumentException if the range `[off, off + len)` is invalid.
+     */
+    internal fun fromBinaryBytes(isNegative: Boolean, isBigEndian: Boolean,
+                                 bytes: ByteArray, off: Int, len: Int): Magia {
+        if (off < 0 || len < 0 || len > bytes.size - off)
+            throw IllegalArgumentException()
+        if (len == 0)
+            return Mago.ZERO
+
+        // calculate offsets and stepping direction for BE BigEndian vs LE LittleEndian
+        val offB1 = if (isBigEndian) -1 else 1 // BE == -1, LE ==  1
+        val offB2 = offB1 shl 1                // BE == -2, LE ==  2
+        val offB3 = offB1 + offB2              // BE == -3, LE ==  3
+        val step1HiToLo = - offB1              // BE ==  1, LE == -1
+        val step4LoToHi = offB1 shl 2          // BE == -4, LE ==  4
+
+        val ibLast = off + len - 1
+        val ibLsb = if (isBigEndian) ibLast else off // index Least significant byte
+        var ibMsb = if (isBigEndian) off else ibLast // index Most significant byte
+
+        val negativeMask = if (isNegative) -1 else 0
+
+        // Leading sign-extension bytes (0x00 for non-negative, 0xFF for negative) are flushed
+        // If all bytes are flush bytes, the result is [ZERO] or [ONE], depending on [isNegative].
+        val leadingFlushByte = negativeMask
+        var remaining = len
+        while (bytes[ibMsb].toInt() == leadingFlushByte) {
+            ibMsb += step1HiToLo
+            --remaining
+            if (remaining == 0)
+                return if (isNegative) Mago.ONE else Mago.ZERO
+        }
+
+        val magia = Magia((remaining + 3) ushr 2)
+
+        var ib = ibLsb
+        var iw = 0
+
+        var carry = -negativeMask.toLong() // if (isNegative) then carry = 1 else 0
+
+        while (remaining >= 4) {
+            val b3 = bytes[ib + offB3].toInt() and 0xFF
+            val b2 = bytes[ib + offB2].toInt() and 0xFF
+            val b1 = bytes[ib + offB1].toInt() and 0xFF
+            val b0 = bytes[ib        ].toInt() and 0xFF
+            val w = (b3 shl 24) or (b2 shl 16) or (b1 shl 8) or b0
+            carry += (w xor negativeMask).toLong() and 0xFFFF_FFFFL
+            magia[iw++] = carry.toInt()
+            carry = carry shr 32
+            check ((carry shr 1) == 0L)
+            ib += step4LoToHi
+            remaining -= 4
+        }
+        if (remaining > 0) {
+            val b3 = negativeMask and 0xFF
+            val b2 = (if (remaining == 3) bytes[ib + offB2].toInt() else negativeMask) and 0xFF
+            val b1 = (if (remaining >= 2) bytes[ib + offB1].toInt() else negativeMask) and 0xFF
+            val b0 = bytes[ib].toInt() and 0xFF
+            val w = (b3 shl 24) or (b2 shl 16) or (b1 shl 8) or b0
+            magia[iw++] = (w xor negativeMask) + carry.toInt()
+        }
+        check(iw == magia.size)
+        return magia
+    }
+
+
 
 
     /**
