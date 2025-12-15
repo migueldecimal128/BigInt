@@ -1982,6 +1982,7 @@ object Magus {
         check(isNormalized(y, yNormLen))
         when {
             yNormLen == 0 -> throw ArithmeticException("div by zero")
+            xNormLen == 0 -> return ZERO
             yNormLen == 1 -> return newRem(x, xNormLen, y[0].toUInt())
             xNormLen <= yNormLen -> {
                 val xBitLen = bitLen(x, xNormLen)

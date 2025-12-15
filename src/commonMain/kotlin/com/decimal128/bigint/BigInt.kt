@@ -91,8 +91,11 @@ class BigInt private constructor(
                 return ZERO
             }
             val signBit = if (sign) 1 else 0
-            val meta = Meta(signBit, magia)
-            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
+            val normLen = Magus.normLen(magia)
+            if (normLen == 0)
+                return ZERO
+            val meta = Meta(signBit, normLen)
+            return BigInt(meta, magia)
         }
 
         internal operator fun invoke(magia: Magia): BigInt {
@@ -149,15 +152,6 @@ class BigInt private constructor(
         }
 
         /**
-         * Converts a 32-bit *unsigned* value, stored in a signed [Int] primitive,
-         * into a non-negative [BigInt].
-         *
-         * @param n the unsigned 32-bit value (stored in an [Int]) to convert.
-         * @return a non-negative [BigInt] equivalent to `n.toUInt()`.
-         */
-        fun fromUnsigned(n: Int) = from(n.toUInt())
-
-        /**
          * Converts a 32-bit unsigned [UInt] into a non-negative [BigInt].
          *
          * The resulting value always has `sign == false`.
@@ -179,15 +173,6 @@ class BigInt private constructor(
          * @return the corresponding [BigInt] representation.
          */
         fun from(l: Long) = from (l < 0, (l.absoluteValue).toULong())
-
-        /**
-         * Converts a 64-bit *unsigned* value, stored in a signed [Long] primitive,
-         * into a non-negative [BigInt].
-         *
-         * @param l the unsigned 64-bit value (stored in a [Long]) to convert.
-         * @return a non-negative [BigInt] equivalent to `l.toULong()`.
-         */
-        fun fromUnsigned(l: Long) = from(false, l.toULong())
 
         /**
          * Converts a 64-bit unsigned [ULong] into a non-negative [BigInt].
@@ -1845,14 +1830,9 @@ class BigInt private constructor(
     }
 
     operator fun rem(other: BigInt): BigInt {
-        if (other.isZero())
-            throw ArithmeticException("div by zero")
-        if (isNotZero()) {
-            val rem = Magus.newRem(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-            if (rem.isNotEmpty())
-                return BigInt(this.meta.signFlag, rem)
-        }
-        return ZERO
+        val rem = Magus.newRem(magia, meta.normLen, other.magia, other.meta.normLen)
+        val bi = BigInt(meta.signFlag, rem)
+        return bi
     }
 
     // note that in java/kotlin, the sign of remainder only depends upon
