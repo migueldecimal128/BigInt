@@ -127,6 +127,50 @@ class BigInt private constructor(
         internal operator fun invoke(sign: Boolean, biMagnitude: BigInt): BigInt =
             fromLittleEndianIntArray(sign, biMagnitude.magia, biMagnitude.meta.normLen)
 
+        internal fun fromNormalizedNonZero(magia: Magia): BigInt =
+            fromNormalizedNonZero(false, magia)
+
+        internal fun fromNormalizedNonZero(sign: Boolean, magia: Magia): BigInt {
+            check (magia.isNotEmpty())
+            check (magia[magia.lastIndex] != 0)
+            return BigInt(Meta(sign, magia.size), magia)
+        }
+
+        internal fun fromNormalizedOrZero(magia: Magia): BigInt =
+            fromNormalizedOrZero(false, magia)
+
+        internal fun fromNormalizedOrZero(sign: Boolean, magia: Magia): BigInt {
+            if (magia.isEmpty()) {
+                check (magia === Magus.ZERO)
+                return ZERO
+            }
+            check (magia.isNotEmpty())
+            check (magia[magia.lastIndex] != 0)
+            return BigInt(Meta(sign, magia.size), magia)
+        }
+
+        internal fun fromNonNormalizedNonZero(magia: Magia): BigInt =
+            fromNonNormalizedNonZero(false, magia)
+
+        internal fun fromNonNormalizedNonZero(sign: Boolean, magia: Magia): BigInt {
+            val normLen = Magus.normLen(magia)
+            // FIXME - inject poison here
+            check (normLen > 0)
+            return BigInt(Meta(sign, normLen), magia)
+        }
+
+        internal fun fromNonNormalizedOrZero(magia: Magia): BigInt =
+            fromNonNormalizedOrZero(false, magia)
+
+        internal fun fromNonNormalizedOrZero(sign: Boolean, magia: Magia): BigInt {
+            val normLen = Magus.normLen(magia)
+            // FIXME - inject poison here
+            if (normLen > 0)
+                return BigInt(Meta(sign, normLen), magia)
+            return ZERO
+        }
+
+
         /**
          * Converts a 32-bit signed [Int] into a signed [BigInt].
          *
@@ -138,8 +182,8 @@ class BigInt private constructor(
          * @return the corresponding [BigInt] representation.
          */
         fun from(n: Int): BigInt = when {
-            n > 0 -> BigInt(intArrayOf(n))
-            n < 0 -> BigInt(sign=true, intArrayOf(-n))
+            n > 0 -> fromNormalizedNonZero(intArrayOf(n))
+            n < 0 -> fromNormalizedNonZero(sign=true, intArrayOf(-n))
             else -> ZERO
         }
 
@@ -152,7 +196,7 @@ class BigInt private constructor(
          * @param w the unsigned integer to convert.
          * @return the corresponding non-negative [BigInt].
          */
-        fun from(w: UInt) = if (w != 0u) BigInt(intArrayOf(w.toInt())) else ZERO
+        fun from(w: UInt) = if (w != 0u) fromNormalizedNonZero(intArrayOf(w.toInt())) else ZERO
 
         /**
          * Converts a 64-bit signed [Long] into a signed [BigInt].
@@ -179,8 +223,8 @@ class BigInt private constructor(
 
         fun from(sign: Boolean, dwMagnitude: ULong) = when {
             dwMagnitude == 0uL -> ZERO
-            (dwMagnitude shr 32) == 0uL -> BigInt(sign, intArrayOf(dwMagnitude.toInt()))
-            else -> BigInt(sign, intArrayOf(dwMagnitude.toInt(), (dwMagnitude shr 32).toInt()))
+            (dwMagnitude shr 32) == 0uL -> fromNormalizedNonZero(sign, intArrayOf(dwMagnitude.toInt()))
+            else -> fromNormalizedNonZero(sign, intArrayOf(dwMagnitude.toInt(), (dwMagnitude shr 32).toInt()))
         }
 
         /**
@@ -474,14 +518,14 @@ class BigInt private constructor(
          * representations.
          */
         private fun from(src: Latin1Iterator): BigInt =
-            BigInt(src.peek() == '-', Magus.from(src))
+            fromNonNormalizedOrZero(src.peek() == '-', Magus.from(src))
 
         /**
          * Parse a BigInt thru a standard iterator for different text
          * representations.
          */
         private fun fromHex(src: Latin1Iterator): BigInt =
-            BigInt(src.peek() == '-', Magus.fromHex(src))
+            fromNormalizedOrZero(src.peek() == '-', Magus.fromHex(src))
 
         /**
          * Generates a random `BigInt` whose magnitude is uniformly sampled from
@@ -540,8 +584,8 @@ class BigInt private constructor(
                 }
                 return when {
                     zeroTest == 0 -> ZERO
-                    !withRandomSign -> BigInt(magia)
-                    else -> BigInt(rng.nextBoolean(), magia)
+                    !withRandomSign -> fromNonNormalizedNonZero(magia)
+                    else -> fromNonNormalizedNonZero(rng.nextBoolean(), magia)
                 }
             }
             if (maxBitLen == 0)

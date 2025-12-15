@@ -3011,8 +3011,11 @@ object Magus {
      * The function accumulates decimal digits in blocks of 9 for efficiency, using
      * [mutateFmaPow10] to multiply and add into the resulting array.
      *
+     * Storage is allocated based upon a close estimate, so the returned [Magia] may
+     * have leading zero limbs.
+     *
      * @param src the input iterator providing characters in Latin-1 encoding.
-     * @return a new [Magia] representing the magnitude of the parsed integer.
+     * @return a new non-normalized [Magia] representing the magnitude of the parsed integer.
      * @throws IllegalArgumentException if the input does not contain a valid decimal integer.
      */
     fun from(src: Latin1Iterator): Magia {
@@ -3075,6 +3078,17 @@ object Magus {
         throw IllegalArgumentException("integer parse error:$src")
     }
 
+    /**
+     * Parses a hexadecimal integer from [src] and returns its magnitude as a normalized limb array.
+     *
+     * The input may include an optional leading sign, an optional `0x`/`0X` prefix, and `_` digit
+     * separators. Leading zeros are permitted. The result is always returned in canonical form:
+     * the top limb is non-zero for non-zero values, and zero is returned as [ZERO].
+     *
+     * @param src the input iterator providing characters in Latin-1 encoding.
+     * @return a new normalized [Magia] representing the magnitude of the parsed integer.
+     * @throws IllegalArgumentException if the input has invalid syntax or contains no digits.
+     */
     internal fun fromHex(src: Latin1Iterator): Magia {
         invalid_syntax@
         do {
