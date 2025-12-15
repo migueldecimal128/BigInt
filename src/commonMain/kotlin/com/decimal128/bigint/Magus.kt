@@ -1033,19 +1033,23 @@ object Magus {
      *
      * @param x the source magnitude in little-endian limb order.
      * @param bitCount the number of bits to shift right; must be non-negative.
-     * @return a new [Magia] containing the shifted result, normalized if all bits are shifted out.
+     * @return a new normalized [Magia] containing the shifted result or [ZERO]
      * @throws IllegalArgumentException if [bitCount] is negative.
      */
-    fun newShiftRight(x: Magia, bitCount: Int): Magia {
-        require(bitCount >= 0)
-        val xLen = normLen(x)
-        val newBitLen = bitLen(x, xLen) - bitCount
-        if (newBitLen <= 0)
-            return ZERO
-        val z = newWithBitLen(newBitLen)
-        val zLen = setShiftRight(z, x, xLen, bitCount)
-        check (zLen == z.size)
-        return z
+    fun newShiftRight(x: Magia, xNormLen: Int, bitCount: Int): Magia {
+        if (bitCount >= 0) {
+            check (isNormalized(x, xNormLen))
+            require(bitCount >= 0)
+            val newBitLen = bitLen(x, xNormLen) - bitCount
+            if (newBitLen <= 0)
+                return ZERO
+            val z = newWithBitLen(newBitLen)
+            val zNormLen = setShiftRight(z, x, xNormLen, bitCount)
+            check(zNormLen == z.size)
+            check (isNormalized(z, zNormLen))
+            return z
+        }
+        throw IllegalArgumentException()
     }
 
     /**
@@ -1320,6 +1324,8 @@ object Magus {
      * Returns a new normalized array holding `x AND y` over their normalized
      * ranges. The result is trimmed to its highest non-zero limb, or [ZERO] if the
      * AND is entirely zero.
+     *
+     * @return normalized [Magia] value or [ZERO]
      */
     fun newAnd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
         var iLast = min(xNormLen, yNormLen)
@@ -1367,8 +1373,12 @@ object Magus {
     /**
      * Returns a new normalized array holding `x OR y` over their normalized ranges.
      * If the OR is zero, returns [ZERO].
+     *
+     * @return the normalized [Magia] value or [ZERO]
      */
     fun newOr(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
+        check (isNormalized(x, xNormLen))
+        check (isNormalized(y, yNormLen))
         val maxLen = max(xNormLen, yNormLen)
         if (maxLen != 0) {
             val z = Magia(maxLen)
@@ -1409,16 +1419,17 @@ object Magus {
     }
 
     /**
-     * Returns a new normalized array holding `x XOR y` over their normalized
-     * ranges. Uses `setXor` to compute the result into a temporary array and
-     * trims the array to the returned normalized length. Returns [ZERO] if the
+     * Returns a new non-normalized array holding `x XOR y` over their normalized
+     * ranges. Uses `setXor` to compute the result. Returns [ZERO] if the
      * XOR result is zero.
+     *
+     * @return non-normalized [Magia]
      */
     fun newXor(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
         val maxLen = max(xNormLen, yNormLen)
         val z = Magia(maxLen)
         val zNormLen = setXor(z, x, xNormLen, y, yNormLen)
-        return if (zNormLen == 0) ZERO else z.copyOf(zNormLen)
+        return if (zNormLen == 0) ZERO else z
     }
 
     /**

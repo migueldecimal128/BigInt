@@ -1946,10 +1946,10 @@ class BigInt private constructor(
      *
      * The result is always non-negative.
      */
-    infix fun and(other: BigInt): BigInt {
-        val magiaAnd = Magus.newAnd(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-        return if (magiaAnd.isNotEmpty()) BigInt(magiaAnd) else ZERO
-    }
+    infix fun and(other: BigInt): BigInt =
+        fromNormalizedOrZero(
+            Magus.newAnd(this.magia, this.meta.normLen,
+                other.magia, other.meta.normLen))
 
     /**
      * Returns a new BigInt representing the bitwise OR of the magnitudes,
@@ -1957,11 +1957,10 @@ class BigInt private constructor(
      *
      * The result is always non-negative.
      */
-    infix fun or(other: BigInt): BigInt {
-        val magiaOr =
-            Magus.newOr(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-        return if (magiaOr.isNotEmpty()) BigInt(magiaOr) else ZERO
-    }
+    infix fun or(other: BigInt): BigInt =
+        fromNormalizedOrZero(
+            Magus.newOr(this.magia, this.meta.normLen,
+                other.magia, other.meta.normLen))
 
     /**
      * Returns a new BigInt representing the bitwise XOR of the magnitudes,
@@ -1969,10 +1968,10 @@ class BigInt private constructor(
      *
      * The result is always non-negative.
      */
-    infix fun xor(other: BigInt): BigInt {
-        val magiaXor = Magus.newXor(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-        return if (magiaXor.isNotEmpty()) BigInt(magiaXor) else ZERO
-    }
+    infix fun xor(other: BigInt): BigInt =
+        fromNonNormalizedOrZero(
+            Magus.newXor(this.magia, this.meta.normLen,
+                other.magia, other.meta.normLen))
 
     /**
      * Performs an unsigned right shift (logical shift) of the magnitude.
@@ -1984,11 +1983,8 @@ class BigInt private constructor(
      */
     infix fun ushr(bitCount: Int): BigInt {
         return when {
-            bitCount > 0 -> {
-                val magia = Magus.newShiftRight(this.magia, bitCount)
-                if (magia !== Magus.ZERO) BigInt(magia) else ZERO
-            }
-
+            bitCount > 0 ->
+                fromNormalizedOrZero(Magus.newShiftRight(this.magia, this.meta.normLen, bitCount))
             bitCount == 0 -> abs()
             else -> throw IllegalArgumentException("bitCount < 0")
         }
@@ -2007,11 +2003,11 @@ class BigInt private constructor(
             bitCount > 0 -> {
                 val bitLen = magnitudeBitLen()
                 if (bitLen <= bitCount)
-                    return if (meta.isPositive) ZERO else NEG_ONE
-                val needsIncrement = meta.isNegative && Magus.testAnyBitInLowerN(magia, bitCount)
-                var magia = Magus.newShiftRight(this.magia, bitCount)
+                    return if (meta.isNegative) NEG_ONE else ZERO
+                val willNeedIncrement = meta.isNegative && Magus.testAnyBitInLowerN(magia, bitCount)
+                var magia = Magus.newShiftRight(this.magia, this.meta.normLen, bitCount)
                 check (Magus.normLen(magia) > 0)
-                if (needsIncrement)
+                if (willNeedIncrement)
                     magia = Magus.newOrMutateAdd(magia, 1u)
                 return BigInt(meta.signFlag, magia)
             }
