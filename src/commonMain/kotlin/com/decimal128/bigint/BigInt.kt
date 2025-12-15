@@ -1823,39 +1823,22 @@ class BigInt private constructor(
         fromNonNormalizedOrZero(this.meta.signFlag,
             Magus.newDiv(magia, meta.normLen, dw))
 
-    operator fun rem(other: BigInt): BigInt {
-        val rem = Magus.newRem(magia, meta.normLen, other.magia, other.meta.normLen)
-        val bi = BigInt(meta.signFlag, rem)
-        return bi
-    }
+    operator fun rem(other: BigInt): BigInt =
+        fromNonNormalizedOrZero(meta.signFlag,
+            Magus.newRem(magia, meta.normLen, other.magia, other.meta.normLen))
 
     // note that in java/kotlin, the sign of remainder only depends upon
     // the dividend, so we just take the abs value of the divisor
     operator fun rem(n: Int): BigInt = rem(n.absoluteValue.toUInt())
 
-    operator fun rem(w: UInt): BigInt {
-        if (w == 0u)
-            throw ArithmeticException("div by zero")
-        if (isNotZero()) {
-            val rem = Magus.newRem(this.magia, this.meta.normLen, w)
-            if (rem.isNotEmpty())
-                return BigInt(this.meta.signFlag, rem)
-        }
-        return ZERO
-    }
+    operator fun rem(w: UInt): BigInt =
+        fromNormalizedOrZero(meta.signFlag, Magus.newRem(magia, meta.normLen, w))
 
     operator fun rem(l: Long): BigInt = rem(l.absoluteValue.toULong())
 
-    operator fun rem(dw: ULong): BigInt {
-        if (dw == 0uL)
-            throw ArithmeticException("div by zero")
-        if (isNotZero()) {
-            val rem = Magus.newRem(this.magia, this.meta.normLen, dw)
-            if (rem.isNotEmpty())
-                return BigInt(this.meta.signFlag, rem)
-        }
-        return ZERO
-    }
+    operator fun rem(dw: ULong): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag,
+            Magus.newRem(this.magia, this.meta.normLen, dw))
 
     /**
      * Divides the given [numerator] (primitive type) by this BigInt and returns the quotient.
@@ -1874,16 +1857,15 @@ class BigInt private constructor(
     fun divInverse(signNumerator: Boolean, numerator: ULong): BigInt {
         if (this.isZero())
             throw ArithmeticException("div by zero")
-        if (this.magnitudeCompareTo(numerator) > 0)
-            return ZERO
-        val quotient = numerator / this.toULongMagnitude()
-        if (quotient == 0uL)
-            return ZERO
-        else
-            return BigInt(
-                this.meta.signFlag xor signNumerator,
-                Magus.newFromULong(quotient)
-            )
+        val cmp = this.magnitudeCompareTo(numerator)
+        return when {
+            cmp > 0 -> ZERO
+            cmp == 0 -> ONE
+            else -> {
+                val quotient = numerator / this.toULongMagnitude()
+                from(this.meta.signFlag xor signNumerator, quotient)
+            }
+        }
     }
 
     /**

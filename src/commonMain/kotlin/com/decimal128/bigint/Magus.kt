@@ -1949,6 +1949,8 @@ object Magus {
      * remainder as a new normalized single-limb array. Uses a fast path for values
      * fitting in one or two limbs, otherwise delegates to `calcRem`. Returns [ZERO]
      * if the remainder is zero.
+     *
+     * @return normalized [Magia] remainder or [ZERO]
      */
     fun newRem(x: Magia, xNormLen: Int, w: UInt): Magia {
         check (isNormalized(x, xNormLen))
@@ -1995,7 +1997,7 @@ object Magus {
      * fits in one or two limbs, and otherwise falls back to the general
      * multi-limb remainder routine using the 2-limb array representation of `dw`.
      *
-     * @return a new normalized array holding the remainder, or [ZERO] if the
+     * @return a new non-normalized array holding the remainder, or [ZERO] if the
      *         remainder is zero.
      */
     fun newRem(x: Magia, xNormLen: Int, dw: ULong): Magia {
@@ -2009,9 +2011,11 @@ object Magus {
     }
 
     /**
-     * Returns a new normalized array holding `x mod y`.
+     * Returns a new non-normalized array holding `x mod y`.
      * Handles 1-limb divisors directly, otherwise delegates to `setRem`
      * and trims the result. Returns [ZERO] if the remainder is zero.
+     *
+     * @return the non-normalized [Magia] remainder or [ZERO]
      */
     fun newRem(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
         check(isNormalized(x, xNormLen))
@@ -2053,6 +2057,7 @@ object Magus {
      * remainder written into `z`. The returned value is the normalized limb length
      * of the remainder.
      *
+     * @return the normalized limb length of the remainder
      * @throws ArithmeticException if `yNormLen == 0` (division by zero)
      * @throws IllegalArgumentException if `z` is too small to hold the remainder
      */
@@ -2072,6 +2077,7 @@ object Magus {
         val r = z
         val rNormLen = knuthDivide(q, r, u, v, m, n)
         check (rNormLen <= n)
+        check (isNormalized(r, rNormLen))
         return rNormLen
     }
 
