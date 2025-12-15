@@ -18,6 +18,13 @@ class TestBigIntAccPlusMinusAssign {
         assertEquals(expected, acc.toBigInt())
     }
 
+    private fun newLargeAcc(bits: Int): BigIntAccumulator {
+        val acc = BigIntAccumulator()
+        acc += BigInt.ONE
+        acc.mutShl(bits)   // explicit in-place shift
+        return acc
+    }
+
     /* ---------- plusAssign primitives ---------- */
 
     @Test
@@ -66,6 +73,66 @@ class TestBigIntAccPlusMinusAssign {
 
         assertAccEquals(10, acc(3).apply { this += pos })
         assertAccEquals(-4, acc(3).apply { this += neg })
+    }
+
+    @Test
+    fun plusAssign_Long_multiLimb() {
+        val acc = newLargeAcc(192)
+        val add: Long = 0x1_0000_0001L
+
+        val expected = acc.toBigInt() + add.toBigInt()
+
+        acc += add
+
+        assertAccEquals(expected, acc)
+    }
+
+    @Test
+    fun plusAssign_ULong_multiLimb() {
+        val acc = newLargeAcc(224)
+        val add: ULong = 0x1_0000_0001uL
+
+        val expected = acc.toBigInt() + add.toBigInt()
+
+        acc += add
+
+        assertAccEquals(expected, acc)
+    }
+
+    @Test
+    fun plusAssign_BigInt_multiLimb() {
+        val acc = newLargeAcc(256)
+        val add = BigInt.from("18446744073709551617") // 2^64 + 1
+
+        val expected = acc.toBigInt() + add
+
+        acc += add
+
+        assertAccEquals(expected, acc)
+    }
+
+    @Test
+    fun plusAssign_BigIntAccumulator_multiLimb() {
+        val acc = newLargeAcc(288)
+        val addAcc = newLargeAcc(160)
+
+        val expected = acc.toBigInt() + addAcc.toBigInt()
+
+        acc += addAcc
+
+        assertAccEquals(expected, acc)
+    }
+
+    @Test
+    fun plusAssign_negativeOperand_multiLimb() {
+        val acc = newLargeAcc(256)
+        val add: Long = -0x1_0000_0001L
+
+        val expected = acc.toBigInt() + add.toBigInt()
+
+        acc += add
+
+        assertAccEquals(expected, acc)
     }
 
     /* ---------- minusAssign primitives ---------- */
@@ -126,6 +193,66 @@ class TestBigIntAccPlusMinusAssign {
         assertAccEquals(3, acc(3).apply { this -= 0 })
         assertAccEquals(3, acc(3).apply { this += 0L })
         assertAccEquals(3, acc(3).apply { this -= 0L })
+    }
+
+    @Test
+    fun minusAssign_Long_multiLimb() {
+        val acc = newLargeAcc(192)
+        val sub: Long = 0x1_0000_0001L
+
+        val expected = acc.toBigInt() - sub.toBigInt()
+
+        acc -= sub
+
+        assertAccEquals(expected, acc)
+    }
+
+    @Test
+    fun minusAssign_ULong_multiLimb() {
+        val acc = newLargeAcc(224)
+        val sub: ULong = 0x1_0000_0001uL
+
+        val expected = acc.toBigInt() - sub.toBigInt()
+
+        acc -= sub
+
+        assertAccEquals(expected, acc)
+    }
+
+    @Test
+    fun minusAssign_BigInt_multiLimb() {
+        val acc = newLargeAcc(256)
+        val sub = BigInt.from("340282366920938463463374607431768211457") // 2^128 + 1
+
+        val expected = acc.toBigInt() - sub
+
+        acc -= sub
+
+        assertAccEquals(expected, acc)
+    }
+
+    @Test
+    fun minusAssign_BigIntAccumulator_multiLimb() {
+        val acc = newLargeAcc(320)
+        val subAcc = newLargeAcc(192)
+
+        val expected = acc.toBigInt() - subAcc.toBigInt()
+
+        acc -= subAcc
+
+        assertAccEquals(expected, acc)
+    }
+
+    @Test
+    fun minusAssign_negativeOperand_multiLimb() {
+        val acc = newLargeAcc(256)
+        val sub: Long = -0x1_0000_0001L
+
+        val expected = acc.toBigInt() - sub.toBigInt()
+
+        acc -= sub
+
+        assertAccEquals(expected, acc)
     }
 
 }

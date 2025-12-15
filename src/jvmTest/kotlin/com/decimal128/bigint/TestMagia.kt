@@ -66,16 +66,17 @@ class TestMagia {
     fun testRoundTripShift(jbi: BigInteger) {
         val shift = random.nextInt(100)
         val magia = MagiaTransducer.magiaFromBi(jbi)
+        val magiaNormLen = Mago.normLen(magia)
 
         val jbiLeft = jbi.shiftLeft(shift)
-        val carLeft = Mago.newShiftLeft(magia, Mago.normLen(magia, magia.size), shift)
-        assert(MagiaTransducer.EQ(carLeft, jbiLeft))
+        val magiaShl = Mago.newShiftLeft(magia, magiaNormLen, shift)
+        assert(MagiaTransducer.EQ(magiaShl, jbiLeft))
 
-        Mago.mutateShiftRight(carLeft, carLeft.size, shift)
-        assert(MagiaTransducer.EQ(carLeft, jbi))
+        Mago.mutateShiftRight(magiaShl, Mago.normLen(magiaShl), shift)
+        assert(MagiaTransducer.EQ(magiaShl, jbi))
 
         val jbiRight = jbi.shiftRight(shift)
-        Mago.mutateShiftRight(magia, magia.size, shift)
+        Mago.mutateShiftRight(magia, Mago.normLen(magia), shift)
         assert(MagiaTransducer.EQ(magia, jbiRight))
     }
 
