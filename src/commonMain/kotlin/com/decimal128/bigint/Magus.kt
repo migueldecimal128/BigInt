@@ -2787,12 +2787,14 @@ object Magus {
      *
      * The bytes may be in either big-endian or little-endian order, as indicated by [isBigEndian].
      *
+     * The return value will be canonical ZERO or a normalized Magia
+     *
      * @param isNegative  `true` if bytes encode a negative value in two’s-complement form.
      * @param isBigEndian `true` if bytes are in big-endian order, `false` for little-endian.
      * @param bytes       Source byte array.
      * @param off         Starting offset in [bytes].
      * @param len         Number of bytes to read.
-     * @return A [Magus] magnitude as an [Magia].
+     * @return a normalized [Magia] or ZERO
      * @throws IllegalArgumentException if the range `[off, off + len)` is invalid.
      */
     internal fun fromBinaryBytes(isNegative: Boolean, isBigEndian: Boolean,

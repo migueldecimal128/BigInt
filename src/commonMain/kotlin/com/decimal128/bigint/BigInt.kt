@@ -628,14 +628,12 @@ class BigInt private constructor(
             withRandomSign: Boolean = false
         ): BigInt {
             if (bitLen > 0) {
-                var zeroTest = 0
                 val magia = Magus.newWithBitLen(bitLen)
                 val topBits = bitLen and 0x1F
                 var mask = (if (topBits == 0) 0 else (1 shl topBits)) - 1
                 for (i in magia.lastIndex downTo 0) {
                     val rand = rng.nextInt() and mask
                     magia[i] = rand
-                    zeroTest = zeroTest or rand
                     mask = -1
                 }
                 val topBitIndex = bitLen - 1
@@ -643,9 +641,9 @@ class BigInt private constructor(
                 check (limbIndex == magia.size - 1)
                 magia[limbIndex] = magia[limbIndex] or (1 shl (topBitIndex and 0x1F))
                 return if (!withRandomSign)
-                    BigInt(magia)
+                    fromNormalizedNonZero(magia)
                 else
-                    BigInt(rng.nextBoolean(), magia)
+                    fromNormalizedNonZero(rng.nextBoolean(), magia)
             }
             if (bitLen == 0)
                 return ZERO
@@ -861,7 +859,7 @@ class BigInt private constructor(
                     length
                 )
                 if (magia !== Magus.ZERO)
-                    return BigInt(isNegative, magia)
+                    return fromNormalizedNonZero(isNegative, magia)
             }
             return ZERO
         }
@@ -876,15 +874,10 @@ class BigInt private constructor(
          * Converts a Little-Endian IntArray to a BigInt with the specified sign.
          */
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray, len: Int): BigInt {
-            if (len >= 0) {
-                var normLen = len
-                while (normLen > 0 && littleEndianIntArray[normLen-1] == 0)
-                    --normLen
-                if (normLen > 0) {
-                    val magia = IntArray(normLen)
-                    littleEndianIntArray.copyInto(magia, 0, 0, normLen)
-                    return BigInt(sign, magia)
-                }
+            if (len >= 0 && len <= littleEndianIntArray.size) {
+                val normLen = Magus.normLen(littleEndianIntArray, len)
+                if (normLen > 0)
+                    return fromNormalizedNonZero(sign, littleEndianIntArray.copyOf(normLen))
                 return ZERO
             }
             throw IllegalArgumentException()
