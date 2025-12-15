@@ -2596,13 +2596,13 @@ object Magus {
      * ```
      */
     fun toHexString(isNegative: Boolean, x: Magia): String =
-        toHexString(isNegative, x, x.size)
+        toHexString(isNegative, x, normLen(x))
 
     /**
      * Converts the magnitude [x] to a hexadecimal string.
      *
      * The limbs in [x] are stored in little-endian order (least-significant limb at index 0).
-     * Only the first [xLen] limbs are used.
+     * Only the first [xNormLen] limbs are used.
      *
      * The result is formatted in big-endian hex, prefixed with `"0x"`, and with a leading
      * `'-'` if [isNegative] is `true`.
@@ -2616,8 +2616,9 @@ object Magus {
      *     == "-0x1"
      * ```
      */
-    fun toHexString(isNegative: Boolean, x: Magia, xLen: Int): String {
-        val bitLen = bitLen(x, xLen)
+    fun toHexString(isNegative: Boolean, x: Magia, xNormLen: Int): String {
+        check (isNormalized(x, xNormLen))
+        val bitLen = bitLen(x, xNormLen)
         var nybbleCount = (bitLen + 3) ushr 2
         val strLen = (if (isNegative) 1 else 0) + 2 + max(nybbleCount, 1)
         val bytes = ByteArray(strLen)
@@ -2641,9 +2642,6 @@ object Magus {
         }
         return bytes.decodeToString()
     }
-
-    fun toHexUtf8(x: Magia, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) =
-        toHexUtf8(x, normLen(x), utf8, off, digitCount, useUpperCase)
 
     fun toHexUtf8(x: Magia, xNormLen: Int, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
         check (isNormalized(x, xNormLen))
