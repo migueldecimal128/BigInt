@@ -138,7 +138,7 @@ class TestMagia {
     fun testMul(jbiA: BigInteger, jbiB: BigInteger) {
         val magiaA = MagiaTransducer.magiaFromBi(jbiA)
         val magiaB = MagiaTransducer.magiaFromBi(jbiB)
-        val magiaProd = Magus.newMul(magiaA, magiaB)
+        val magiaProd = Magus.newMul(magiaA, Magus.normLen(magiaA), magiaB, Magus.normLen(magiaB))
 
         val jbiProd = jbiA.multiply(jbiB)
 

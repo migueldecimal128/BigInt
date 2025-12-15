@@ -1784,40 +1784,24 @@ class BigInt private constructor(
     operator fun minus(dw: ULong): BigInt =
         this.addImpl(signFlipThis = false, otherSign = true, dw = dw)
 
-    operator fun times(other: BigInt): BigInt {
-        return if (isNotZero() && other.isNotZero())
-            BigInt(meta.signFlag xor other.meta.signFlag, Magus.newMul(this.magia, other.magia))
-        else
-            ZERO
-    }
+    operator fun times(other: BigInt): BigInt =
+        fromNonNormalizedOrZero(meta.signFlag xor other.meta.signFlag,
+            Magus.newMul(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
 
-    operator fun times(n: Int): BigInt {
-        return if (isNotZero() && n != 0)
-            BigInt(this.meta.signFlag xor (n < 0), Magus.newMul(this.magia, n.absoluteValue.toUInt()))
-        else
-            ZERO
-    }
+    operator fun times(n: Int): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag xor (n < 0),
+            Magus.newMul(this.magia, this.meta.normLen, n.absoluteValue.toUInt()))
 
-    operator fun times(w: UInt): BigInt {
-        return if (isNotZero() && w != 0u)
-            BigInt(this.meta.signFlag, Magus.newMul(this.magia, w))
-        else
-            ZERO
-    }
+    operator fun times(w: UInt): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag, Magus.newMul(this.magia, this.meta.normLen, w))
 
-    operator fun times(l: Long): BigInt {
-        return if (isNotZero() && l != 0L)
-            BigInt(this.meta.signFlag xor (l < 0), Magus.newMul(this.magia, l.absoluteValue.toULong()))
-        else
-            ZERO
-    }
+    operator fun times(l: Long): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag xor (l < 0),
+            Magus.newMul(this.magia, this.meta.normLen, l.absoluteValue.toULong()))
 
-    operator fun times(dw: ULong): BigInt {
-        return if (isNotZero() && dw != 0uL)
-            BigInt(this.meta.signFlag, Magus.newMul(this.magia, dw))
-        else
-            ZERO
-    }
+    operator fun times(dw: ULong): BigInt =
+        fromNonNormalizedOrZero(this.meta.signFlag,
+            Magus.newMul(this.magia, this.meta.normLen, dw))
 
     operator fun div(other: BigInt): BigInt {
         if (other.isZero())

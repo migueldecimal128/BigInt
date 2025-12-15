@@ -653,13 +653,24 @@ object Magus {
     /**
      * Returns a new limb array representing [x] multiplied by the unsigned 32-bit value [w].
      *
-     * Returns [ZERO] if [x] or [w] is zero.
+     * Only the normalized limbs `[0, xNormLen)` of [x] are used. Returns [ZERO] if [x] is zero
+     * or if [w] is zero.
+     *
+     * Limb storage is preallocated using a bit-length estimate based on [x] and [w]; the
+     * returned array may therefore contain unused high limbs even though the computed
+     * product itself is normalized.
+     *
+     * @param x magnitude limb array for the multiplicand.
+     * @param xNormLen normalized limb length of [x].
+     * @param w unsigned 32-bit multiplier.
+     *
+     * @return [ZERO] or a (possibly non-normalized) [Magia] containing the product.
      */
-    fun newMul(x: Magia, w: UInt): Magia {
-        val xBitLen = bitLen(x)
-        if (xBitLen == 0 || w == 0u)
+    fun newMul(x: Magia, xNormLen: Int, w: UInt): Magia {
+        check (isNormalized(x, xNormLen))
+        if (xNormLen == 0 || w == 0u)
             return ZERO
-        val xNormLen = normLenFromBitLen(xBitLen)
+        val xBitLen = bitLen(x, xNormLen)
         val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul(z, x, xNormLen, w)
@@ -703,13 +714,23 @@ object Magus {
     /**
      * Returns a new limb array representing [x] multiplied by the unsigned 64-bit value [dw].
      *
-     * Returns [ZERO] if [x] or [dw] is zero.
+     * Only the normalized limbs `[0, xNormLen)` of [x] are used. Returns [ZERO] if [x] is zero
+     * or if [dw] is zero.
+     *
+     * Limb storage is preallocated using a bit-length estimate based on [x] and [dw]; the
+     * returned array may therefore contain unused high limbs even though the computed
+     * product itself is normalized.
+     *
+     * @param x magnitude limb array for the multiplicand.
+     * @param xNormLen normalized limb length of [x].
+     * @param dw unsigned 64-bit multiplier.
+     *
+     * @return [ZERO] or a (possibly non-normalized) [Magia] containing the product.
      */
-    fun newMul(x: Magia, dw: ULong): Magia {
-        val xBitLen = bitLen(x)
-        if (xBitLen == 0 || dw == 0uL)
+    fun newMul(x: Magia, xNormLen: Int, dw: ULong): Magia {
+        if (xNormLen == 0 || dw == 0uL)
             return ZERO
-        val xNormLen = normLenFromBitLen(xBitLen)
+        val xBitLen = bitLen(x, xNormLen)
         val zBitLen = xBitLen + 64 - dw.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul(z, x, xNormLen, dw)
@@ -771,13 +792,24 @@ object Magus {
     /**
      * Returns a new limb array representing the product of [x] and [y].
      *
-     * Returns [ZERO] if either [x] or [y] is zero.
+     * Only the normalized limbs `[0, xNormLen)` of [x] and `[0, yNormLen)` of [y] are used.
+     * Returns [ZERO] if either operand is zero.
+     *
+     * Limb storage is preallocated using bit-length estimates; the returned array may
+     * contain unused high limbs even though the product itself is normalized.
+     *
+     * @param x magnitude limb array for the first operand.
+     * @param xNormLen normalized limb length of [x].
+     * @param y magnitude limb array for the second operand.
+     * @param yNormLen normalized limb length of [y].
+     *
+     * @return [ZERO] or a (possibly non-normalized) limb array containing the product.
      */
-    fun newMul(x: Magia, y: Magia): Magia {
-        val xBitLen = bitLen(x)
-        val yBitLen = bitLen(y)
-        if (xBitLen == 0 || yBitLen == 0)
+    fun newMul(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
+        if (xNormLen == 0 || yNormLen == 0)
             return ZERO
+        val xBitLen = bitLen(x, xNormLen)
+        val yBitLen = bitLen(y, yNormLen)
         val z = newWithBitLen(xBitLen + yBitLen)
         val zNormLen = setMul(z, x, normLenFromBitLen(xBitLen), y, normLenFromBitLen(yBitLen))
         check (isNormalized(z, zNormLen))
@@ -806,7 +838,9 @@ object Magus {
             val cortoLen = if (xNormLen < yNormLen) xNormLen else yNormLen
             val largoLen = if (xNormLen < yNormLen) yNormLen else xNormLen
 
-            z.fill(0, 0, largoLen) // zero out the product
+            // zero out the minimum amount needed
+            // higher limbs will be written before read
+            z.fill(0, 0, largoLen)
             for (i in 0..<cortoLen) {
                 val cortoLimb = dw32(corto[i])
                 var carry = 0uL
