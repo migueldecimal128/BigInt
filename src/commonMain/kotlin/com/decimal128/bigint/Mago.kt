@@ -2274,9 +2274,10 @@ internal object Mago {
             var qhat = num / vn_1
             var rhat = num % vn_1
 
+            val un_j = dw32(un[j + n - 2])
             // correct estimate
             while ((qhat shr 32) != 0uL ||
-                qhat * vn_2 > (rhat shl 32) + dw32(un[j + n - 2])) {
+                qhat * vn_2 > (rhat shl 32) + un_j) {
                 qhat--
                 rhat += vn_1
                 if ((rhat shr 32) != 0uL)
@@ -2296,8 +2297,10 @@ internal object Mago {
             }
             val t = dw32(un[j + n]) - carry
             un[j + n] = t.toInt()
-            if (q != null)
-                q[j] = (qhat - (t shr 63)).toInt()
+            if (q != null) {
+                val borrow = t shr 63
+                q[j] = (qhat - borrow).toInt()
+            }
             if (t.toLong() < 0L) {
                 var c2 = 0uL
                 for (i in 0 until n) {
@@ -2378,8 +2381,8 @@ internal object Mago {
 
         //val vn_1 = dw32(vn[n - 1])
         //val vn_2 = dw32(vn[n - 2])
-        val vn_1 = vnDw shr 32
-        val vn_2 = vnDw and 0xFFFF_FFFFuL
+        val vn1 = vnDw shr 32
+        val vn0 = vnDw and 0xFFFF_FFFFuL
 
         // -- main loop --
         for (j in m - n downTo 0) {
@@ -2390,44 +2393,64 @@ internal object Mago {
             //if (hi == 0L && lo < vn_1) // this would short-circuit,
             //    continue               // but probability is astronomically small
             val num = (hi shl 32) or lo
-            var qhat = num / vn_1
-            var rhat = num % vn_1
+            var qhat = num / vn1
+            var rhat = num % vn1
 
+            val un_j = dw32(un[j])
             // correct estimate
             while ((qhat shr 32) != 0uL ||
-                qhat * vn_2 > (rhat shl 32) + dw32(un[j + n - 2])) {
+                qhat * vn0 > (rhat shl 32) + un_j) {
                 qhat--
-                rhat += vn_1
+                rhat += vn1
                 if ((rhat shr 32) != 0uL)
                     break
             }
 
             // multiply & subtract
             var carry = 0uL
-            for (i in 0 until n) {
-                //val prod = qhat * dw32(vn[i])
-                val vni = (vnDw shr (i * 32)) and 0xFFFF_FFFFuL
-                val prod = qhat * vni
+            // i = 0
+            run {
+                val prod = qhat * vn0
                 val prodHi = prod shr 32
                 val prodLo = prod and 0xFFFF_FFFFuL
-                val unIJ = dw32(un[j + i])
-                val t = unIJ - prodLo - carry
-                un[j + i] = t.toInt()
-                carry = prodHi - (t.toLong() shr 32).toULong() // yes, this is a signed shift right
+                val un0 = dw32(un[j])
+                val t0 = un0 - prodLo - carry
+                un[j] = t0.toInt()
+                carry = prodHi - (t0.toLong() shr 32).toULong()
             }
+
+            // i = 1
+            run {
+                val prod = qhat * vn1
+                val prodHi = prod shr 32
+                val prodLo = prod and 0xFFFF_FFFFuL
+                val un1 = dw32(un[j + 1])
+                val t1 = un1 - prodLo - carry
+                un[j + 1] = t1.toInt()
+                carry = prodHi - (t1.toLong() shr 32).toULong()
+            }
+
             val t = dw32(un[j + n]) - carry
             un[j + n] = t.toInt()
-            if (q != null)
-                q[j] = (qhat - (t shr 63)).toInt()
+            if (q != null) {
+                val borrow = t shr 63
+                q[j] = (qhat - borrow).toInt()
+            }
             if (t.toLong() < 0L) {
                 var c2 = 0uL
-                for (i in 0 until n) {
-                    //val sum = dw32(un[j + i]) + dw32(vn[i]) + c2
-                    val vni = (vnDw shr (i * 32)) and 0xFFFF_FFFFuL
-                    val sum = dw32(un[j + i]) + vni + c2
-                    un[j + i] = sum.toInt()
-                    c2 = sum shr 32
+                // i = 0
+                run {
+                    val sum0 = dw32(un[j]) + vn0 + c2
+                    un[j] = sum0.toInt()
+                    c2 = sum0 shr 32
                 }
+                // i = 1
+                run {
+                    val sum1 = dw32(un[j + 1]) + vn1 + c2
+                    un[j + 1] = sum1.toInt()
+                    c2 = sum1 shr 32
+                }
+
                 un[j + n] += c2.toInt()
             }
         }
