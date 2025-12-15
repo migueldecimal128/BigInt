@@ -1742,8 +1742,8 @@ internal object Mago {
      *
      * @return the normalized limb length of the quotient stored in [z].
      */
-    fun setDiv(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
-        if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
+    fun setDiv64(z: Magia, x: Magia, xNormLen: Int, unBuf: IntArray?, dw: ULong): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen - 2 + 1) {
             check (isNormalized(x, xNormLen))
             when {
                 (dw shr 32) == 0uL -> return setDiv(z, x, xNormLen, dw.toUInt())
@@ -1758,7 +1758,7 @@ internal object Mago {
             val vnDw = dw
             val q = z
             val r = null
-            knuthDivide64(q, r, u, vnDw, m)
+            knuthDivide64(q, r, u, vnDw, m, unBuf)
             return normLen(q)
         }
         throw IllegalArgumentException()
@@ -1796,6 +1796,17 @@ internal object Mago {
                     }
                 }
             }
+        }
+        return -1
+    }
+
+    fun trySetDivFastPath64(zMagia: Magia, xMagia: Magia, xNormLen: Int, yDw: ULong): Int {
+        when {
+            yDw == 0uL -> throw ArithmeticException("div by zero")
+            xNormLen == 0 || xNormLen < 2 -> return 0
+            xNormLen <= 2 ->
+                return setULong(zMagia, toRawULong(xMagia, xNormLen) / yDw)
+            (yDw shr 32) == 0uL -> return setDiv(zMagia, xMagia, xNormLen, yDw.toUInt())
         }
         return -1
     }
@@ -1866,7 +1877,7 @@ internal object Mago {
         val vnDw = dw
         val q = Magia(m - 2 + 1)
         val r = null
-        val qNormLen = knuthDivide64(q, r, u, vnDw, m)
+        val qNormLen = knuthDivide64(q, r, u, vnDw, m, unBuf=null)
         return if (qNormLen > 0) q else ZERO
     }
 
@@ -2322,12 +2333,104 @@ internal object Mago {
         u: IntArray,
         vDw: ULong,
         m: Int,
+        unBuf: IntArray?
     ): Int {
         if (m < 2 || (vDw shr 32) == 0uL)
             throw IllegalArgumentException()
 
-        val v = intArrayOf(vDw.toInt(), (vDw shr 32).toInt())
-        return knuthDivide(q, r, u, v, m, 2)
+        // Step D1: Normalize
+        val un = when {
+            unBuf != null && unBuf.size < m + 1 -> throw IllegalArgumentException()
+            unBuf != null -> unBuf
+            r != null && r.size >= m + 1 -> r
+            else -> IntArray(m + 1)
+        }
+        u.copyInto(un, 0, 0, m)
+        un[m] = 0
+        val shift = vDw.countLeadingZeroBits()
+        val vnDw = vDw shl shift
+
+        if (shift > 0)
+            setShiftLeft(un, un, m, shift)
+
+        knuthDivideNormalizedCore64(q, un, vnDw, m)
+
+        var rNormLen = 0
+        if (r != null)
+            rNormLen = setShiftRight(r, un, normLen(un), shift)
+
+        return when {
+            q != null -> normLen(q, m-2+1)
+            r != null -> rNormLen
+            else -> -1
+        }
+    }
+
+    fun knuthDivideNormalizedCore64(
+        q: IntArray?,
+        un: IntArray,
+        vnDw: ULong,
+        m: Int
+    ) {
+        val n = 2
+        if (m < n || n < 2 || (vnDw shr 63) != 1uL)
+            throw IllegalArgumentException()
+
+        //val vn_1 = dw32(vn[n - 1])
+        //val vn_2 = dw32(vn[n - 2])
+        val vn_1 = vnDw shr 32
+        val vn_2 = vnDw and 0xFFFF_FFFFuL
+
+        // -- main loop --
+        for (j in m - n downTo 0) {
+
+            // estimate q̂ = (un[j+n]*B + un[j+n-1]) / vn[n-1]
+            val hi = dw32(un[j + n])
+            val lo = dw32(un[j + n - 1])
+            //if (hi == 0L && lo < vn_1) // this would short-circuit,
+            //    continue               // but probability is astronomically small
+            val num = (hi shl 32) or lo
+            var qhat = num / vn_1
+            var rhat = num % vn_1
+
+            // correct estimate
+            while ((qhat shr 32) != 0uL ||
+                qhat * vn_2 > (rhat shl 32) + dw32(un[j + n - 2])) {
+                qhat--
+                rhat += vn_1
+                if ((rhat shr 32) != 0uL)
+                    break
+            }
+
+            // multiply & subtract
+            var carry = 0uL
+            for (i in 0 until n) {
+                //val prod = qhat * dw32(vn[i])
+                val vni = (vnDw shr (i * 32)) and 0xFFFF_FFFFuL
+                val prod = qhat * vni
+                val prodHi = prod shr 32
+                val prodLo = prod and 0xFFFF_FFFFuL
+                val unIJ = dw32(un[j + i])
+                val t = unIJ - prodLo - carry
+                un[j + i] = t.toInt()
+                carry = prodHi - (t.toLong() shr 32).toULong() // yes, this is a signed shift right
+            }
+            val t = dw32(un[j + n]) - carry
+            un[j + n] = t.toInt()
+            if (q != null)
+                q[j] = (qhat - (t shr 63)).toInt()
+            if (t.toLong() < 0L) {
+                var c2 = 0uL
+                for (i in 0 until n) {
+                    //val sum = dw32(un[j + i]) + dw32(vn[i]) + c2
+                    val vni = (vnDw shr (i * 32)) and 0xFFFF_FFFFuL
+                    val sum = dw32(un[j + i]) + vni + c2
+                    un[j + i] = sum.toInt()
+                    c2 = sum shr 32
+                }
+                un[j + n] += c2.toInt()
+            }
+        }
     }
 
     /**

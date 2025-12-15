@@ -504,6 +504,9 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    fun setDiv(x: BigIntAccumulator, yDw: ULong): BigIntAccumulator =
+        setDivImpl(x, false, yDw)
+
     fun setDiv(x: BigInt, y: BigInt): BigIntAccumulator =
         setDivImpl(x.meta, x.magia, y.meta, y.magia)
 
@@ -550,6 +553,23 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    private fun setDivImpl(x: BigIntAccumulator, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+        check (this !== x)
+        check ((yDw shr 32) != 0uL)
+        // save these early so that they won't be lost
+        // when we resize the quotient ... in case of aliasing
+        val xMagia = x.magia
+        ensureCapacityDiscard(x.meta.normLen - 2 + 1)
+        if (trySetDivFastPath64(x.meta, x.magia, ySign, yDw))
+            return this
+        val unBuf =
+            if (this !== x) {x.ensureTmpCapacity(x.meta.normLen + 1); x.tmp}
+            else Magia(x.meta.normLen + 1)
+        val normLen = Mago.setDiv64(magia, xMagia, x.meta.normLen, unBuf, yDw)
+        meta = Meta(x.meta.signFlag xor ySign, normLen)
+        return this
+    }
+
     private fun mutateDivImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
         this.ensureTmpCapacity(meta.normLen - yMeta.normLen + 1)
         swapTmp()
@@ -573,6 +593,15 @@ class BigIntAccumulator private constructor (
     private fun trySetDivFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
         val qSignFlag = xMeta.signFlag xor yMeta.signFlag
         val qNormLen = Mago.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+        if (qNormLen < 0)
+            return false
+        meta = Meta(qSignFlag, qNormLen)
+        return true
+    }
+
+    private fun trySetDivFastPath64(xMeta: Meta, xMagia: Magia, ySign: Boolean, yDw: ULong): Boolean {
+        val qSignFlag = xMeta.signFlag xor ySign
+        val qNormLen = Mago.trySetDivFastPath64(this.magia, xMagia, xMeta.normLen, yDw)
         if (qNormLen < 0)
             return false
         meta = Meta(qSignFlag, qNormLen)
@@ -1521,8 +1550,8 @@ class BigIntAccumulator private constructor (
     private fun mutateDivImpl(wSign: Boolean, dw: ULong) {
         validate()
         ensureTmpCapacity(meta.normLen - 2 + 1)
-        val normLen = Mago.setDiv(tmp, magia, meta.normLen, dw)
-        magia = tmp
+        val normLen = Mago.setDiv64(tmp, magia, meta.normLen, unBuf=null, dw)
+        swapTmp()
         meta = Meta(meta.signFlag xor wSign, normLen)
         validate()
     }
