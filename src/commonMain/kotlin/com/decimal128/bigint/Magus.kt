@@ -2007,16 +2007,9 @@ object Magus {
     fun setRem(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
         check (isNormalized(x, xNormLen))
         check (isNormalized(y, yNormLen))
-        when {
-            yNormLen == 0 -> throw ArithmeticException("div by zero")
-            yNormLen == 1 -> return setRem(z, x, xNormLen, y[0].toUInt())
-            yNormLen == 2 && xNormLen <= 2 ->
-                return setULong(z, toRawULong(x, xNormLen) % toRawULong(y, yNormLen))
-            xNormLen < yNormLen -> {
-                x.copyInto(z, 0, 0, xNormLen)
-                return xNormLen
-            }
-        }
+        val rLen0 = trySetRemFastPath(z, x, xNormLen, y, yNormLen)
+        if (rLen0 >= 0)
+            return rLen0
         val n = yNormLen
         val m = xNormLen
         val u = x
