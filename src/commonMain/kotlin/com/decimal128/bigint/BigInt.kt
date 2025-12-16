@@ -1061,6 +1061,20 @@ class BigInt private constructor(
     fun signum() = Zoro.signum(meta)
 
     /**
+     * Returns `true` if this value is even.
+     *
+     * Zero is considered even.
+     */
+    fun isEven() = isZero() || (magia[0] and 1) == 0
+
+    /**
+     * Returns `true` if this value is odd.
+     *
+     * Zero is not considered odd.
+     */
+    fun isOdd() = isNotZero() && (magia[0] and 1) != 0
+
+    /**
      * Returns `true` if the magnitude of this BigInt is a power of two
      * (exactly one bit set).
      */
@@ -2275,17 +2289,6 @@ operator fun UInt.rem(other: BigInt) = other.remInverse(this)
 operator fun Long.rem(other: BigInt) = other.remInverse(this)
 operator fun ULong.rem(other: BigInt) = other.remInverse(false, this)
 
-operator fun Int.compareTo(bi: BigInt) =
-    -bi.compareToHelper(this < 0, this.absoluteValue.toUInt().toULong())
-
-operator fun UInt.compareTo(bi: BigInt) =
-    -bi.compareToHelper(false, this.toULong())
-
-operator fun Long.compareTo(bi: BigInt) =
-    -bi.compareToHelper(this < 0, this.absoluteValue.toULong())
-
-operator fun ULong.compareTo(bi: BigInt) =
-    -bi.compareToHelper(false, this)
 
 /**
  * Compares this [Int] value with a [BigInt] for numerical equality

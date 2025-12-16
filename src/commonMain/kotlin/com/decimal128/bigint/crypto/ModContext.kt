@@ -15,7 +15,13 @@ class ModContext(val m: BigInt) {
     fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) =
         impl.modMul(a, b, out)
 
+    fun modMul(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) =
+        impl.modMul(a, b, out)
+
     fun modSqr(a: BigInt, out: BigIntAccumulator) =
+        impl.modSqr(a, out)
+
+    fun modSqr(a: BigIntAccumulator, out: BigIntAccumulator) =
         impl.modSqr(a, out)
 
     fun modPow(base: BigInt, exp: BigInt, out: BigIntAccumulator) =
@@ -142,6 +148,7 @@ class ModContext(val m: BigInt) {
         }
 
         fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) {
+            check (out !== mulTmp)
             mulTmp.setMul(a, b)
             reduceInto(mulTmp, out)
         }
@@ -153,6 +160,7 @@ class ModContext(val m: BigInt) {
         }
 
         fun modSqr(a: BigInt, out: BigIntAccumulator) {
+            check (out !== mulTmp)
             mulTmp.setSqr(a)
             reduceInto(mulTmp, out)
         }
@@ -176,7 +184,9 @@ class ModContext(val m: BigInt) {
                 else
                     baseTmp.setRem(base, m)
             }
-            for (i in exp.magnitudeBitLen() - 1 downTo 0) {
+            out.set(baseTmp)
+            val topBitIndex = exp.magnitudeBitLen() - 1
+            for (i in topBitIndex - 1 downTo 0) {
                 // result = result^2 mod m
                 modSqr(out, out)
 

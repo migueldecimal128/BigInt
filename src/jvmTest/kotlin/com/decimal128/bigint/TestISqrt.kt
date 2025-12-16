@@ -24,7 +24,6 @@ class TestISqrt {
             println("testSqrUp hi:$hi")
         val hi2 = hi.sqr()
         if (hi != hi2.isqrt()) {
-            println("kilroy was here!")
             assertEquals(hi, hi2.isqrt())
         }
 

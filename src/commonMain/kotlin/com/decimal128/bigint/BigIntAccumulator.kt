@@ -131,6 +131,20 @@ class BigIntAccumulator private constructor (
     fun isOne() = meta.normLen == 1 && magia[0] == 1
 
     /**
+     * Returns `true` if this value is even.
+     *
+     * Zero is considered even.
+     */
+    fun isEven() = isZero() || (magia[0] and 1) == 0
+
+    /**
+     * Returns `true` if this value is odd.
+     *
+     * Zero is not considered odd.
+     */
+    fun isOdd() = isNotZero() && (magia[0] and 1) != 0
+
+    /**
      * Resets this accumulator to zero.
      *
      * This method clears the current value by setting the internal length to zero
@@ -410,6 +424,8 @@ class BigIntAccumulator private constructor (
         setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
 
     private fun setAddImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
+        check (Mago.isNormalized(x, xMeta.normLen))
+        check (Mago.isNormalized(y, yMeta.normLen))
         when {
             yMeta.isZero -> set(xMeta, x)
             xMeta.isZero -> set(yMeta, y)
@@ -1118,6 +1134,7 @@ class BigIntAccumulator private constructor (
      * @throws IllegalArgumentException if `bitWidth` or `bitIndex` is negative.
      */
     fun applyBitMask(bitWidth: Int, bitIndex: Int = 0): BigIntAccumulator {
+        check (isNormalized())
         val myBitLen = magnitudeBitLen()
         when {
             bitIndex < 0 || bitWidth < 0 ->
@@ -1130,19 +1147,22 @@ class BigIntAccumulator private constructor (
                 magia.fill(0, 0, limbIndex)
                 magia[limbIndex] = 1 shl (bitIndex and 0x1F)
                 meta = Meta(limbIndex + 1)
+                check (isNormalized())
                 return this
             }
         }
         // more than 1 bit wide and some overlap
         val clampedBitLen = min(bitWidth + bitIndex, myBitLen)
-        val normLen = (clampedBitLen + 0x1F) ushr 5
-        val nlz = (normLen shl 5) - clampedBitLen
-        magia[normLen - 1] = magia[normLen - 1] and (-1 ushr nlz)
+        val normLen0 = (clampedBitLen + 0x1F) ushr 5
+        val nlz = (normLen0 shl 5) - clampedBitLen
+        magia[normLen0 - 1] = magia[normLen0 - 1] and (-1 ushr nlz)
         val loIndex = bitIndex ushr 5
         magia.fill(0, 0, loIndex)
         val ctz = bitIndex and 0x1F
         magia[loIndex] = magia[loIndex] and (-1 shl ctz)
+        val normLen = Mago.normLen(magia, normLen0)
         meta = Meta(normLen)
+        check (isNormalized())
         return this
     }
 
@@ -1569,6 +1589,43 @@ class BigIntAccumulator private constructor (
         meta = Meta(meta.signFlag, normLen)
         validate()
     }
+
+    /**
+     * Value comparison for computational use.
+     *
+     * Equality is intentionally **asymmetric**:
+     * - Compares by numeric value against [BigIntAccumulator], [BigInt], and
+     *   selected integer primitives.
+     * - `other.equals(this)` is **not** guaranteed to return the same result.
+     *
+     * This type is mutable and **not a value type**:
+     * - Must not be used in hash-based collections.
+     * - [hashCode] is unsupported and always throws.
+     *
+     * Intended for internal arithmetic and testing, not for generic equality checks.
+     */
+    override fun equals(other: Any?): Boolean {
+        return when (other) {
+            is BigIntAccumulator -> this EQ other
+            is BigInt -> this EQ other
+            is Int -> this EQ other
+            is Long -> this EQ other
+            is UInt -> this EQ other
+            is ULong -> this EQ other
+            else -> false
+        }
+    }
+
+    /**
+     * Always throws.
+     *
+     * `BigIntAccumulator` is mutable and must never be used as a key in hash-based
+     * collections (`HashMap`, `HashSet`, etc.). Calling `hashCode()` is therefore
+     * unsupported and results in an exception.
+     */
+    override fun hashCode(): Int =
+        throw UnsupportedOperationException(
+            "mutable BigIntAccumulator is an invalid key in collections")
 
     // <<<<<<<<<<<<<<<<<< BEGINNING OF SHARED TEXT SOURCE CODE >>>>>>>>>>>>>>>>>>>>>>
 
