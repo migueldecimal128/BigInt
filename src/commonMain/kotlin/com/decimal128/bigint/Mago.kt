@@ -1858,11 +1858,9 @@ internal object Mago {
     fun calcRem32(x: Magia, xNormLen: Int, w: UInt): UInt {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
-            if (w == 0u)
-                throw ArithmeticException("div by zero")
-
-            if (xNormLen <= 2) {
-                return when {
+            when {
+                w == 0u -> throw ArithmeticException("div by zero")
+                xNormLen <= 2 -> return when {
                     xNormLen == 2 -> {
                         val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
                         (xDw % w.toULong()).toUInt()
@@ -1870,6 +1868,8 @@ internal object Mago {
                     xNormLen == 1 -> x[0].toUInt() % w
                     else -> 0u
                 }
+                w.countOneBits() == 1 ->
+                    return x[0].toUInt() and ((1u shl w.countTrailingZeroBits()) - 1u)
             }
 
             val dw = w.toULong()
@@ -1887,11 +1887,9 @@ internal object Mago {
     fun calcRem64(x: Magia, xNormLen: Int, unBuf: IntArray?, dw: ULong): ULong {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
-            if ((dw shr 32) == 0uL)
-                return calcRem32(x, xNormLen, dw.toUInt()).toULong()
-
-            if (xNormLen <= 2) {
-                return when {
+            when {
+                (dw shr 32) == 0uL -> return calcRem32(x, xNormLen, dw.toUInt()).toULong()
+                xNormLen <= 2 -> return when {
                     xNormLen == 2 -> {
                         val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
                         xDw % dw
@@ -1899,6 +1897,9 @@ internal object Mago {
                     xNormLen == 1 -> x[0].toUInt().toULong()
                     else -> 0uL
                 }
+                dw.countOneBits() == 1 ->
+                    return ((x[1].toULong() shl 32) or x[0].toUInt().toULong()) and
+                            ((1uL shl dw.countTrailingZeroBits()) - 1uL)
             }
 
             return knuthDivide64(
