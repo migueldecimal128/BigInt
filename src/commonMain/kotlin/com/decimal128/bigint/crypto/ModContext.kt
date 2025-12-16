@@ -12,6 +12,12 @@ class ModContext(val m: BigInt) {
 
     private val impl = Barrett(m)
 
+    fun modAdd(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) =
+        impl.modAdd(a, b, out)
+
+    fun modSub(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) =
+        impl.modSub(a, b, out)
+
     fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) =
         impl.modMul(a, b, out)
 
@@ -26,6 +32,9 @@ class ModContext(val m: BigInt) {
 
     fun modPow(base: BigInt, exp: BigInt, out: BigIntAccumulator) =
         impl.modPow(base, exp, out)
+
+    fun modHalfLucas(a: BigIntAccumulator, out: BigIntAccumulator) =
+        impl.modHalfLucas(a, out)
 
     // modInv scratch for EEA Extended Euclidean Algorithm
 
@@ -147,6 +156,16 @@ class ModContext(val m: BigInt) {
                 throw IllegalStateException()
         }
 
+        fun modAdd(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) {
+            out.setAdd(a, b)
+            if (out >= m) out -= m
+        }
+
+        fun modSub(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) {
+            out.setSub(a, b)
+            if (out.isNegative()) out += m
+        }
+
         fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) {
             check (out !== mulTmp)
             mulTmp.setMul(a, b)
@@ -193,6 +212,15 @@ class ModContext(val m: BigInt) {
                 if (exp.testBit(i))
                     modMul(out, baseTmp, out)
             }
+        }
+
+        fun modHalfLucas(a: BigIntAccumulator, out: BigIntAccumulator) {
+            check (m.isOdd())
+            if (out !== a)
+                out.set(a)
+            if (out.isOdd())
+                out += m
+            out.mutShr(1)
         }
     }
 }

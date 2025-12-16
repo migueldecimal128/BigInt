@@ -3,6 +3,7 @@ package com.decimal128.bigint.crypto
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntAccumulator
 import com.decimal128.bigint.toBigInt
+import com.decimal128.bigint.toBigIntAccumulator
 
 object BigIntPrime {
 
@@ -100,6 +101,29 @@ object BigIntPrime {
             if (witness) return false
         }
         return true
+    }
+
+    fun jacobi(a: BigInt, n: BigInt): Int {
+        require (n > 0 && n.isOdd())
+        var u = (a % n).toBigIntAccumulator()          // ensure 0 <= a < n
+        if (u < 0)
+            u += n
+        var v = n.toBigIntAccumulator()
+        var j = 1
+        while (u.isNotZero()) {
+            while (u.isEven()) {
+                u.mutShr(1)
+                val v8 = v.toInt() and 0x07
+                if (v8 == 3 || v8 == 5)
+                    j = -j
+            }
+            // swap
+            val t = u; u = v; v = t
+            if ((u.toInt() and 3) == 3 && (v.toInt() and 3) == 3)
+                j = -j
+            u %= v
+        }
+        return if (v EQ 1) j else 0
     }
 
 }
