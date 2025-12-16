@@ -162,13 +162,14 @@ internal object Mago {
      *
      * Zero returns [ZERO].
      */
-    fun newFromULong(dw: ULong): Magia {
-        return when {
-            (dw shr 32) != 0uL -> intArrayOf(dw.toInt(), (dw shr 32).toInt())
-            dw != 0uL -> intArrayOf(dw.toInt())
-            else -> ZERO
-        }
+    fun newFromULong(dw: ULong): Magia = when {
+        (dw shr 32) != 0uL -> intArrayOf(dw.toInt(), (dw shr 32).toInt())
+        dw != 0uL -> intArrayOf(dw.toInt())
+        else -> ZERO
     }
+
+    fun newFromUInt(w: UInt): Magia =
+        if (w != 0u) intArrayOf(w.toInt()) else ZERO
 
     /**
      * Stores the 64-bit unsigned value `dw` into `z` as 32-bit limbs (little-endian)
@@ -542,6 +543,8 @@ internal object Mago {
         }
         throw IllegalArgumentException()
     }
+
+    fun newSub(x: Magia, xNormLen: Int, w: UInt): Magia = newSub(x, xNormLen, w.toULong())
 
     /**
      * Subtracts a 64-bit unsigned integer [dw] from a multi-limb big integer [x] (first [xLen] limbs),
@@ -1820,6 +1823,18 @@ internal object Mago {
             check (isNormalized(x, xNormLen))
             if (w == 0u)
                 throw ArithmeticException("div by zero")
+
+            if (xNormLen <= 2) {
+                return when {
+                    xNormLen == 2 -> {
+                        val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
+                        (xDw % w.toULong()).toUInt()
+                    }
+                    xNormLen == 1 -> x[0].toUInt() % w
+                    else -> 0u
+                }
+            }
+
             val dw = w.toULong()
             var carry = 0uL
             for (i in xNormLen - 1 downTo 0) {
@@ -1828,6 +1843,35 @@ internal object Mago {
                 carry = r
             }
             return carry.toUInt()
+        }
+        throw IllegalArgumentException()
+    }
+
+    fun calcRem64(x: Magia, xNormLen: Int, unBuf: IntArray?, dw: ULong): ULong {
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            check (isNormalized(x, xNormLen))
+            if ((dw shr 32) == 0uL)
+                return calcRem32(x, xNormLen, dw.toUInt()).toULong()
+
+            if (xNormLen <= 2) {
+                return when {
+                    xNormLen == 2 -> {
+                        val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
+                        xDw % dw
+                    }
+                    xNormLen == 1 -> x[0].toUInt().toULong()
+                    else -> 0uL
+                }
+            }
+
+            return knuthDivide64(
+                q = null,
+                r = null,
+                u = x,
+                vDw = dw,
+                m = xNormLen,
+                unBuf = unBuf
+            )
         }
         throw IllegalArgumentException()
     }
@@ -1877,7 +1921,7 @@ internal object Mago {
         val vnDw = dw
         val q = Magia(m - 2 + 1)
         val r = null
-        val qNormLen = knuthDivide64(q, r, u, vnDw, m, unBuf=null)
+        val qNormLen = knuthDivide64(q, r, u, vnDw, m, unBuf=null).toInt()
         return if (qNormLen > 0) q else ZERO
     }
 
@@ -1981,19 +2025,8 @@ internal object Mago {
      *
      * @return normalized [Magia] remainder or [ZERO]
      */
-    fun newRem(x: Magia, xNormLen: Int, w: UInt): Magia {
-        check (isNormalized(x, xNormLen))
-        if (xNormLen > 0) {
-            val rem =
-                if (xNormLen <= 2)
-                    (toRawULong(x, xNormLen) % w.toULong()).toUInt()
-                else
-                    calcRem32(x, xNormLen, w)
-            if (rem > 0u)
-                return intArrayOf(rem.toInt())
-        }
-        return ZERO
-    }
+    fun newRem(x: Magia, xNormLen: Int, w: UInt): Magia =
+        newFromUInt(calcRem32(x, xNormLen, w))
 
     /**
      * Computes `x mod w` for the normalized range `x[0‥xNormLen)` and stores the
@@ -2005,11 +2038,7 @@ internal object Mago {
     fun setRem(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         check (isNormalized(x, xNormLen))
         if (xNormLen > 0) {
-            val rem =
-                if (xNormLen <= 2)
-                    (toRawULong(x, xNormLen) % w.toULong()).toUInt()
-                else
-                    calcRem32(x, xNormLen, w)
+            val rem = calcRem32(x, xNormLen, w)
             if (rem > 0u) {
                 z[0] = rem.toInt()
                 return 1
@@ -2029,15 +2058,8 @@ internal object Mago {
      * @return a new non-normalized array holding the remainder, or [ZERO] if the
      *         remainder is zero.
      */
-    fun newRem(x: Magia, xNormLen: Int, dw: ULong): Magia {
-        val lo = dw.toUInt()
-        val hi = (dw shr 32).toUInt()
-        if (hi == 0u)
-            return newRem(x, xNormLen, lo)
-        if (xNormLen <= 2)
-            return newFromULong(toRawULong(x, xNormLen) % dw)
-        return newRem(x, xNormLen, intArrayOf(lo.toInt(), hi.toInt()), 2)
-    }
+    fun newRem(x: Magia, xNormLen: Int, dw: ULong): Magia =
+        newFromULong(calcRem64(x, xNormLen, null, dw))
 
     fun setRem(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         check (isNormalized(x, xNormLen))
@@ -2063,6 +2085,7 @@ internal object Mago {
             yNormLen == 0 -> throw ArithmeticException("div by zero")
             xNormLen == 0 -> return ZERO
             yNormLen == 1 -> return newRem(x, xNormLen, y[0].toUInt())
+            yNormLen == 2 -> return newRem(x, xNormLen, (y[1].toULong() shl 32) or y[0].toUInt().toULong())
             xNormLen <= yNormLen -> {
                 val xBitLen = bitLen(x, xNormLen)
                 val yBitLen = bitLen(y, yNormLen)
@@ -2339,7 +2362,7 @@ internal object Mago {
         vDw: ULong,
         m: Int,
         unBuf: IntArray?
-    ): Int {
+    ): ULong {
         if (m < 2 || (vDw shr 32) == 0uL)
             throw IllegalArgumentException()
 
@@ -2364,11 +2387,21 @@ internal object Mago {
         if (r != null)
             rNormLen = setShiftRight(r, un, normLen(un), shift)
 
-        return when {
-            q != null -> normLen(q, m-2+1)
-            r != null -> rNormLen
-            else -> -1
-        }
+        if (q != null)
+            return normLen(q, m-2+1).toULong()
+        if (r != null)
+            return rNormLen.toULong()
+        // caller wants the remainder as a ULong
+        val un0 = un[0].toUInt().toULong()
+        val un1 = un[1].toUInt().toULong()
+        val un2 = un[2].toUInt().toULong()
+        val rDw: ULong =
+            if (shift > 0) {
+                (un2 shl (64 - shift)) or (un1 shl (32 - shift)) or (un0 shr (shift))
+            } else {
+                (un1 shl 32) or un0
+            }
+        return rDw
     }
 
     fun knuthDivideNormalizedCore64(

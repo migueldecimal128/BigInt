@@ -1859,6 +1859,38 @@ class BigInt private constructor(
         fromNonNormalizedOrZero(this.meta.signFlag,
             Mago.newRem(this.magia, this.meta.normLen, dw))
 
+    infix fun mod(n: Int): BigInt = mod(n.absoluteValue.toUInt())
+
+    infix fun mod(w: UInt): BigInt {
+        val rem = Mago.calcRem32(magia, meta.normLen, w)
+        if (meta.isPositive || rem == 0u)
+            return from(rem)
+        // negative: return w - rem
+        return from(w - rem)
+    }
+
+    infix fun mod(l: Long): BigInt = mod(l.absoluteValue.toULong())
+
+    infix fun mod(dw: ULong): BigInt {
+        val rem = Mago.calcRem64(magia, meta.normLen, unBuf = null, dw)
+        if (meta.isPositive || rem == 0uL)
+            return from(rem)
+        // negative: return dw - rem
+        return from(dw - rem)
+    }
+
+    infix fun mod(other: BigInt): BigInt {
+        val rem = Mago.newRem(magia, meta.normLen, other.magia, other.meta.normLen)
+        if (rem === Mago.ZERO)
+            return ZERO
+        val mod =
+            if (meta.isPositive)
+                rem
+            else
+                Mago.newSub(other.magia, other.meta.normLen, rem, Mago.normLen(rem))
+        return fromNonNormalizedNonZero(mod)
+    }
+
     /**
      * Divides the given [numerator] (primitive type) by this BigInt and returns the quotient.
      *
@@ -2192,7 +2224,7 @@ class BigInt private constructor(
         }
         val cmp = this.magnitudeCompareTo(w)
         val ret = when {
-            cmp > 0 -> BigInt(thisSign, Mago.newSub(this.magia, this.meta.normLen, w.toULong()))
+            cmp > 0 -> BigInt(thisSign, Mago.newSub(this.magia, this.meta.normLen, w))
             cmp < 0 -> BigInt(otherSign, intArrayOf(w.toInt() - this.magia[0]))
             else -> ZERO
         }
