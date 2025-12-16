@@ -59,17 +59,23 @@ object BigIntPrime {
         1795265022
     )
 
-    fun isProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()): Boolean {
-        require(!n.isNegative())
+    fun isProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()) =
+        isBailliePSWProbablePrime(n, tmp)
 
+    fun isBailliePSWProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()): Boolean {
+        require(!n.isNegative())
         return when (classifyBySmallPrimes(n, tmp)) {
             SmallPrimeResult.COMPOSITE -> false
             SmallPrimeResult.PRIME -> true
-            SmallPrimeResult.INCONCLUSIVE -> millerRabin(n, tmp)
+            SmallPrimeResult.INCONCLUSIVE -> {
+                if (! isMillerRabinBase2(n, tmp)) return false
+                val selfridge = selectSelfridgeParams(n)
+                selfridge.D != 0 && isStrongLucasProbablePrime(n, selfridge)
+            }
         }
     }
 
-    fun millerRabin(n: BigInt, tmp: BigIntAccumulator): Boolean {
+    fun isMillerRabinBase2(n: BigInt, tmp: BigIntAccumulator): Boolean {
         require (! n.isNegative())
         val nMinusOne = n - 1
         var d = nMinusOne
@@ -162,70 +168,67 @@ object BigIntPrime {
         n: BigInt,
         params: LucasParams
     ): Boolean {
-        val D = params.D
-        val Q = params.Q   // Int
-        // P is always 1
 
-        // write n + 1 = d * 2^s
+        // n + 1 = d * 2^s, with d odd
         val n1 = n + 1
         val s = n1.countTrailingZeroBits()
-        val d = n1 shr s   // odd
+        val d = n1 shr s
 
-        // U_k, V_k, Q^k
-        val (U, V, Qk) = lucasUVQk(n, d, Q)
+        // U_d, V_d, Q^d (all normalized mod n)
+        val (U, V, Qk) = lucasUVQk(n, d, params.D, params.Q)
 
         if (U.isZero()) return true
 
         var Vcur = V
         var Qcur = Qk
+
         repeat(s - 1) {
-            Vcur = (Vcur * Vcur - (Qcur shl 1)) % n
-            Qcur = (Qcur * Qcur) % n
+            Vcur = (Vcur * Vcur - (Qcur shl 1)) mod n
+            Qcur = (Qcur * Qcur) mod n
+
             if (Vcur.isZero()) return true
         }
 
         return false
     }
 
+    /**
+     * Computes x / 2 modulo odd modulus n.
+     * Precondition: 0 ≤ x < n and n is odd.
+     */
+    private fun modHalfLucas(x: BigInt, n: BigInt): BigInt {
+        check(n.isOdd())
+        // x is already reduced mod n
+        return if (x.isOdd()) (x + n) shr 1 else x shr 1
+    }
+
     fun lucasUVQk(
         n: BigInt,
         d: BigInt,   // odd
+        D: Int,
         Q: Int
     ): Triple<BigInt, BigInt, BigInt> {
 
-        // --- initialize for m = 1 ---
-        var U = BigInt.ONE          // U1
-        var V = BigInt.ONE          // V1
-        var Qk = Q.toBigInt() % n   // Q^1 mod n
+        var U = BigInt.ONE
+        var V = BigInt.ONE
+        var Qk = Q.toBigInt() mod n
 
-        // iterate over remaining bits of d (excluding top 1 bit)
         for (i in d.magnitudeBitLen() - 2 downTo 0) {
 
             val bit = d.testBit(i)
 
-            // ---- doubling: m → 2m ----
-            // U2m = U * V
-            // V2m = V^2 − 2*Qk
-            // Q2m = Qk^2
-
-            val U2m = (U * V) % n
-            val V2m = (V * V - (Qk shl 1)) % n
-            val Q2m = (Qk * Qk) % n
+            val U2m = (U * V) mod n
+            val V2m = (V * V - (Qk shl 1)) mod n
+            val Q2m = (Qk * Qk) mod n
 
             if (!bit) {
-                // m = 2m
                 U = U2m
                 V = V2m
                 Qk = Q2m
             } else {
-                // ---- add 1: 2m → 2m + 1 ----
-                // U_{2m+1} = (U2m + V2m) / 2
-                // V_{2m+1} = (V2m + U2m) / 2   (P = 1)
-                // Q_{2m+1} = Q2m * Q
-
-                val U2m1 = ((U2m + V2m) shr 1) % n
-                val V2m1 = ((V2m + U2m) shr 1) % n
-                val Q2m1 = (Q2m * Q) % n
+                val U2m1 = modHalfLucas((U2m + V2m) mod n, n)
+                val V2m1 = modHalfLucas((V2m + (U2m * D)) mod n, n)
+                val Q2m1 = (Q2m * Q) mod n
 
                 U = U2m1
                 V = V2m1
