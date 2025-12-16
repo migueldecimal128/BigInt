@@ -5,7 +5,73 @@ import com.decimal128.bigint.BigIntAccumulator
 import com.decimal128.bigint.toBigInt
 import com.decimal128.bigint.toBigIntAccumulator
 
+/**
+ * Primality-testing utilities for [BigInt].
+ *
+ * Provides fast probabilistic primality checks based on the
+ * **Baillie–PSW** test:
+ * - Trial division by a fixed set of small primes
+ * - Deterministic Miller–Rabin for 64-bit–safe bases
+ * - Strong Lucas probable-prime test (Selfridge method)
+ *
+ * The combined test has no known counterexamples and is suitable for
+ * cryptographic and numerical use.
+ *
+ * ## Notes
+ * - All algorithms are allocation-conscious and reuse
+ *   [BigIntAccumulator] scratch storage where possible.
+ * - Results are *probabilistic* but extremely reliable in practice.
+ * - Negative values are rejected; `0` and `1` are composite.
+ */
 object BigIntPrime {
+
+    /**
+     * Returns `true` if [n] is a probable prime (Baillie–PSW test).
+     */
+    fun isProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()) =
+        isBailliePSWProbablePrime(n, tmp)
+
+    /**
+     * Tests whether [n] is a probable prime using the Baillie–PSW algorithm.
+     *
+     * The Baillie–PSW test is a strong, widely used probabilistic primality test
+     * combining:
+     *
+     * 1. Trial division by a fixed set of small primes
+     * 2. A base-2 Miller–Rabin strong probable-prime test
+     * 3. A strong Lucas probable-prime test with Selfridge parameter selection
+     *
+     * This implementation uses a slightly stronger Miller-Rabin test by
+     * testing 7 bases (including base-2) instead of only a base-2 test.
+     *
+     * No counterexamples to Baillie–PSW are known, and it is considered
+     * deterministic for all practical purposes.
+     *
+     * ## Behavior
+     * - Returns `false` for negative values, `0`, and `1`
+     * - Returns `true` for all small primes
+     * - Uses [BigIntAccumulator] scratch storage to minimize heap allocation
+     *
+     * ## Constraints
+     * - [n] must be non-negative
+     *
+     * @param n value to test for primality
+     * @param tmp reusable scratch accumulator
+     * @return `true` if [n] is a probable prime, `false` if composite
+     * @throws IllegalArgumentException if [n] is negative
+     */
+    fun isBailliePSWProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()): Boolean {
+        require(!n.isNegative())
+        return when (classifyBySmallPrimes(n, tmp)) {
+            SmallPrimeResult.COMPOSITE -> false
+            SmallPrimeResult.PRIME -> true
+            SmallPrimeResult.INCONCLUSIVE -> {
+                if (! isMillerRabin64(n, tmp)) return false
+                val selfridge = selectSelfridgeParams(n)
+                selfridge.D != 0 && isStrongLucasProbablePrime(n, selfridge)
+            }
+        }
+    }
 
     private val SMALL_PRIMES = shortArrayOf(
         3, 5, 7, 11, 13, 17, 19, 23,
@@ -49,7 +115,13 @@ object BigIntPrime {
         }
     }
 
-    private val MR_BASES = intArrayOf(
+    /**
+     * Deterministic Miller–Rabin bases sufficient for testing 64-bit–range values.
+     *
+     * When used together, these bases make the Miller–Rabin test
+     * deterministic for all `n < 2^64`.
+     */
+    private val MILLER_RABIN_2_64_BASES = intArrayOf(
         2,
         325,
         9375,
@@ -59,23 +131,21 @@ object BigIntPrime {
         1795265022
     )
 
-    fun isProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()) =
-        isBailliePSWProbablePrime(n, tmp)
-
-    fun isBailliePSWProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()): Boolean {
-        require(!n.isNegative())
-        return when (classifyBySmallPrimes(n, tmp)) {
-            SmallPrimeResult.COMPOSITE -> false
-            SmallPrimeResult.PRIME -> true
-            SmallPrimeResult.INCONCLUSIVE -> {
-                if (! isMillerRabinBase2(n, tmp)) return false
-                val selfridge = selectSelfridgeParams(n)
-                selfridge.D != 0 && isStrongLucasProbablePrime(n, selfridge)
-            }
-        }
-    }
-
-    fun isMillerRabinBase2(n: BigInt, tmp: BigIntAccumulator): Boolean {
+    /**
+     * Performs a Miller–Rabin strong probable-prime test on [n].
+     *
+     * Uses a fixed set of deterministic bases sufficient to make the test
+     * exact for all values in the 64-bit range and extremely reliable for
+     * larger values.
+     *
+     * The test writes intermediate results into [tmp] to avoid heap allocation.
+     *
+     * @param n value to test (must be non-negative)
+     * @param tmp reusable scratch accumulator
+     * @return `true` if [n] passes all Miller–Rabin bases, `false` if composite
+     * @throws IllegalArgumentException if [n] is negative
+     */
+    fun isMillerRabin64(n: BigInt, tmp: BigIntAccumulator): Boolean {
         require (! n.isNegative())
         val nMinusOne = n - 1
         var d = nMinusOne
@@ -87,7 +157,7 @@ object BigIntPrime {
 
         val ctx = ModContext(n)
 
-        for (a in MR_BASES) {
+        for (a in MILLER_RABIN_2_64_BASES) {
             if (n <= a) continue   // important for small n
 
             ctx.modPow(a.toBigInt(), d, tmp)
@@ -109,8 +179,18 @@ object BigIntPrime {
         return true
     }
 
+    /**
+     * Computes the Jacobi symbol (a | n).
+     *
+     * @return -1, 0, or 1 depending on the value of the Jacobi symbol
+     */
     fun jacobi(a: Int, n: Int): Int = jacobi(a, n.toBigInt())
 
+    /**
+     * Computes the Jacobi symbol (a | n).
+     *
+     * @return -1, 0, or 1 depending on the value of the Jacobi symbol
+     */
     fun jacobi(a: Int, n: BigInt): Int {
         require (n > 0 && n.isOdd())
         var v = n.toBigIntAccumulator()
@@ -135,8 +215,25 @@ object BigIntPrime {
         return if (v EQ 1) j else 0
     }
 
+    /**
+     * Parameters (D, P, Q) for Lucas sequences, selected using
+     * the Selfridge method when used in primality testing.
+     */
     data class LucasParams(val D: Int, val P: Int, val Q: Int)
 
+    /**
+     * Selects Lucas sequence parameters using the Selfridge method.
+     *
+     * Iteratively chooses signed values of `D = 5, -7, 9, -11, ...` until
+     * `jacobi(D, n) = -1`, then returns the corresponding `(D, P, Q)` values
+     * used for the strong Lucas probable-prime test.
+     *
+     * If `jacobi(D, n) = 0`, the number is composite unless `n == |D|`,
+     * in which case valid parameters are returned.
+     *
+     * @param n positive odd integer to test
+     * @return selected Lucas parameters, or `(0, 0, 0)` if `n` is composite
+     */
     fun selectSelfridgeParams(n: BigInt): LucasParams {
         require(n.isPositive() && n.isOdd())
         var D = 5
@@ -164,6 +261,17 @@ object BigIntPrime {
         }
     }
 
+    /**
+     * Performs a strong Lucas probable-prime test on [n].
+     *
+     * Uses the Lucas parameters [params] (typically selected via the
+     * Selfridge method) and checks the strong Lucas conditions based on
+     * the factorization `n + 1 = d · 2^s`.
+     *
+     * @param n odd integer to test for primality
+     * @param params Lucas sequence parameters `(D, P, Q)`
+     * @return `true` if [n] passes the strong Lucas test, `false` if composite
+     */
     fun isStrongLucasProbablePrime(
         n: BigInt,
         params: LucasParams
@@ -202,6 +310,20 @@ object BigIntPrime {
         return if (x.isOdd()) (x + n) shr 1 else x shr 1
     }
 
+    /**
+     * Computes Lucas sequence values `U_d`, `V_d`, and `Q^d (mod n)`.
+     *
+     * Uses a left-to-right binary method to evaluate the Lucas sequences
+     * defined by parameters `(D, P = 1, Q)` modulo [n], where [d] is odd.
+     *
+     * The returned values are required by the strong Lucas probable-prime test.
+     *
+     * @param n modulus (odd)
+     * @param d odd exponent
+     * @param D Lucas parameter `D = P^2 - 4Q`
+     * @param Q Lucas parameter `Q`
+     * @return a triple `(U_d, V_d, Q^d mod n)`
+     */
     fun lucasUVQk(
         n: BigInt,
         d: BigInt,   // odd
