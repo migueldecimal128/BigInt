@@ -282,19 +282,10 @@ internal object Zoro {
      * @param magia magnitude limb array in little-endian order.
      * @return the count of trailing zero bits, or `-1` if the magnitude is zero.
      *
-     * @throws IllegalStateException if `meta.normLen` is out of bounds.
+     * @throws IllegalArgumentException if `meta.normLen` is out of bounds.
      */
-    internal fun countTrailingZeroBits(meta: Meta, magia: Magia): Int {
-        if (meta.normLen >= 0 && meta.normLen <= magia.size) { // BCE
-            for (i in 0..<meta.normLen) {
-                if (magia[i] != 0)
-                    return (i shl 5) + magia[i].countTrailingZeroBits()
-            }
-            return -1
-        }
-        throw IllegalStateException()
-    }
-
+    internal fun countTrailingZeroBits(meta: Meta, magia: Magia): Int =
+        Mago.ctz(magia, meta.normLen)
 
     /**
      * Counts the number of set bits (population count) in the normalized magnitude.

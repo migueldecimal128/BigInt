@@ -187,6 +187,12 @@ internal object Mago {
         return 2
     }
 
+    fun setUInt(z: Magia, w: UInt): Int {
+        val n = w.toInt()
+        z[0] = n
+        return (n or -n) ushr 31
+    }
+
     /**
      * Returns the normalized limb length of **x**—the index of the highest
      * non-zero limb plus one. If all limbs are zero, returns `0`.
@@ -1257,6 +1263,8 @@ internal object Mago {
     }
 
 
+
+
     /**
      * Returns the bit length of the value represented by the entire [x] array.
      *
@@ -1328,6 +1336,30 @@ internal object Mago {
             throw IllegalArgumentException()
         }
     }
+
+    /**
+     * Returns the count of trailing zero bits in the unsigned magnitude.
+     *
+     * Scans limbs `0 ..< normLen` in little-endian order and returns the bit index
+     * of the least-significant set bit. Returns `-1` if the magnitude is zero
+     * (`normLen == 0` or all inspected limbs are zero).
+     *
+     * @param x the limb array in little-endian order.
+     * @param normLen the count of significant limbs to inspect.
+     * @return the count of trailing zero bits, or `-1` if the magnitude is zero.
+     * @throws IllegalArgumentException if `normLen` is out of bounds.
+     */
+    fun ctz(x: Magia, normLen: Int): Int {
+        if (normLen >= 0 && normLen <= x.size) { // BCE
+            for (i in 0..<normLen) {
+                if (x[i] != 0)
+                    return (i shl 5) + x[i].countTrailingZeroBits()
+            }
+            return -1
+        }
+        throw IllegalArgumentException()
+    }
+
 
     /**
      * Returns a new normalized array holding `x AND y` over their normalized
@@ -1748,14 +1780,11 @@ internal object Mago {
     fun setDiv64(z: Magia, x: Magia, xNormLen: Int, unBuf: IntArray?, dw: ULong): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen - 2 + 1) {
             check (isNormalized(x, xNormLen))
-            when {
-                (dw shr 32) == 0uL -> return setDiv(z, x, xNormLen, dw.toUInt())
-                xNormLen <= 2 -> {
-                    val dwX = toRawULong(x, xNormLen)
-                    return setULong(z, dwX / dw)
-                }
-                dw.countOneBits() == 1 -> return setShiftRight(z, x, xNormLen, dw.countTrailingZeroBits())
-            }
+
+            val tryLen = trySetDivFastPath64(z, x, xNormLen, dw)
+            if (tryLen >= 0)
+                return tryLen
+
             val u = x
             val m = xNormLen
             val vnDw = dw
@@ -1778,10 +1807,14 @@ internal object Mago {
     fun trySetDivFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
         when {
             yNormLen == 0 -> throw ArithmeticException("div by zero")
-            xNormLen == 0 || xNormLen < yNormLen -> return 0
+            xNormLen == 0 -> return 0
+            xNormLen < yNormLen -> return 0
             xNormLen <= 2 ->
                 return setULong(zMagia, toRawULong(xMagia, xNormLen) / toRawULong(yMagia, yNormLen))
             yNormLen == 1 -> return setDiv(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
+            isPowerOfTwo(yMagia, yNormLen) ->
+                return setShiftRight(zMagia, xMagia, xNormLen,
+                    ctz(yMagia, yNormLen))
             // note that this will handle aliasing
             // when x === yMeta,yMagia
             xNormLen == yNormLen -> {
@@ -1806,7 +1839,8 @@ internal object Mago {
     fun trySetDivFastPath64(zMagia: Magia, xMagia: Magia, xNormLen: Int, yDw: ULong): Int {
         when {
             yDw == 0uL -> throw ArithmeticException("div by zero")
-            xNormLen < 2 -> return 0
+            xNormLen == 0 -> return 0
+            xNormLen == 1 -> return setUInt(zMagia, (xMagia[0].toUInt().toULong() / yDw).toUInt())
             xNormLen == 2 ->
                 return setULong(zMagia,
                     ((xMagia[1].toULong() shl 32) or xMagia[0].toUInt().toULong()) / yDw)
