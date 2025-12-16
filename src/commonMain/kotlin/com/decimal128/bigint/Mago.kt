@@ -1806,9 +1806,12 @@ internal object Mago {
     fun trySetDivFastPath64(zMagia: Magia, xMagia: Magia, xNormLen: Int, yDw: ULong): Int {
         when {
             yDw == 0uL -> throw ArithmeticException("div by zero")
-            xNormLen == 0 || xNormLen < 2 -> return 0
-            xNormLen <= 2 ->
-                return setULong(zMagia, toRawULong(xMagia, xNormLen) / yDw)
+            xNormLen < 2 -> return 0
+            xNormLen == 2 ->
+                return setULong(zMagia,
+                    ((xMagia[1].toULong() shl 32) or xMagia[0].toUInt().toULong()) / yDw)
+            yDw.countOneBits() == 1 ->
+                return setShiftRight(zMagia, xMagia, xNormLen, yDw.countTrailingZeroBits())
             (yDw shr 32) == 0uL -> return setDiv(zMagia, xMagia, xNormLen, yDw.toUInt())
         }
         return -1
