@@ -103,12 +103,15 @@ object BigIntPrime {
         return true
     }
 
-    fun jacobi(a: BigInt, n: BigInt): Int {
+    fun jacobi(a: Int, n: Int): Int = jacobi(a, n.toBigInt())
+
+    fun jacobi(a: Int, n: BigInt): Int {
         require (n > 0 && n.isOdd())
-        var u = (a % n).toBigIntAccumulator()          // ensure 0 <= a < n
+        var v = n.toBigIntAccumulator()
+        var u = a.toBigIntAccumulator()
+        u %= v
         if (u < 0)
             u += n
-        var v = n.toBigIntAccumulator()
         var j = 1
         while (u.isNotZero()) {
             while (u.isEven()) {
@@ -126,4 +129,32 @@ object BigIntPrime {
         return if (v EQ 1) j else 0
     }
 
+    data class LucasParams(val D: Int, val P: Int, val Q: Int)
+
+    fun selectSelfridgeParams(n: BigInt): LucasParams {
+        require(n.isPositive() && n.isOdd())
+        var D = 5
+        var sign = 1
+        while (true) {
+            val dSigned = sign * D
+            val jac = jacobi(dSigned, n)
+            if (jac == -1) {
+                // P = 1
+                // Q = (1 - D) / 4  where D is signed here
+                val Q = (1 - dSigned) shr 2   // exact division by 4
+                return LucasParams(dSigned, 1, Q)
+            }
+            if (jac == 0) {
+                // gcd(D, n) > 1 ⇒ composite unless n == D
+                if (n EQ D) {
+                    val Q = (1 - dSigned) shr 2
+                    return LucasParams(dSigned, 1, Q)
+                }
+                return LucasParams(0, 0, 0)
+            }
+            // next D in 5, -7, 9, -11, 13, ...
+            D += 2
+            sign = -sign
+        }
+    }
 }

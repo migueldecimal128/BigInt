@@ -2325,4 +2325,9 @@ private inline fun dw32(n: Int) = n.toUInt().toULong()
 
 fun BigInt.toBigIntAccumulator() = BigIntAccumulator.from(this)
 
+fun Int.toBigIntAccumulator() = BigIntAccumulator().set(this)
+fun UInt.toBigIntAccumulator() = BigIntAccumulator().set(this)
+fun Long.toBigIntAccumulator() = BigIntAccumulator().set(this)
+fun ULong.toBigIntAccumulator() = BigIntAccumulator().set(this)
+
 fun String.toBigIntAccumulator() = this.toBigInt().toBigIntAccumulator()

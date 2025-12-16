@@ -1054,6 +1054,11 @@ class BigInt private constructor(
     fun isNegative() = meta.isNegative
 
     /**
+     * returns `true` if this BigInt is non-negative.
+     */
+    fun isPositive() = meta.isPositive
+
+    /**
      * Standard signum function.
      *
      * @return -1 if negative, 0 if zero, 1 if positive
