@@ -438,26 +438,15 @@ class BigIntAccumulator private constructor (
     fun set(dw: ULong) = set(false, dw)
 
     /**
-     * Sets this accumulator’s value from a [BigInt].
-     *
-     * The accumulator adopts the sign and magnitude of the given [BigInt].
-     * Internal storage is reused where possible.
-     *
-     * @param bi the source [BigInt].
-     * @return this accumulator instance, for call chaining.
-     */
-    fun set(bi: BigInt): BigIntAccumulator = set(Meta(bi.meta.isNegative, bi.magia), bi.magia)
-
-    /**
      * Sets this accumulator’s value from another [BigIntAccumulator].
      *
      * The accumulator copies the sign, and magnitude of the source accumulator.
      * Internal storage of the destination is reused when possible.
      *
-     * @param hia the source [BigIntAccumulator].
+     * @param bi the source [BigIntAccumulator].
      * @return this accumulator instance, for call chaining.
      */
-    fun set(hia: BigIntAccumulator): BigIntAccumulator = set(hia.meta, hia.magia)
+    fun set(bi: BigIntBase): BigIntAccumulator = set(bi.meta, bi.magia)
 
     /**
      * Sets this accumulator’s value from a raw sign and 64-bit magnitude.
@@ -529,42 +518,26 @@ class BigIntAccumulator private constructor (
     fun toBigInt(): BigInt =
         BigInt.fromLittleEndianIntArray(meta.signFlag, magia, meta.normLen)
 
-    fun setAdd(x: BigInt, n: Int) =
+    fun setAdd(x: BigIntBase, n: Int) =
         setAddImpl(x.meta, x.magia, n < 0, n.absoluteValue.toUInt().toULong())
-    fun setAdd(x: BigInt, w: UInt) =
+    fun setAdd(x: BigIntBase, w: UInt) =
         setAddImpl(x.meta, x.magia, false, w.toULong())
-    fun setAdd(x: BigInt, l: Long) =
+    fun setAdd(x: BigIntBase, l: Long) =
         setAddImpl(x.meta, x.magia, l < 0, l.absoluteValue.toULong())
-    fun setAdd(x: BigInt, dw: ULong) =
+    fun setAdd(x: BigIntBase, dw: ULong) =
         setAddImpl(x.meta, x.magia, false, dw)
-    fun setAdd(x: BigInt, y: BigInt) =
-        setAddImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setAdd(x: BigInt, y: BigIntAccumulator) =
+    fun setAdd(x: BigIntBase, y: BigIntBase) =
         setAddImpl(x.meta, x.magia, y.meta, y.magia)
 
-    fun setAdd(x: BigIntAccumulator, n: Int) =
-        setAddImpl(x.meta, x.magia, n < 0, n.absoluteValue.toUInt().toULong())
-    fun setAdd(x: BigIntAccumulator, w: UInt) =
-        setAddImpl(x.meta, x.magia, false, w.toULong())
-    fun setAdd(x: BigIntAccumulator, l: Long) =
-        setAddImpl(x.meta, x.magia, l < 0, l.absoluteValue.toULong())
-    fun setAdd(x: BigIntAccumulator, dw: ULong) =
-        setAddImpl(x.meta, x.magia, false, dw)
-    fun setAdd(x: BigIntAccumulator, y: BigInt) =
-        setAddImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setAdd(x: BigIntAccumulator, y: BigIntAccumulator) =
-        setAddImpl(x.meta, x.magia, y.meta, y.magia)
-
-    fun setSub(x: BigInt, y: BigInt) =
-        setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
-
-    fun setSub(x: BigInt, y: BigIntAccumulator) =
-        setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
-
-    fun setSub(x: BigIntAccumulator, y: BigInt) =
-        setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
-
-    fun setSub(x: BigIntAccumulator, y: BigIntAccumulator) =
+    fun setSub(x: BigIntBase, n: Int) =
+        setAddImpl(x.meta, x.magia, n >= 0, n.absoluteValue.toUInt().toULong())
+    fun setSub(x: BigIntBase, w: UInt) =
+        setAddImpl(x.meta, x.magia, true, w.toULong())
+    fun setSub(x: BigIntBase, l: Long) =
+        setAddImpl(x.meta, x.magia, l >= 0L, l.absoluteValue.toULong())
+    fun setSub(x: BigIntBase, dw: ULong) =
+        setAddImpl(x.meta, x.magia, true, dw)
+    fun setSub(x: BigIntBase, y: BigIntBase) =
         setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
 
     private fun setAddImpl(xMeta: Meta, xMagia: Magia, ySign: Boolean, yDw: ULong): BigIntAccumulator {
@@ -637,40 +610,15 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    fun setMul(x: BigInt, n: Int) =
+    fun setMul(x: BigIntBase, n: Int) =
         setMulImpl(x.meta, x.magia, n < 0, n.absoluteValue.toUInt())
-
-    fun setMul(x: BigInt, w: UInt) =
+    fun setMul(x: BigIntBase, w: UInt) =
         setMulImpl(x.meta, x.magia, false, w)
-
-    fun setMul(x: BigInt, l: Long) =
+    fun setMul(x: BigIntBase, l: Long) =
         setMulImpl(x.meta, x.magia, l < 0, l.absoluteValue.toULong())
-
-    fun setMul(x: BigInt, dw: ULong) =
+    fun setMul(x: BigIntBase, dw: ULong) =
         setMulImpl(x.meta, x.magia, false, dw)
-
-    fun setMul(x: BigIntAccumulator, n: Int) =
-        setMulImpl(x.meta, x.magia, n < 0, n.absoluteValue.toUInt())
-
-    fun setMul(x: BigIntAccumulator, w: UInt) =
-        setMulImpl(x.meta, x.magia, false, w)
-
-    fun setMul(x: BigIntAccumulator, l: Long) =
-        setMulImpl(x.meta, x.magia, l < 0, l.absoluteValue.toULong())
-
-    fun setMul(x: BigIntAccumulator, dw: ULong) =
-        setMulImpl(x.meta, x.magia, false, dw)
-
-    fun setMul(x: BigInt, y: BigInt) =
-        setMulImpl(x.meta, x.magia, y.meta, y.magia)
-
-    fun setMul(x: BigInt, y: BigIntAccumulator) =
-        setMulImpl(x.meta, x.magia, y.meta, y.magia)
-
-    fun setMul(x: BigIntAccumulator, y: BigInt) =
-        setMulImpl(x.meta, x.magia, y.meta, y.magia)
-
-    fun setMul(x: BigIntAccumulator, y: BigIntAccumulator) =
+    fun setMul(x: BigIntBase, y: BigIntBase) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
 
     private fun setMulImpl(xMeta: Meta, x: Magia, wSign: Boolean, w: UInt): BigIntAccumulator {
@@ -707,12 +655,6 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    fun setSqr(x: BigInt): BigIntAccumulator =
-        setSqrImpl(x.meta, x.magia)
-
-    fun setSqr(x: BigIntAccumulator): BigIntAccumulator =
-        setSqrImpl(x.meta, x.magia)
-
     fun setSqr(n: Int): BigIntAccumulator = setSqr(n.absoluteValue.toUInt())
 
     fun setSqr(w: UInt): BigIntAccumulator {
@@ -728,6 +670,9 @@ class BigIntAccumulator private constructor (
         return set(false, hi, lo)
     }
 
+    fun setSqr(x: BigIntBase): BigIntAccumulator =
+        setSqrImpl(x.meta, x.magia)
+
     private fun setSqrImpl(xMeta: Meta, x: Magia): BigIntAccumulator {
         check(Mago.isNormalized(x, xMeta.normLen))
         val xNormLen = xMeta.normLen
@@ -740,19 +685,15 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    fun setDiv(x: BigIntAccumulator, yDw: ULong): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia , false, yDw)
-
-    fun setDiv(x: BigInt, y: BigInt): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia, y.meta, y.magia)
-
-    fun setDiv(x: BigInt, y: BigIntAccumulator): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia, y.meta, y.magia)
-
-    fun setDiv(x: BigIntAccumulator, y: BigInt): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia, y.meta, y.magia)
-
-    fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
+    fun setDiv(x: BigIntAccumulator, n: Int): BigIntAccumulator =
+        setDivImpl(x.meta, x.magia , n < 0, n.absoluteValue.toUInt().toULong())
+    fun setDiv(x: BigIntAccumulator, w: UInt): BigIntAccumulator =
+        setDivImpl(x.meta, x.magia , false, w.toULong())
+    fun setDiv(x: BigIntAccumulator, l: Long): BigIntAccumulator =
+        setDivImpl(x.meta, x.magia , l < 0L, l.absoluteValue.toULong())
+    fun setDiv(x: BigIntAccumulator, dw: ULong): BigIntAccumulator =
+        setDivImpl(x.meta, x.magia , false, dw)
+    fun setDiv(x: BigIntBase, y: BigIntBase): BigIntAccumulator =
         setDivImpl(x.meta, x.magia, y.meta, y.magia)
 
     private fun setDivImpl(xMeta: Meta, xMagia: Magia, ySign: Boolean, yDw: ULong): BigIntAccumulator {
@@ -803,14 +744,20 @@ class BigIntAccumulator private constructor (
         return true
     }
 
-    fun setRem(x: BigInt, y: BigInt): BigIntAccumulator =
+    fun setRem(x: BigIntAccumulator, n: Int): BigIntAccumulator =
+        setRemImpl(x.meta, x.magia , n < 0, n.absoluteValue.toUInt().toULong())
+    fun setRem(x: BigIntAccumulator, w: UInt): BigIntAccumulator =
+        setRemImpl(x.meta, x.magia , false, w.toULong())
+    fun setRem(x: BigIntAccumulator, l: Long): BigIntAccumulator =
+        setRemImpl(x.meta, x.magia , l < 0L, l.absoluteValue.toULong())
+    fun setRem(x: BigIntAccumulator, dw: ULong): BigIntAccumulator =
+        setRemImpl(x.meta, x.magia , false, dw)
+    fun setRem(x: BigIntBase, y: BigIntBase): BigIntAccumulator =
         setRemImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setRem(x: BigInt, y: BigIntAccumulator): BigIntAccumulator =
-        setRemImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setRem(x: BigIntAccumulator, y: BigInt): BigIntAccumulator =
-        setRemImpl(x.meta, x.magia, y.meta, y.magia)
-    fun setRem(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
-        setRemImpl(x.meta, x.magia, y.meta, y.magia)
+
+    private fun setRemImpl(xMeta: Meta, xMagia: Magia, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+        TODO()
+    }
 
     private fun setRemImpl(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
         ensureCapacityDiscard(yMeta.normLen)
