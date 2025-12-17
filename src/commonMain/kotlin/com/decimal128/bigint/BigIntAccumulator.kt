@@ -69,7 +69,8 @@ class BigIntAccumulator private constructor (
 ) : Magian {
     constructor() : this(Meta(0), Magia(4))
 
-    internal var tmp: Magia = Mago.ZERO
+    internal var tmp1: Magia = Mago.ZERO
+    internal var tmp2: Magia = Mago.ZERO
 
     companion object {
 
@@ -115,6 +116,257 @@ class BigIntAccumulator private constructor (
         )
     }
 
+    // <<<<<<<<<<< BEGIN STORAGE MANAGEMENT FUNCTIONS >>>>>>>>>>>>
+
+    /**
+     * Resizes the internal limb storage, discarding any existing value.
+     *
+     * Capacity policy:
+     * - If the current backing array is the initial fixed-size storage (4 limbs),
+     *   allocate a new array with capacity **at least** [minLimbLen].
+     * - Otherwise, allocate with additional headroom (~50%) to reduce the number
+     *   of future reallocations.
+     *
+     * The final capacity is rounded up to the allocator’s heap quantum
+     * (e.g., 16 bytes / 4 ints).
+     *
+     * @param minLimbLen the minimum number of limbs required; must exceed the
+     *        current capacity and the inline storage size.
+     */
+    private fun resizeDiscard(minLimbLen: Int) {
+        check (minLimbLen > 4 && minLimbLen > magia.size)
+        // if the existing magia.size == 4 then this is the first resizing.
+        // if this is the first resizing then give them requested size.
+        // otherwise, we are in a growth pattern, so give them 50% more.
+        val headRoom = (minLimbLen ushr 1) and ((4 - magia.size) shr 31)
+        // newWithFloorLen rounds up to heap quantum, 16 bytes, 4 ints
+        magia = Mago.newWithFloorLen(minLimbLen + headRoom)
+    }
+
+    /**
+     * Resizes the internal limb storage while preserving the current value.
+     *
+     * Capacity policy:
+     * - If the current backing array is the initial fixed-size storage (4 limbs),
+     *   allocate a new array with capacity **at least** [minLimbLen].
+     * - Otherwise, allocate with additional headroom (~50%) to reduce the number
+     *   of future reallocations.
+     *
+     * The final capacity is rounded up to the allocator’s heap quantum.
+     * Only the normalized limbs ([meta.normLen]) are copied; any additional limbs
+     * in the new storage remain zero-initialized.
+     *
+     * @param minLimbLen the minimum number of limbs required; must exceed the
+     *        current capacity and the inline storage size.
+     */
+    private fun resizeCopy(minLimbLen: Int) {
+        check (minLimbLen > 4 && minLimbLen > magia.size)
+        val t = magia
+        val headRoom = (minLimbLen ushr 1) and ((4 - magia.size) shr 31)
+        magia = Mago.newWithFloorLen(minLimbLen + headRoom)
+        t.copyInto(magia, 0, 0, meta.normLen)
+    }
+
+    /**
+     * Resizes the `tmp1` temporary buffer.
+     *
+     * Temporary buffers start with zero capacity. On the first allocation,
+     * the buffer is grown to a capacity **at least** [minLimbLen]. On subsequent
+     * resizes, additional headroom (~50%) is added to reduce reallocation.
+     *
+     * The final capacity is rounded up to the allocator’s heap quantum.
+     * Existing contents, if any, are discarded.
+     *
+     * @param minLimbLen the minimum number of limbs required; must exceed the
+     *        current capacity of the temporary buffer.
+     */
+    private fun resizeTmp1(minLimbLen: Int) {
+        check (minLimbLen > tmp1.size)
+        // tmp arrays start off with zero size
+        // if this is the first resize then give them what they want
+        // otherwise, give them 50% more
+        val headRoom = (minLimbLen ushr 1) and (-tmp1.size shr 31)
+        tmp1 = Mago.newWithFloorLen(minLimbLen + headRoom)
+    }
+
+    /**
+     * Resizes the `tmp2` temporary buffer.
+     *
+     * Temporary buffers start with zero capacity. On the first allocation,
+     * the buffer is grown to a capacity **at least** [minLimbLen]. On subsequent
+     * resizes, additional headroom (~50%) is added to reduce reallocation.
+     *
+     * The final capacity is rounded up to the allocator’s heap quantum.
+     * Existing contents, if any, are discarded.
+     *
+     * @param minLimbLen the minimum number of limbs required; must exceed the
+     *        current capacity of the temporary buffer.
+     */
+    private fun resizeTmp2(minLimbLen: Int) {
+        check (minLimbLen > tmp2.size)
+        // tmp arrays start off with zero size
+        // if this is the first resize then give them what they want
+        // otherwise, give them 50% more
+        val headRoom = (minLimbLen ushr 1) and (-tmp2.size shr 31)
+        tmp2 = Mago.newWithFloorLen(minLimbLen + headRoom)
+    }
+
+    /**
+     * Ensures that the backing limb array has capacity **at least** [minLimbLen].
+     *
+     * If the current array is too small, it is replaced with a new zero-initialized
+     * array whose capacity is at least [minLimbLen] (rounded up to the allocator’s
+     * heap quantum). Any existing value is discarded.
+     *
+     * @param minLimbLen the minimum number of limbs required.
+     */
+    private inline fun ensureCapacityDiscard(minLimbLen: Int) {
+        if (magia.size < minLimbLen)
+            resizeDiscard(minLimbLen)
+    }
+
+    /**
+     * Ensures that the backing limb array has capacity **at least** [minLimbLen].
+     *
+     * If the current array is too small, it is replaced with a new zero-initialized
+     * array whose capacity is at least [minLimbLen] (rounded up to the allocator’s
+     * heap quantum). Only the normalized limbs are copied into the new storage,
+     * and any additional limbs remain zero.
+     *
+     * @param minLimbLen the minimum number of limbs required.
+     */
+    private inline fun ensureCapacityCopy(minLimbLen: Int) {
+        if (magia.size < minLimbLen)
+            resizeCopy(minLimbLen)
+    }
+
+    /**
+     * Ensures that the backing limb array has capacity **at least** [newLimbLen],
+     * and that all limbs in the range `[meta.normLen, newLimbLen)` are zero.
+     *
+     * If the current array is large enough, any existing garbage limbs in that
+     * range are explicitly cleared in place. If the array is too small, it is
+     * replaced with a new zero-initialized array whose capacity is at least
+     * [newLimbLen] (rounded up to the allocator’s heap quantum), and the normalized
+     * limbs are copied.
+     *
+     * Existing normalized limbs (`[0, meta.normLen)`) are always preserved.
+     *
+     * @param newLimbLen the required limb length to be zeroed.
+     */
+    private inline fun ensureCapacityZeroed(newLimbLen: Int) {
+        if (newLimbLen <= magia.size) {
+            if (newLimbLen > meta.normLen)
+                magia.fill(0, meta.normLen, newLimbLen)
+        } else {
+            // resize allocates new clean zeroed storage
+            resizeCopy(newLimbLen)
+        }
+    }
+
+    /**
+     * Ensures capacity for representing at least [minBitLen] bits, discarding any
+     * existing value.
+     *
+     * The bit-length requirement is converted to a minimum limb count
+     * (`ceil(minBitLen / 32)`) and delegated to [ensureCapacityDiscard].
+     *
+     * @param minBitLen the minimum number of bits required.
+     */
+    private inline fun ensureBitCapacityDiscard(minBitLen: Int) =
+        ensureCapacityDiscard((minBitLen + 0x1F) ushr 5)
+
+    /**
+     * Ensures capacity for representing at least [minBitLen] bits while preserving
+     * the existing value.
+     *
+     * The bit-length requirement is converted to a minimum limb count
+     * (`ceil(minBitLen / 32)`) and delegated to [ensureCapacityCopy].
+     *
+     * @param minBitLen the minimum number of bits required.
+     */
+    private inline fun ensureBitCapacityCopy(minBitLen: Int) =
+        ensureCapacityCopy((minBitLen + 0x1F) ushr 5)
+
+    /**
+     * Ensures that the temporary limb buffer `tmp1` has capacity **at least**
+     * [minLimbLen].
+     *
+     * If `tmp1` is too small, it is replaced with a new zero-initialized array whose
+     * capacity is at least [minLimbLen] (rounded up to the allocator’s heap quantum).
+     * Any existing contents are discarded.
+     *
+     * @param minLimbLen the minimum number of limbs required.
+     */
+    private inline fun ensureTmp1Capacity(minLimbLen: Int) {
+        if (minLimbLen > tmp1.size)
+            resizeTmp1(minLimbLen)
+    }
+
+    /**
+     * Ensures that the temporary limb buffer `tmp2` has capacity **at least**
+     * [minLimbLen].
+     *
+     * If `tmp2` is too small, it is replaced with a new zero-initialized array whose
+     * capacity is at least [minLimbLen] (rounded up to the allocator’s heap quantum).
+     * Any existing contents are discarded.
+     *
+     * @param minLimbLen the minimum number of limbs required.
+     */
+    private inline fun ensureTmp2Capacity(minLimbLen: Int) {
+        if (minLimbLen > tmp2.size)
+            resizeTmp2(minLimbLen)
+    }
+
+    /**
+     * Ensures that the temporary limb buffer `tmp1` has capacity **at least**
+     * [newLimbLen], and that all limbs in the range `[0, newLimbLen)` are zero.
+     *
+     * If `tmp1` is already large enough, it is zero-cleared up to `newLimbLen`.
+     * If it is too small, it is replaced with a new zero-initialized array
+     * whose capacity is at least [newLimbLen] (rounded up to the allocator’s heap
+     * quantum).
+     *
+     * Any existing contents are discarded.
+     *
+     * @param newLimbLen the required limb length to be zeroed.
+     */
+    private inline fun ensureTmp1CapacityZeroed(newLimbLen: Int) {
+        if (newLimbLen <= tmp1.size)
+            tmp1.fill(0, 0, newLimbLen)
+        else
+            resizeTmp1(newLimbLen)
+    }
+
+    /**
+     * Swaps the temporary limb buffer `tmp1` with the primary backing array `magia`.
+     *
+     * This is a pointer swap with no allocation or copying.
+     * After the swap, the previous contents of `magia` become `tmp1`, and
+     * the previous contents of `tmp1` become the active backing storage.
+     */
+    private inline fun swapTmp1() {
+        val t = tmp1; tmp1 = magia; magia = t
+    }
+
+    /**
+     * Swaps the temporary limb buffer `tmp1` with the primary backing array `magia`,
+     * then copies the normalized limbs back into the active storage.
+     *
+     * After the swap, the previous contents of `tmp1` become the active backing
+     * array. The normalized limbs (`[0, meta.normLen)`) are then copied from
+     * `tmp1` into `magia`, preserving the current value while allowing the
+     * temporary buffer to be reused.
+     *
+     * No allocation occurs.
+     */
+    private inline fun swapTmp1Copy() {
+        val t = tmp1; tmp1 = magia; magia = t
+        tmp1.copyInto(magia, 0, 0, meta.normLen)
+    }
+
+
+    // <<<<<<<<<<< END STORAGE MANAGEMENT FUNCTIONS >>>>>>>>>>>>
     /**
      * Returns `true` if this BigIntAccumulator currently is zero.
      */
@@ -269,99 +521,6 @@ class BigIntAccumulator private constructor (
         magia[3] = (dwHi shr 32).toInt()
         return this
     }
-
-    /**
-     * Ensures that the backing limb array has at least [minLimbLen] capacity.
-     *
-     * If the current array is too small, a new zero-initialized array of the
-     * required size is allocated and the previous contents are discarded.
-     * Existing contents are **not** preserved.
-     */
-    private inline fun ensureCapacityDiscard(minLimbLen: Int) {
-        if (magia.size < minLimbLen)
-            magia = Mago.newWithFloorLen(minLimbLen)
-    }
-
-    /**
-     * Ensures the limb array has at least [minLimbLen] capacity.
-     *
-     * If the array is too small, a larger one is allocated and the
-     * existing contents are copied into it.
-     */
-    private inline fun ensureCapacityCopy(minLimbLen: Int) {
-        if (magia.size < minLimbLen)
-            magia = Mago.newCopyWithFloorLen(magia, minLimbLen)
-    }
-
-    /**
-     * Ensures capacity for at least [minBitLen] bits, discarding any existing data.
-     * Converts the bit requirement to limb capacity and delegates to
-     * `ensureCapacityDiscard`.
-     */
-    private inline fun ensureBitCapacityDiscard(minBitLen: Int) =
-        ensureCapacityDiscard((minBitLen + 0x1F) ushr 5)
-
-    /**
-     * Ensures capacity for at least [minBitLen] bits, preserving existing data.
-     * Converts the bit requirement to limb capacity and delegates to
-     * `ensureCapacityCopy`.
-     */
-    private inline fun ensureBitCapacityCopy(minBitLen: Int) =
-        ensureCapacityCopy((minBitLen + 0x1F) ushr 5)
-
-
-    /**
-     * Ensures the backing array has at least [newLimbLen] limbs and that any
-     * newly-exposed limbs are zero-initialized.
-     *
-     * - If [newLimbLen] ≤ current `normLen`, nothing is done.
-     * - If [newLimbLen] ≤ current capacity, the unused limbs are zeroed
-     *   from the current `meta.normLen` up to [newLimbLen].
-     * - Otherwise a new zeroed array with minimum [newLimbLen] is
-     *   allocated and existing limbs up to `meta.normLen` are copied.
-     *
-     * This adjusts physical storage only; callers remain responsible for updating
-     * `meta.normLen` as needed.
-     */
-    private fun ensureLimbLen(newLimbLen: Int) {
-        if (newLimbLen <= meta.normLen)
-            return
-        if (newLimbLen <= magia.size) {
-            magia.fill(0, meta.normLen, newLimbLen)
-            return
-        }
-        magia = Mago.newCopyWithFloorLen(magia, meta.normLen, newLimbLen)
-    }
-
-    /**
-     * Ensures backing storage for at least [newBitLen] bits, zero-initializing
-     * any newly added limbs. Does not modify `meta.normLen`.
-     */
-    private fun ensureBitLen(newBitLen: Int) = ensureLimbLen((newBitLen + 0x1F) ushr 5)
-
-
-    private inline fun ensureTmpCapacity(minLimbLen: Int) {
-        if (tmp.size < minLimbLen + 1 - (-minLimbLen ushr 31))
-            tmp = Mago.newWithFloorLen(minLimbLen)
-    }
-
-    private inline fun clearTmpCapacity(minLimbLen: Int) {
-        if (tmp.size < minLimbLen)
-            tmp = Mago.newWithFloorLen(minLimbLen)
-        else
-            tmp.fill(0, 0, minLimbLen)
-    }
-
-    private inline fun swapTmp() {
-        val t = tmp; tmp = magia; magia = t
-    }
-
-    private inline fun swapTmpCopy() {
-        val t = tmp; tmp = magia; magia = t
-        tmp.copyInto(magia, 0, 0, meta.normLen)
-    }
-
-
     /**
      * Sets this accumulator’s value from a raw limb array.
      *
@@ -501,8 +660,8 @@ class BigIntAccumulator private constructor (
 
     private fun setMulImpl(xMeta: Meta, x: Magia, wSign: Boolean, w: UInt): BigIntAccumulator {
         val xNormLen = xMeta.normLen
-        ensureTmpCapacity(xNormLen + 1)
-        swapTmp()
+        ensureTmp1Capacity(xNormLen + 1)
+        swapTmp1()
         meta = Meta(
             xMeta.signFlag xor wSign,
             Mago.setMul(magia, x, xNormLen, w)
@@ -512,8 +671,8 @@ class BigIntAccumulator private constructor (
 
     private fun setMulImpl(xMeta: Meta, x: Magia, wSign: Boolean, dw: ULong): BigIntAccumulator {
         val xNormLen = xMeta.normLen
-        ensureTmpCapacity(xNormLen + 1)
-        swapTmp()
+        ensureTmp1Capacity(xNormLen + 1)
+        swapTmp1()
         meta = Meta(
             xMeta.signFlag xor wSign,
             Mago.setMul(magia, x, xNormLen, dw)
@@ -524,8 +683,8 @@ class BigIntAccumulator private constructor (
     private fun setMulImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
-        ensureTmpCapacity(xNormLen + yNormLen)
-        swapTmp()
+        ensureTmp1Capacity(xNormLen + yNormLen)
+        swapTmp1()
         meta = Meta(
             xMeta.signBit xor yMeta.signBit,
             Mago.setMul(magia, x, xNormLen, y, yNormLen)
@@ -557,8 +716,8 @@ class BigIntAccumulator private constructor (
     private fun setSqrImpl(xMeta: Meta, x: Magia): BigIntAccumulator {
         check(Mago.isNormalized(x, xMeta.normLen))
         val xNormLen = xMeta.normLen
-        clearTmpCapacity(xNormLen + xNormLen)
-        swapTmp()
+        ensureTmp1CapacityZeroed(xNormLen + xNormLen)
+        swapTmp1()
         meta = Meta(
             0,
             Mago.setSqr(magia, x, xNormLen)
@@ -593,10 +752,10 @@ class BigIntAccumulator private constructor (
         if (trySetDivFastPath(xMeta, xMagia, y.meta, yMagia))
             return this
         check (xMagia !== yMagia)
-        this.ensureTmpCapacity(max(xMagia.size, xMeta.normLen + 1))
-        y.ensureTmpCapacity(y.meta.normLen)
+        this.ensureTmp1Capacity(max(xMagia.size, xMeta.normLen + 1))
+        y.ensureTmp1Capacity(y.meta.normLen)
         meta = Meta(xMeta.signFlag xor y.meta.signFlag,
-            Mago.setDiv(magia, xMagia, xMeta.normLen, this.tmp, yMagia, y.meta.normLen, y.tmp))
+            Mago.setDiv(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, y.meta.normLen, y.tmp1))
         return this
     }
 
@@ -608,10 +767,10 @@ class BigIntAccumulator private constructor (
         if (trySetDivFastPath(x.meta, x.magia, yMeta, yMagia))
             return this
         check (xMagia !== yMagia)
-        x.ensureTmpCapacity(max(xMagia.size, x.meta.normLen + 1))
-        this.ensureTmpCapacity(yMagia.size)
+        x.ensureTmp1Capacity(max(xMagia.size, x.meta.normLen + 1))
+        this.ensureTmp1Capacity(yMagia.size)
         meta = Meta(x.meta.signFlag xor yMeta.signFlag,
-            Mago.setDiv(magia, xMagia, x.meta.normLen, x.tmp, yMagia, yMeta.normLen, this.tmp))
+            Mago.setDiv(magia, xMagia, x.meta.normLen, x.tmp1, yMagia, yMeta.normLen, this.tmp1))
         return this
     }
 
@@ -625,7 +784,7 @@ class BigIntAccumulator private constructor (
         if (trySetDivFastPath64(x.meta, x.magia, ySign, yDw))
             return this
         val unBuf =
-            if (this !== x) {x.ensureTmpCapacity(x.meta.normLen + 1); x.tmp}
+            if (this !== x) {x.ensureTmp1Capacity(x.meta.normLen + 1); x.tmp1}
             else Magia(x.meta.normLen + 1)
         val normLen = Mago.setDiv64(magia, xMagia, x.meta.normLen, unBuf, yDw)
         meta = Meta(x.meta.signFlag xor ySign, normLen)
@@ -633,12 +792,12 @@ class BigIntAccumulator private constructor (
     }
 
     private fun mutateDivImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        this.ensureTmpCapacity(meta.normLen - yMeta.normLen + 1)
-        swapTmp()
-        if (trySetDivFastPath(meta, tmp, yMeta, yMagia))
+        this.ensureTmp1Capacity(meta.normLen - yMeta.normLen + 1)
+        swapTmp1()
+        if (trySetDivFastPath(meta, tmp1, yMeta, yMagia))
             return this
         meta = Meta(meta.signBit,
-            Mago.setDiv(magia, tmp, meta.normLen, null, yMagia, yMeta.normLen, null))
+            Mago.setDiv(magia, tmp1, meta.normLen, null, yMagia, yMeta.normLen, null))
         return this
     }
 
@@ -646,9 +805,9 @@ class BigIntAccumulator private constructor (
         ensureCapacityDiscard(xMeta.normLen - yMeta.normLen + 1)
         if (trySetDivFastPath(xMeta, x, yMeta, y))
             return this
-        ensureTmpCapacity(xMeta.normLen + 1)
+        ensureTmp1Capacity(xMeta.normLen + 1)
         meta = Meta(xMeta.signBit xor yMeta.signBit,
-            Mago.setDiv(magia, x, xMeta.normLen, tmp, y, yMeta.normLen, null))
+            Mago.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, null))
         return this
     }
 
@@ -701,10 +860,10 @@ class BigIntAccumulator private constructor (
         if (trySetRemFastPath(xMeta, xMagia, y.meta, yMagia))
             return this
         check (xMagia !== yMagia)
-        this.ensureTmpCapacity(max(xMagia.size, xMeta.normLen + 1))
-        y.ensureTmpCapacity(y.meta.normLen)
+        this.ensureTmp1Capacity(max(xMagia.size, xMeta.normLen + 1))
+        y.ensureTmp1Capacity(y.meta.normLen)
         meta = Meta(xMeta.signBit,
-            Mago.setRem(magia, xMagia, xMeta.normLen, this.tmp, yMagia, y.meta.normLen, y.tmp))
+            Mago.setRem(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, y.meta.normLen, y.tmp1))
         return this
     }
 
@@ -716,10 +875,10 @@ class BigIntAccumulator private constructor (
         if (trySetRemFastPath(x.meta, xMagia, yMeta, yMagia))
             return this
         check (xMagia !== yMagia)
-        x.ensureTmpCapacity(max(xMagia.size, x.meta.normLen + 1))
-        this.ensureTmpCapacity(yMeta.normLen)
+        x.ensureTmp1Capacity(max(xMagia.size, x.meta.normLen + 1))
+        this.ensureTmp1Capacity(yMeta.normLen)
         meta = Meta(x.meta.signBit,
-            Mago.setRem(magia, xMagia, x.meta.normLen, x.tmp, yMagia, yMeta.normLen, this.tmp))
+            Mago.setRem(magia, xMagia, x.meta.normLen, x.tmp1, yMagia, yMeta.normLen, this.tmp1))
         return this
     }
 
@@ -729,19 +888,19 @@ class BigIntAccumulator private constructor (
             return this
         check (this.magia !== xMagia)
         check (this.magia !== yMagia)
-        ensureTmpCapacity(xMeta.normLen + 1)
-        val rNormLen = Mago.setRem(magia, xMagia, xMeta.normLen, this.tmp, yMagia, yMeta.normLen, null)
+        ensureTmp1Capacity(xMeta.normLen + 1)
+        val rNormLen = Mago.setRem(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, yMeta.normLen, null)
         meta = Meta(xMeta.signBit, rNormLen)
         return this
     }
 
     private fun mutRemImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        this.ensureTmpCapacity(yMeta.normLen)
-        swapTmp()
-        if (trySetRemFastPath(meta, tmp, yMeta, yMagia))
+        this.ensureTmp1Capacity(yMeta.normLen)
+        swapTmp1()
+        if (trySetRemFastPath(meta, tmp1, yMeta, yMagia))
             return this
         meta = Meta(meta.signBit,
-            Mago.setRem(magia, tmp, meta.normLen, null, yMagia, yMeta.normLen, null))
+            Mago.setRem(magia, tmp1, meta.normLen, null, yMagia, yMeta.normLen, null))
         return this
     }
 
@@ -1141,7 +1300,7 @@ class BigIntAccumulator private constructor (
                 magia[wordIndex] = magia[wordIndex] or isolatedBit
                 return this
             }
-            ensureLimbLen(wordIndex + 1)
+            ensureCapacityZeroed(wordIndex + 1)
             magia[wordIndex] = isolatedBit
             meta = Meta(meta.signBit, wordIndex + 1)
             return this
@@ -1272,14 +1431,14 @@ class BigIntAccumulator private constructor (
             return
         }
         val hi64 = unsignedMulHi(dw, dw)
-        if (tmp.size < 4)
-            tmp = Magia(4)
-        tmp[0] = lo64.toInt()
-        tmp[1] = (lo64 shr 32).toInt()
-        tmp[2] = hi64.toInt()
-        tmp[3] = (hi64 shr 32).toInt()
-        val normLen = Mago.normLen(tmp, 4)
-        mutateAddMagImpl(Meta(0, normLen), tmp)
+        if (tmp1.size < 4)
+            tmp1 = Magia(4)
+        tmp1[0] = lo64.toInt()
+        tmp1[1] = (lo64 shr 32).toInt()
+        tmp1[2] = hi64.toInt()
+        tmp1[3] = (hi64 shr 32).toInt()
+        val normLen = Mago.normLen(tmp1, 4)
+        mutateAddMagImpl(Meta(0, normLen), tmp1)
     }
 
     /**
@@ -1500,12 +1659,12 @@ class BigIntAccumulator private constructor (
      */
     private inline fun addSquareOfImpl(y: Magia, yNormLen: Int) {
         val sqrLenMax = yNormLen * 2
-        if (tmp.size < sqrLenMax)
-            tmp = Mago.newWithFloorLen(sqrLenMax)
+        if (tmp1.size < sqrLenMax)
+            tmp1 = Mago.newWithFloorLen(sqrLenMax)
         else
-            tmp.fill(0, 0, sqrLenMax)
-        val normLenSqr = Mago.setSqr(tmp, y, yNormLen)
-        mutateAddMagImpl(Meta(0, normLenSqr), tmp)
+            tmp1.fill(0, 0, sqrLenMax)
+        val normLenSqr = Mago.setSqr(tmp1, y, yNormLen)
+        mutateAddMagImpl(Meta(0, normLenSqr), tmp1)
         validate()
     }
 
@@ -1580,9 +1739,9 @@ class BigIntAccumulator private constructor (
             setZero()
             return
         }
-        ensureTmpCapacity(normLen + yMeta.normLen + 1)
-        swapTmpCopy()
-        val normLen = Mago.setMul(magia, tmp, normLen, y, yMeta.normLen)
+        ensureTmp1Capacity(normLen + yMeta.normLen + 1)
+        swapTmp1Copy()
+        val normLen = Mago.setMul(magia, tmp1, normLen, y, yMeta.normLen)
         meta = Meta(signBit xor yMeta.signBit, normLen)
         validate()
     }
@@ -1599,10 +1758,10 @@ class BigIntAccumulator private constructor (
     private fun mutateSquare() {
         if (meta.normLen > 0) {
             val newLimbLenMax = normLen * 2
-            clearTmpCapacity(newLimbLenMax)
-            swapTmp()
+            ensureTmp1CapacityZeroed(newLimbLenMax)
+            swapTmp1()
             meta = Meta(0,
-                Mago.setSqr(magia, tmp, meta.normLen))
+                Mago.setSqr(magia, tmp1, meta.normLen))
         }
     }
 
@@ -1615,9 +1774,9 @@ class BigIntAccumulator private constructor (
 
     private fun mutateDivImpl(wSign: Boolean, dw: ULong) {
         validate()
-        ensureTmpCapacity(meta.normLen - 2 + 1)
-        val normLen = Mago.setDiv64(tmp, magia, meta.normLen, unBuf=null, dw)
-        swapTmp()
+        ensureTmp1Capacity(max(1, meta.normLen)) // remember that dw is not normalized
+        val normLen = Mago.setDiv64(tmp1, magia, meta.normLen, unBuf=null, dw)
+        swapTmp1()
         meta = Meta(meta.signFlag xor wSign, normLen)
         validate()
     }
