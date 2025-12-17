@@ -438,7 +438,7 @@ internal object Mago {
      * Returns the resulting normalized limb length.
      * Throws `ArithmeticException` if the sum overflows `z`.
      */
-    fun setAdd(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
+    fun setAdd64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
             var carry = dw
             var i = 0
@@ -566,7 +566,7 @@ internal object Mago {
      * @throws IllegalArgumentException if input lengths are invalid or arrays too small
      * @throws ArithmeticException if the subtraction underflows (i.e., dw > x)
      */
-    fun setSub(z: Magia, x: Magia, xLen: Int, dw: ULong): Int {
+    fun setSub64(z: Magia, x: Magia, xLen: Int, dw: ULong): Int {
         if (xLen >= 0 && xLen <= x.size) {
             val xNormLen = normLen(x, xLen)
             if (z.size >= xNormLen) {
@@ -688,7 +688,7 @@ internal object Mago {
         val xBitLen = bitLen(x, xNormLen)
         val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
-        val zNormLen = setMul(z, x, xNormLen, w)
+        val zNormLen = setMul32(z, x, xNormLen, w)
         check (isNormalized(z, zNormLen))
         return z
     }
@@ -701,7 +701,7 @@ internal object Mago {
      * @throws ArithmeticException if [z] is too small to hold the full product (including carry)
      * @throws IllegalArgumentException if [xNormLen] <= 0 or [xNormLen] >= x.size
      */
-    fun setMul(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
+    fun setMul32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
             if (xNormLen == 0 || w == 0u)
@@ -750,7 +750,7 @@ internal object Mago {
         val xBitLen = bitLen(x, xNormLen)
         val zBitLen = xBitLen + 64 - dw.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
-        val zNormLen = setMul(z, x, xNormLen, dw)
+        val zNormLen = setMul64(z, x, xNormLen, dw)
         check (isNormalized(z, zNormLen))
         return z
     }
@@ -767,9 +767,9 @@ internal object Mago {
      *
      * @throws IllegalArgumentException if [xNormLen], [zLen], or array sizes are invalid.
      */
-    fun setMul(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
+    fun setMul64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         if ((dw shr 32) == 0uL)
-            return setMul(z, x, xNormLen, dw.toUInt())
+            return setMul32(z, x, xNormLen, dw.toUInt())
         if (xNormLen >= 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
             val lo = dw and 0xFFFF_FFFFuL
@@ -1749,7 +1749,7 @@ internal object Mago {
      *
      * @return the normalized length
      */
-    fun setDiv(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
+    fun setDiv32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
             check (isNormalized(x, xNormLen))
             when {
@@ -1795,8 +1795,8 @@ internal object Mago {
             val vnDw = dw
             val q = z
             val r = null
-            knuthDivide64(q, r, u, vnDw, m, unBuf)
-            return normLen(q)
+            val qNormLen = knuthDivide64(q, r, u, vnDw, m, unBuf).toInt()
+            return qNormLen
         }
         throw IllegalArgumentException()
     }
@@ -1816,7 +1816,7 @@ internal object Mago {
             xNormLen < yNormLen -> return 0
             xNormLen <= 2 ->
                 return setULong(zMagia, toRawULong(xMagia, xNormLen) / toRawULong(yMagia, yNormLen))
-            yNormLen == 1 -> return setDiv(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
+            yNormLen == 1 -> return setDiv32(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
             isPowerOfTwo(yMagia, yNormLen) ->
                 return setShiftRight(zMagia, xMagia, xNormLen,
                     ctz(yMagia, yNormLen))
@@ -1851,7 +1851,7 @@ internal object Mago {
                     ((xMagia[1].toULong() shl 32) or xMagia[0].toUInt().toULong()) / yDw)
             yDw.countOneBits() == 1 ->
                 return setShiftRight(zMagia, xMagia, xNormLen, yDw.countTrailingZeroBits())
-            (yDw shr 32) == 0uL -> return setDiv(zMagia, xMagia, xNormLen, yDw.toUInt())
+            (yDw shr 32) == 0uL -> return setDiv32(zMagia, xMagia, xNormLen, yDw.toUInt())
         }
         return -1
     }
@@ -1907,14 +1907,8 @@ internal object Mago {
                             ((1uL shl dw.countTrailingZeroBits()) - 1uL)
             }
 
-            return knuthDivide64(
-                q = null,
-                r = null,
-                u = x,
-                vDw = dw,
-                m = xNormLen,
-                unBuf = unBuf
-            )
+            val rem = knuthDivide64(q=null, r=null, u=x, vDw=dw, m=xNormLen, unBuf=unBuf)
+            return rem
         }
         throw IllegalArgumentException()
     }
@@ -1934,7 +1928,7 @@ internal object Mago {
         check (isNormalized(x, xNormLen))
         if (xNormLen > 0) {
             val z = Magia(xNormLen)
-            val zNormLen = setDiv(z, x, xNormLen, w)
+            val zNormLen = setDiv32(z, x, xNormLen, w)
             if (zNormLen > 0)
                 return z
         }
@@ -2104,7 +2098,7 @@ internal object Mago {
     fun newRem(x: Magia, xNormLen: Int, dw: ULong): Magia =
         newFromULong(calcRem64(x, xNormLen, null, dw))
 
-    fun setRem(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
+    fun setRem64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         check (isNormalized(x, xNormLen))
         return when {
             (dw shr 32) == 0uL -> setRem(z, x, xNormLen, dw.toUInt())
@@ -2388,12 +2382,22 @@ internal object Mago {
      * `vDw` is expanded into two 32-bit limbs. The quotient and remainder
      * are written to `q` and `r` if provided.
      *
+     * Since this is specialized for 64-bit divisor it has some **special**
+     * behavior. The returned value is a ULong that has different
+     * interpretations depending upon whether we are trying to calculate
+     * the quotient or the remainder.
+     *
+     * if q != null then qNormLen is returned ... as a ULong
+     * if r != null then rNormLen is returned ... as a ULong
+     * otherwise, the 64-bit remainder itself is returned
+     *
      * @param q optional quotient array (length ≥ m − 1)
      * @param r optional remainder array (length ≥ m + 1)
      * @param u dividend limbs (least-significant limb first)
      * @param vDw 64-bit unsigned divisor (high 32 bits must be non-zero)
      * @param m number of significant limbs in `u` (≥ 2)
-     * @return qNormLen if q != null, rNormLen if r != null, else -1
+     * @return a ULong with qNormLen if q != null, rNormLen if r != null,
+     *         the remainder itself.
      *
      * @throws IllegalArgumentException if `m < 2` or the high 32 bits of `vDw` are zero
      * @see knuthDivide

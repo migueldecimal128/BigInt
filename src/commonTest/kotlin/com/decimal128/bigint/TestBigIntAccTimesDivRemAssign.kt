@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 
 class TestBigIntAccTimesDivRemAssign {
 
+    val verbose = true
     /* ---------- helpers ---------- */
 
     private fun newAcc(value: Long): BigIntAccumulator {
@@ -286,6 +287,9 @@ class TestBigIntAccTimesDivRemAssign {
         val expected = acc.toBigInt() / div.toBigInt()
 
         acc /= div
+
+        if (verbose)
+            println("expected:$expected observed:$acc")
 
         assertAccEqualsBig(expected, acc)
     }

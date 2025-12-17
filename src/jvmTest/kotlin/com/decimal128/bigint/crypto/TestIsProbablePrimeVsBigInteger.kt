@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 
 class TestIsProbablePrimeVsBigInteger {
 
-    val verbose = false
+    val verbose = true
 
     @Test
     fun testIsProbablePrime_againstJavaBigInteger() {
@@ -48,7 +48,8 @@ class TestIsProbablePrimeVsBigInteger {
             println("testProblemA isProbablePrime() myOpinion:$myOpinion")
         for (certainty in 25..200 step 25) {
             val javaOpinion = java.isProbablePrime(certainty)
-            println("  java certainty:$certainty javaOpinion:$javaOpinion")
+            if (verbose)
+                println("  java certainty:$certainty javaOpinion:$javaOpinion")
         }
     }
 

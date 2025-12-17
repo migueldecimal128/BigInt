@@ -549,7 +549,7 @@ class BigIntAccumulator private constructor (
                 ensureCapacityDiscard(max(xMeta.normLen, 2) + 1)
                 _meta = Meta(
                     xMeta.signBit,
-                    Mago.setAdd(magia, xMagia, xMeta.normLen, yDw)
+                    Mago.setAdd64(magia, xMagia, xMeta.normLen, yDw)
                 )
             }
             else -> {
@@ -559,7 +559,7 @@ class BigIntAccumulator private constructor (
                         ensureCapacityDiscard(xMeta.normLen)
                         _meta = Meta(
                             xMeta.signBit,
-                            Mago.setSub(magia, xMagia, xMeta.normLen, yDw)
+                            Mago.setSub64(magia, xMagia, xMeta.normLen, yDw)
                         )
                     }
                     cmp < 0 -> set(ySign, yDw - toRawULong())
@@ -626,7 +626,7 @@ class BigIntAccumulator private constructor (
         ensureTmp1Capacity(xNormLen + 1)
         _meta = Meta(
             xMeta.signFlag xor wSign,
-            Mago.setMul(tmp1, x, xNormLen, w)
+            Mago.setMul32(tmp1, x, xNormLen, w)
         )
         swapTmp1()
         return this
@@ -637,7 +637,7 @@ class BigIntAccumulator private constructor (
         ensureTmp1Capacity(xNormLen + 2)
         _meta = Meta(
             xMeta.signFlag xor wSign,
-            Mago.setMul(tmp1, x, xNormLen, dw)
+            Mago.setMul64(tmp1, x, xNormLen, dw)
         )
         swapTmp1()
         return this
@@ -942,11 +942,11 @@ class BigIntAccumulator private constructor (
      */
     operator fun timesAssign(bi: BigIntBase) { setMul(this, bi) }
 
-    operator fun divAssign(n: Int) = mutateDivImpl(n < 0, n.absoluteValue.toUInt())
+    operator fun divAssign(n: Int) { setDiv(this, n) }
 
-    operator fun divAssign(w: UInt) = mutateDivImpl(false, w)
+    operator fun divAssign(w: UInt) { setDiv(this, w) }
 
-    operator fun divAssign(l: Long) = mutateDivImpl(l < 0, l.absoluteValue.toULong())
+    operator fun divAssign(l: Long) { setDiv(this, l) }
 
     operator fun divAssign(dw: ULong) = mutateDivImpl(false, dw)
 
@@ -1103,7 +1103,7 @@ class BigIntAccumulator private constructor (
                 check (normLen > 0)
                 if (needsIncrement) {
                     ensureBitCapacityCopy(zBitLen + 1)
-                    normLen = Mago.setAdd(magia, magia, normLen, 1u)
+                    normLen = Mago.setAdd64(magia, magia, normLen, 1u)
                 }
                 _meta = Meta(xMeta.signFlag, normLen)
             }
@@ -1382,7 +1382,7 @@ class BigIntAccumulator private constructor (
 
     private fun mutateDivImpl(wSign: Boolean, w: UInt) {
         validate()
-        val normLen = Mago.setDiv(magia, magia, meta.normLen, w)
+        val normLen = Mago.setDiv32(magia, magia, meta.normLen, w)
         _meta = Meta(meta.signFlag xor wSign, normLen)
         validate()
     }
@@ -1405,7 +1405,7 @@ class BigIntAccumulator private constructor (
 
     private fun mutateRemImpl(dw: ULong) {
         validate()
-        val normLen = Mago.setRem(magia, magia, meta.normLen, dw)
+        val normLen = Mago.setRem64(magia, magia, meta.normLen, dw)
         _meta = Meta(meta.signFlag, normLen)
         validate()
     }
