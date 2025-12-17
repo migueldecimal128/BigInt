@@ -562,7 +562,7 @@ class BigIntAccumulator private constructor (
                             Mago.setSub(magia, xMagia, xMeta.normLen, yDw)
                         )
                     }
-                    cmp < 0 -> set(yDw - toRawULong())
+                    cmp < 0 -> set(ySign, yDw - toRawULong())
                     else -> setZero()
                 }
             }
@@ -776,7 +776,7 @@ class BigIntAccumulator private constructor (
      * @param n the value to add.
      * @see plusAssign(Long)
      */
-    operator fun plusAssign(n: Int) = mutateAddImpl(n < 0, n.absoluteValue.toUInt().toULong())
+    operator fun plusAssign(n: Int) { setAdd(this, n) }
 
     /**
      * Adds the given UInt value to this accumulator.
@@ -784,7 +784,7 @@ class BigIntAccumulator private constructor (
      * @param w the value to add.
      * @see plusAssign(Long)
      */
-    operator fun plusAssign(w: UInt) = mutateAddImpl(false, w.toULong())
+    operator fun plusAssign(w: UInt) { setAdd(this, w) }
 
     /**
      * Adds the given Long value to this accumulator in place.
@@ -803,7 +803,7 @@ class BigIntAccumulator private constructor (
      *
      * @param l the value to add.
      */
-    operator fun plusAssign(l: Long) = mutateAddImpl(l < 0, l.absoluteValue.toULong())
+    operator fun plusAssign(l: Long) { setAdd(this, l) }
 
     /**
      * Adds the given ULong value to this accumulator.
@@ -811,7 +811,7 @@ class BigIntAccumulator private constructor (
      * @param dw the value to add.
      * @see plusAssign(Long)
      */
-    operator fun plusAssign(dw: ULong) = mutateAddImpl(false, dw)
+    operator fun plusAssign(dw: ULong) { setAdd(this, dw) }
 
     /**
      * Adds the given BigInt value to this accumulator.
@@ -819,17 +819,7 @@ class BigIntAccumulator private constructor (
      * @param bi the value to add.
      * @see plusAssign(Long)
      */
-    operator fun plusAssign(bi: BigInt) =
-        mutateAddImpl(Meta(bi.meta.isNegative, bi.magia), bi.magia)
-
-    /**
-     * Adds the given BigIntAccumulator value to this accumulator.
-     *
-     * @param acc the value to add.
-     * @see plusAssign(Long)
-     */
-    operator fun plusAssign(acc: BigIntAccumulator) =
-        mutateAddImpl(acc.meta, acc.magia)
+    operator fun plusAssign(bi: BigIntBase) { setAdd(this, bi) }
 
     /**
      * Subtracts the given Int value from this accumulator.
@@ -837,7 +827,7 @@ class BigIntAccumulator private constructor (
      * @param n the value to subtract.
      * @see minusAssign(Long)
      */
-    operator fun minusAssign(n: Int) = mutateAddImpl(n > 0, n.absoluteValue.toUInt().toULong())
+    operator fun minusAssign(n: Int) { setSub(this, n) }
 
     /**
      * Subtracts the given UInt value from this accumulator.
@@ -845,7 +835,7 @@ class BigIntAccumulator private constructor (
      * @param w the value to subtract.
      * @see minusAssign(Long)
      */
-    operator fun minusAssign(w: UInt) = mutateAddImpl(w > 0u, w.toULong())
+    operator fun minusAssign(w: UInt) { setSub(this, w) }
 
     /**
      * Subtracts the given Long value from this accumulator in place.
@@ -862,7 +852,7 @@ class BigIntAccumulator private constructor (
      *
      * @param l the value to subtract.
      */
-    operator fun minusAssign(l: Long) = mutateAddImpl(l > 0L, l.absoluteValue.toULong())
+    operator fun minusAssign(l: Long) { setSub(this, l) }
 
     /**
      * Subtracts the given ULong value from this accumulator.
@@ -870,7 +860,7 @@ class BigIntAccumulator private constructor (
      * @param dw the value to subtract.
      * @see minusAssign(Long)
      */
-    operator fun minusAssign(dw: ULong) = mutateAddImpl(dw > 0uL, dw)
+    operator fun minusAssign(dw: ULong) { setSub(this, dw) }
 
     /**
      * Subtracts the given BigInt value from this accumulator.
@@ -878,17 +868,7 @@ class BigIntAccumulator private constructor (
      * @param bi the value to subtract.
      * @see minusAssign(Long)
      */
-    operator fun minusAssign(bi: BigInt) =
-        mutateAddImpl(Meta(bi.meta.isPositive, bi.magia), bi.magia)
-
-    /**
-     * Subtracts the given BigIntAccumulator value from this accumulator.
-     *
-     * @param acc the value to subtract.
-     * @see minusAssign(Long)
-     */
-    operator fun minusAssign(acc: BigIntAccumulator) =
-        mutateAddImpl(acc.meta.negate(), acc.magia)
+    operator fun minusAssign(bi: BigIntBase) { setSub(this, bi) }
 
     /**
      * Multiplies this accumulator by the given value in place.
@@ -1292,7 +1272,7 @@ class BigIntAccumulator private constructor (
     fun addSquareOf(dw: ULong) {
         val lo64 = dw * dw
         if ((dw shr 32) == 0uL) {
-            mutateAddMagImpl(lo64)
+            setAdd(this, lo64)
             return
         }
         val hi64 = unsignedMulHi(dw, dw)
@@ -1303,7 +1283,7 @@ class BigIntAccumulator private constructor (
         tmp1[2] = hi64.toInt()
         tmp1[3] = (hi64 shr 32).toInt()
         val normLen = Mago.normLen(tmp1, 4)
-        mutateAddMagImpl(Meta(0, normLen), tmp1)
+        setAddImpl(meta, magia, Meta(0, normLen), tmp1)
     }
 
     /**
@@ -1360,22 +1340,14 @@ class BigIntAccumulator private constructor (
     fun addAbsValueOf(l: Long) = plusAssign(l.absoluteValue.toULong())
 
     /**
-     * Adds the absolute value of the given BigInt to this accumulator.
+     * Adds the absolute value of the given [BigInt] or
+     * [BigIntAccumulator] to this accumulator.
      *
      * @param hi the value to add.
      * @see addAbsValueOf(Long)
      */
-    fun addAbsValueOf(hi: BigInt) =
-        mutateAddMagImpl(Meta(0, hi.magia), hi.magia)
-
-    /**
-     * Adds the absolute value of the given BigIntAccumulator to this accumulator.
-     *
-     * @param acc the value to add.
-     * @see addAbsValueOf(Long)
-     */
-    fun addAbsValueOf(acc: BigIntAccumulator) =
-        mutateAddMagImpl(acc.meta.abs(), acc.magia)
+    fun addAbsValueOf(bi: BigIntBase) =
+        setAddImpl(meta, magia, bi.meta.abs(), bi.magia)
 
     /**
      * Returns the current value of this accumulator as a raw unsigned 64-bit value.
@@ -1400,115 +1372,6 @@ class BigIntAccumulator private constructor (
     }
 
     /**
-     * Adds a value to this accumulator in place, taking the operand’s logical sign into account.
-     *
-     * This is a low-level internal helper used by the public `plusAssign` and
-     * `minusAssign` operators. Internally, the operation always performs addition,
-     * and [otherSign] determines whether the operand is effectively positive or negative.
-     *
-     * @param otherSign `true` if the operand is negative, `false` if positive.
-     * @param dw the magnitude of the operand as an unsigned 64-bit value.
-     */
-    private fun mutateAddImpl(otherSign: Boolean, dw: ULong) {
-        val rawULong = toRawULong()
-        when {
-            dw == 0uL -> {}
-            meta.signFlag == otherSign -> mutateAddMagImpl(dw)
-            meta.normLen == 0 -> set(otherSign, dw)
-            meta.normLen > 2 || rawULong > dw -> {
-                //Magia.mutateSub(magia, meta.normLen, dw)
-                //val normLen = Magia.normLen(magia, meta.normLen)
-                val normLen = Mago.setSub(magia, magia, meta.normLen, dw)
-                _meta = Meta(signFlag, normLen)
-            }
-            rawULong < dw -> set(otherSign, dw - rawULong)
-            else -> setZero()
-        }
-    }
-
-    /**
-     * Adds a multi-limb integer to this accumulator in place, considering its sign.
-     *
-     * This is a low-level internal helper used by public operators such as
-     * `plusAssign` and `minusAssign`. The operation always performs addition
-     * internally, while [ySign] determines the logical sign of the operand.
-     *
-     * Only the first [yLen] limbs of [y] are used. [y] represents the magnitude
-     * in little-endian order (least significant limb first).
-     *
-     * @param ySign `true` if the operand is negative, `false` if positive.
-     * @param y the array of limbs representing the operand's magnitude.
-     * @param yLen the number of active limbs in [y] to consider.
-     */
-    private fun mutateAddImpl(yMeta: Meta, y: Magia) {
-        validate()
-        when {
-            yMeta.normLen <= 2 -> {
-                when {
-                    yMeta.normLen == 2 -> mutateAddImpl(yMeta.signFlag, (dw32(y[1]) shl 32) or dw32(y[0]))
-                    yMeta.normLen == 1 -> mutateAddImpl(yMeta.signFlag, y[0].toUInt().toULong())
-                }
-                // if yLen == 0 do nothing
-                return
-            }
-
-            normLen == 0 -> { set(yMeta, y); validate(); return }
-            signBit == yMeta.signBit -> { mutateAddMagImpl(yMeta, y); validate(); return }
-        }
-        val cmp = Mago.compare(magia, normLen, y, yMeta.normLen)
-        when {
-            cmp > 0 -> _meta = Meta(signBit,
-                Mago.setSub(magia, magia, normLen, y, yMeta.normLen))
-            cmp < 0 -> {
-                ensureCapacityCopy(yMeta.normLen)
-                _meta = Meta(yMeta.signBit,
-                    Mago.setSub(magia, y, yMeta.normLen, magia, normLen))
-            }
-            else -> setZero()
-        }
-        validate()
-    }
-
-    /**
-     * Adds the given magnitude to this accumulator in place.
-     *
-     * This is a low-level internal helper that assumes the operand is non-negative
-     * and represented as a single unsigned 64-bit value ([dw]). The operation
-     * directly updates the accumulator’s internal magnitude.
-     *
-     * This method does not consider any sign; it is intended for internal use
-     * where the operand’s sign has already been handled by the caller.
-     *
-     * @param dw the unsigned magnitude to add.
-     */
-    private fun mutateAddMagImpl(dw: ULong) {
-        ensureCapacityCopy(normLen + 2)
-        val normLen = Mago.setAdd(magia, magia, normLen, dw)
-        _meta = Meta(signBit, normLen)
-        validate()
-    }
-
-    /**
-     * Adds a multi-limb magnitude to this accumulator in place.
-     *
-     * This is a low-level internal helper that assumes the operand is non-negative.
-     * The operation directly updates the accumulator’s internal magnitude without
-     * considering any sign; the caller is responsible for handling sign logic.
-     *
-     * Only the first [yLen] limbs of [y] are used. The array [y] is interpreted
-     * as little-endian, with the least significant limb at index 0.
-     *
-     * @param y the array of limbs representing the operand's magnitude.
-     * @param yLen the number of active limbs in [y] to add.
-     */
-    private fun mutateAddMagImpl(yMeta: Meta, y: Magia) {
-        ensureCapacityCopy(yMeta.normLen + 1)
-        _meta = Meta(signBit,
-            Mago.setAdd(magia, magia, normLen, y, yMeta.normLen))
-        validate()
-    }
-
-    /**
      * Adds the square of a multi-limb integer to this accumulator in place.
      *
      * This is a low-level internal helper used by `addSquareOf` for [BigInt]
@@ -1529,7 +1392,7 @@ class BigIntAccumulator private constructor (
         else
             tmp1.fill(0, 0, sqrLenMax)
         val normLenSqr = Mago.setSqr(tmp1, y, yNormLen)
-        mutateAddMagImpl(Meta(0, normLenSqr), tmp1)
+        setAddImpl(this.meta, this.magia, Meta(0, normLenSqr), tmp1)
         validate()
     }
 

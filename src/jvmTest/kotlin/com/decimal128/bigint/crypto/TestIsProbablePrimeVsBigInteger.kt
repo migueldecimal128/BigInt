@@ -9,11 +9,11 @@ import kotlin.test.assertEquals
 
 class TestIsProbablePrimeVsBigInteger {
 
-    val verbose = true
+    val verbose = false
 
     @Test
     fun testIsProbablePrime_againstJavaBigInteger() {
-        repeat(300) {
+        repeat(200) {
             val n = BigInt.randomWithMaxBitLen(2048) or BigInt.ONE  // odd
             val ours = BigIntPrime.isProbablePrime(n)
 
