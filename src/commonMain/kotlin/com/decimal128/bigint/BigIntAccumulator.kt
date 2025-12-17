@@ -66,9 +66,10 @@ import kotlin.math.min
 class BigIntAccumulator private constructor (
     override var meta: Meta,
     override var magia: Magia,
-    internal var tmp: Magia
 ) : Magian {
-    constructor() : this(Meta(0), Magia(4), Mago.ZERO)
+    constructor() : this(Meta(0), Magia(4))
+
+    internal var tmp: Magia = Mago.ZERO
 
     companion object {
 
@@ -79,7 +80,6 @@ class BigIntAccumulator private constructor (
                 val initialLimbCapacity = max(4, limbLenFromBitLen(initialBitCapacity))
                 return BigIntAccumulator(
                     Meta(0),
-                    Mago.newWithFloorLen(initialLimbCapacity),
                     Mago.newWithFloorLen(initialLimbCapacity)
                 )
             }
@@ -89,7 +89,7 @@ class BigIntAccumulator private constructor (
         private fun from(meta: Meta, magia: Magia): BigIntAccumulator {
             return BigIntAccumulator(
                 Meta(0),
-                Mago.newWithFloorLen(meta.normLen), Mago.ZERO
+                Mago.newWithFloorLen(meta.normLen)
             ).set(meta, magia)
         }
 
