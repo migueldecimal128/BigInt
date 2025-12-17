@@ -745,24 +745,28 @@ class BigIntAccumulator private constructor (
     }
 
     fun setRem(x: BigIntAccumulator, n: Int): BigIntAccumulator =
-        setRemImpl(x.meta, x.magia , n < 0, n.absoluteValue.toUInt().toULong())
+        setRemImpl(x.meta, x.magia , n.absoluteValue.toUInt().toULong())
     fun setRem(x: BigIntAccumulator, w: UInt): BigIntAccumulator =
-        setRemImpl(x.meta, x.magia , false, w.toULong())
+        setRemImpl(x.meta, x.magia , w.toULong())
     fun setRem(x: BigIntAccumulator, l: Long): BigIntAccumulator =
-        setRemImpl(x.meta, x.magia , l < 0L, l.absoluteValue.toULong())
+        setRemImpl(x.meta, x.magia , l.absoluteValue.toULong())
     fun setRem(x: BigIntAccumulator, dw: ULong): BigIntAccumulator =
-        setRemImpl(x.meta, x.magia , false, dw)
+        setRemImpl(x.meta, x.magia , dw)
     fun setRem(x: BigIntBase, y: BigIntBase): BigIntAccumulator =
         setRemImpl(x.meta, x.magia, y.meta, y.magia)
 
-    private fun setRemImpl(xMeta: Meta, xMagia: Magia, ySign: Boolean, yDw: ULong): BigIntAccumulator {
-        TODO()
+    private fun setRemImpl(xMeta: Meta, xMagia: Magia, yDw: ULong): BigIntAccumulator {
+        ensureTmp1Capacity(xMeta.normLen + 1)
+        val rem = Mago.calcRem64(xMagia, xMeta.normLen, tmp1, yDw)
+        return set(xMeta.signFlag, rem)
     }
 
     private fun setRemImpl(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
         ensureCapacityDiscard(yMeta.normLen)
         if (trySetRemFastPath(xMeta, xMagia, yMeta, yMagia))
             return this
+        if (yMeta.normLen == 2)
+            return setRemImpl(xMeta, xMagia, (yMagia[1].toULong() shl 32) or (yMagia[0].toUInt().toULong()))
         ensureTmp1Capacity(xMeta.normLen + 1)
         ensureTmp2Capacity(yMeta.normLen)
         val rNormLen = Mago.setRem(magia, xMagia, xMeta.normLen, tmp1, yMagia, yMeta.normLen, tmp2)

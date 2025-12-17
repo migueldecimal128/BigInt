@@ -2065,10 +2065,9 @@ internal object Mago {
         check (isNormalized(x, xNormLen))
         if (xNormLen > 0) {
             val rem = calcRem32(x, xNormLen, w)
-            if (rem > 0u) {
-                z[0] = rem.toInt()
+            z[0] = rem.toInt()
+            if (rem > 0u)
                 return 1
-            }
         }
         return 0
     }
