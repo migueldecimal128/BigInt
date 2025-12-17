@@ -694,16 +694,18 @@ internal object Mago {
     }
 
     /**
-     * Multiplies a normalized multi-limb integer [x] (first [xLen] limbs) by a single 32-bit word [w],
+     * Multiplies a normalized multi-limb integer [x] (first [xNormLen] limbs) by a single 32-bit word [w],
      * storing the result in [z]. The operation is safe in-place, so [z] may be the same array as [x].
      *
      * @return number of significant limbs written to [z]
      * @throws ArithmeticException if [z] is too small to hold the full product (including carry)
-     * @throws IllegalArgumentException if [xLen] <= 0 or [xLen] >= x.size
+     * @throws IllegalArgumentException if [xNormLen] <= 0 or [xNormLen] >= x.size
      */
-    fun setMul(z: Magia, x: Magia, xLen: Int, w: UInt): Int {
-        if (xLen > 0 && xLen <= x.size) {
-            val xNormLen = normLen(x, xLen)
+    fun setMul(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            check (isNormalized(x, xNormLen))
+            if (xNormLen == 0 || w == 0u)
+                return 0
             val w64 = w.toULong()
             var carry = 0uL
             var i = 0
@@ -754,22 +756,22 @@ internal object Mago {
     }
 
     /**
-     * Multiplies the first [xLen] limbs of [x] by the unsigned 64-bit value [dw], storing the result in [z].
+     * Multiplies the first [xNormLen] limbs of [x] by the unsigned 64-bit value [dw], storing the result in [z].
      *
      * - Performs a single-pass multiplication.
      * - Does not overwrite [x], allowing in-place multiplication scenarios.
-     * - [zLen] must be greater than [xLen]; caller must ensure it is large enough to hold the full product.
+     * - [zLen] must be greater than [xNormLen]; caller must ensure it is large enough to hold the full product.
      *
      * The caller is responsible for ensuring that [zLen] is sufficient, either by checking limb lengths
      * (typically requiring +2 limbs) or by checking bit lengths (0 to 2 extra limbs).
      *
-     * @throws IllegalArgumentException if [xLen], [zLen], or array sizes are invalid.
+     * @throws IllegalArgumentException if [xNormLen], [zLen], or array sizes are invalid.
      */
-    fun setMul(z: Magia, x: Magia, xLen: Int, dw: ULong): Int {
+    fun setMul(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         if ((dw shr 32) == 0uL)
-            return setMul(z, x, xLen, dw.toUInt())
-        if (xLen >= 0 && xLen <= x.size) {
-            val xNormLen = normLen(x, xLen)
+            return setMul(z, x, xNormLen, dw.toUInt())
+        if (xNormLen >= 0 && xNormLen <= x.size) {
+            check (isNormalized(x, xNormLen))
             val lo = dw and 0xFFFF_FFFFuL
             val hi = dw shr 32
 

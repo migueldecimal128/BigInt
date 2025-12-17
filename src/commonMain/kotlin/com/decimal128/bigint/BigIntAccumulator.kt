@@ -896,7 +896,7 @@ class BigIntAccumulator private constructor (
      * @see timesAssign(Long)
      *
      */
-    operator fun timesAssign(n: Int) = mutateMulImpl(n < 0, n.absoluteValue.toUInt())
+    operator fun timesAssign(n: Int) { setMul(this, n) }
 
     /**
      * Multiplies this accumulator by the given UInt value.
@@ -904,7 +904,7 @@ class BigIntAccumulator private constructor (
      * @param w the value to multiply by.
      * @see timesAssign(Long)
      */
-    operator fun timesAssign(w: UInt) = mutateMulImpl(false, w)
+    operator fun timesAssign(w: UInt) { setMul(this, w) }
 
     /**
      * Multiplies this accumulator by the given Long value in place.
@@ -923,7 +923,7 @@ class BigIntAccumulator private constructor (
      *
      * @param l the value to multiply by.
      */
-    operator fun timesAssign(l: Long) = mutateMulImpl(l < 0, l.absoluteValue.toULong())
+    operator fun timesAssign(l: Long) { setMul(this, l) }
 
     /**
      * Multiplies this accumulator by the given ULong value.
@@ -931,32 +931,16 @@ class BigIntAccumulator private constructor (
      * @param dw the value to multiply by.
      * @see timesAssign(Long)
      */
-    operator fun timesAssign(dw: ULong) = mutateMulImpl(false, dw)
+    operator fun timesAssign(dw: ULong) { setMul(this, dw) }
 
     /**
-     * Multiplies this accumulator by the given BigInt value.
+     * Multiplies this accumulator by the given [BigInt]
+     * or [BigIntAccumulator] value.
      *
      * @param bi the value to multiply by.
      * @see timesAssign(Long)
      */
-    operator fun timesAssign(bi: BigInt) =
-        mutateMulImpl(Meta(bi.meta.isNegative, bi.magia), bi.magia)
-
-    /**
-     * Multiplies this accumulator by the given BigIntAccumulator value.
-     *
-     * If `this === other`, a specialized squaring routine is used to avoid aliasing
-     * issues and improve performance.
-     *
-     * @param acc the value to multiply by.
-     * @see timesAssign(Long)
-     */
-    operator fun timesAssign(acc: BigIntAccumulator) {
-        if (this === acc)
-            mutateSquare()  // prevent aliasing problems & improve performance
-        else
-            mutateMulImpl(acc.meta, acc.magia)
-    }
+    operator fun timesAssign(bi: BigIntBase) { setMul(this, bi) }
 
     operator fun divAssign(n: Int) = mutateDivImpl(n < 0, n.absoluteValue.toUInt())
 
@@ -1394,103 +1378,6 @@ class BigIntAccumulator private constructor (
         val normLenSqr = Mago.setSqr(tmp1, y, yNormLen)
         setAddImpl(this.meta, this.magia, Meta(0, normLenSqr), tmp1)
         validate()
-    }
-
-    /**
-     * Multiplies this accumulator in place by a single-limb value.
-     *
-     * This is a low-level internal helper used by the public `timesAssign` operators.
-     * The operation multiplies the accumulator by [w], taking into account the
-     * logical sign of the operand specified by [wSign].
-     *
-     * Internally, the multiplication always modifies the accumulator in place,
-     * updating its magnitude and sign as needed.
-     *
-     * @param wSign `true` if the operand is negative, `false` if positive.
-     * @param w the unsigned 32-bit magnitude to multiply by.
-     */
-    private fun mutateMulImpl(wSign: Boolean, w: UInt) {
-        validate()
-        if (w == 0u || normLen == 0) {
-            setZero()
-            return
-        }
-        ensureCapacityCopy(normLen + 1)
-        _meta = Meta(signFlag xor wSign, Mago.setMul(magia, magia, normLen, w))
-        validate()
-    }
-
-    /**
-     * Multiplies this accumulator in place by a single 64-bit value.
-     *
-     * This is a low-level internal helper used by the public `timesAssign` operators.
-     * The operation multiplies the accumulator by [dw], taking into account the
-     * logical sign of the operand specified by [dwSign].
-     *
-     * Internally, the multiplication always modifies the accumulator in place,
-     * updating its magnitude and sign as needed.
-     *
-     * @param dwSign `true` if the operand is negative, `false` if positive.
-     * @param dw the unsigned 64-bit magnitude to multiply by.
-     */
-    private fun mutateMulImpl(dwSign: Boolean, dw: ULong) {
-        validate()
-        if ((dw shr 32) == 0uL) {
-            mutateMulImpl(dwSign, dw.toUInt())
-            return
-        }
-        if (normLen == 0)
-            return
-        ensureCapacityCopy(normLen + 2)
-        _meta = Meta(signFlag xor dwSign, Mago.setMul(magia, magia, normLen, dw))
-        validate()
-    }
-
-    /**
-     * Multiplies this accumulator in place by a multi-limb value.
-     *
-     * This is a low-level internal helper used by the public `timesAssign` operators.
-     * The operation multiplies the first [yLen] limbs of [y] with this accumulator,
-     * taking into account the logical sign of the operand specified by [ySign].
-     *
-     * Only the first [yLen] limbs are referenced. The operation uses the internal
-     * `tmp` associated with `this` and effectively updates the value in-place
-     * while minimizing or eliminating heap allocation.
-     *
-     * @param ySign `true` if the operand is negative, `false` if positive.
-     * @param y the array of limbs representing the operand's magnitude.
-     * @param yLen the number of active limbs in [y] to multiply by.
-     */
-    private fun mutateMulImpl(yMeta: Meta, y: Magia) {
-        validate()
-        if (normLen == 0 || yMeta.normLen == 0) {
-            setZero()
-            return
-        }
-        ensureTmp1Capacity(normLen + yMeta.normLen + 1)
-        swapTmp1Copy()
-        val normLen = Mago.setMul(magia, tmp1, normLen, y, yMeta.normLen)
-        _meta = Meta(signBit xor yMeta.signBit, normLen)
-        validate()
-    }
-
-    /**
-     * Squares this accumulator in place.
-     *
-     * This is a low-level internal helper used when multiplying an accumulator
-     * by itself (for example, `acc *= acc`).
-     *
-     * This method modifies the accumulator in place and is optimized to handle
-     * aliasing safely when the source and destination are the same object.
-     */
-    private fun mutateSquare() {
-        if (meta.normLen > 0) {
-            val newLimbLenMax = normLen * 2
-            ensureTmp1CapacityZeroed(newLimbLenMax)
-            swapTmp1()
-            _meta = Meta(0,
-                Mago.setSqr(magia, tmp1, meta.normLen))
-        }
     }
 
     private fun mutateDivImpl(wSign: Boolean, w: UInt) {
