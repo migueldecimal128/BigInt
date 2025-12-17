@@ -57,9 +57,9 @@ import kotlin.text.HexFormat
  * and for compute-heavy crypto calculations.
  */
 class BigInt private constructor(
-    override val meta: Meta,
-    override val magia: Magia
-) : Comparable<BigInt>, Magian {
+    meta: Meta,
+    magia: Magia
+) : Comparable<BigInt>, BigIntBase(meta, magia) {
 
     companion object {
         /**

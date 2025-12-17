@@ -64,9 +64,9 @@ import kotlin.math.min
  * @see BigInt for the immutable arbitrary-precision integer implementation.
  */
 class BigIntAccumulator private constructor (
-    override var meta: Meta,
-    override var magia: Magia,
-) : Magian {
+    meta: Meta,
+    magia: Magia,
+) : BigIntBase(meta, magia) {
     constructor() : this(Meta(0), Magia(4))
 
     internal var tmp1: Magia = Mago.ZERO
@@ -140,7 +140,7 @@ class BigIntAccumulator private constructor (
         // otherwise, we are in a growth pattern, so give them 50% more.
         val headRoom = (minLimbLen ushr 1) and ((4 - magia.size) shr 31)
         // newWithFloorLen rounds up to heap quantum, 16 bytes, 4 ints
-        magia = Mago.newWithFloorLen(minLimbLen + headRoom)
+        _magia = Mago.newWithFloorLen(minLimbLen + headRoom)
     }
 
     /**
@@ -161,9 +161,9 @@ class BigIntAccumulator private constructor (
      */
     private fun resizeCopy(minLimbLen: Int) {
         check (minLimbLen > 4 && minLimbLen > magia.size)
-        val t = magia
+        val t = _magia
         val headRoom = (minLimbLen ushr 1) and ((4 - magia.size) shr 31)
-        magia = Mago.newWithFloorLen(minLimbLen + headRoom)
+        _magia = Mago.newWithFloorLen(minLimbLen + headRoom)
         t.copyInto(magia, 0, 0, meta.normLen)
     }
 
@@ -346,7 +346,7 @@ class BigIntAccumulator private constructor (
      * the previous contents of `tmp1` become the active backing storage.
      */
     private inline fun swapTmp1() {
-        val t = tmp1; tmp1 = magia; magia = t
+        val t = tmp1; tmp1 = _magia; _magia = t
     }
 
     /**
@@ -361,7 +361,7 @@ class BigIntAccumulator private constructor (
      * No allocation occurs.
      */
     private inline fun swapTmp1Copy() {
-        val t = tmp1; tmp1 = magia; magia = t
+        val t = tmp1; tmp1 = _magia; _magia = t
         tmp1.copyInto(magia, 0, 0, meta.normLen)
     }
 
@@ -407,25 +407,25 @@ class BigIntAccumulator private constructor (
      */
     fun setZero(): BigIntAccumulator {
         validate()
-        meta = Meta(0)
+        _meta = Meta(0)
         return this
     }
 
     fun setOne(signFlag: Boolean = false): BigIntAccumulator {
         validate()
-        meta = Meta(signFlag, 1)
+        _meta = Meta(signFlag, 1)
         magia[0] = 1
         validate()
         return this
     }
 
     fun mutAbs(): BigIntAccumulator {
-        meta = meta.abs()
+        _meta = _meta.abs()
         return this
     }
 
     fun mutNegate(): BigIntAccumulator {
-        meta = meta.negate()
+        _meta = _meta.negate()
         return this
     }
 
@@ -500,7 +500,7 @@ class BigIntAccumulator private constructor (
      */
     fun set(sign: Boolean, dw: ULong): BigIntAccumulator {
         val normLen = (64 - dw.countLeadingZeroBits() + 31) ushr 5
-        meta = Meta(sign, normLen)
+        _meta = Meta(sign, normLen)
         // limbLen = if (dw == 0uL) 0 else if ((dw shr 32) == 0uL) 1 else 2
         magia[0] = dw.toInt()
         magia[1] = (dw shr 32).toInt()
@@ -513,12 +513,12 @@ class BigIntAccumulator private constructor (
         else
             128 - dwHi.countLeadingZeroBits()
         val normLen = (bitLen + 0x1F) ushr 5
-        meta = Meta(sign, normLen)
+        _meta = Meta(sign, normLen)
         // limbLen = if (dw == 0uL) 0 else if ((dw shr 32) == 0uL) 1 else 2
-        magia[0] = dwLo.toInt()
-        magia[1] = (dwLo shr 32).toInt()
-        magia[2] = dwHi.toInt()
-        magia[3] = (dwHi shr 32).toInt()
+        _magia[0] = dwLo.toInt()
+        _magia[1] = (dwLo shr 32).toInt()
+        _magia[2] = dwHi.toInt()
+        _magia[3] = (dwHi shr 32).toInt()
         return this
     }
     /**
@@ -537,7 +537,7 @@ class BigIntAccumulator private constructor (
      */
     private fun set(yMeta: Meta, y: Magia): BigIntAccumulator {
         ensureCapacityDiscard(yMeta.normLen)
-        meta = yMeta
+        _meta = yMeta
         y.copyInto(magia, 0, 0, yMeta.normLen)
         return this
     }
@@ -602,7 +602,7 @@ class BigIntAccumulator private constructor (
             xMeta.isZero -> set(ySign, yDw)
             xMeta.signFlag == ySign -> {
                 ensureCapacityDiscard(max(xMeta.normLen, 2) + 1)
-                meta = Meta(
+                _meta = Meta(
                     xMeta.signBit,
                     Mago.setAdd(magia, xMagia, xMeta.normLen, yDw)
                 )
@@ -612,7 +612,7 @@ class BigIntAccumulator private constructor (
                 when {
                     cmp > 0 -> {
                         ensureCapacityDiscard(xMeta.normLen)
-                        meta = Meta(
+                        _meta = Meta(
                             xMeta.signBit,
                             Mago.setSub(magia, xMagia, xMeta.normLen, yDw)
                         )
@@ -633,7 +633,7 @@ class BigIntAccumulator private constructor (
             xMeta.isZero -> set(yMeta, y)
             xMeta.signBit == yMeta.signBit -> {
                 ensureCapacityDiscard(max(xMeta.normLen, yMeta.normLen) + 1)
-                meta = Meta(
+                _meta = Meta(
                     xMeta.signBit,
                     Mago.setAdd(magia, x, xMeta.normLen, y, yMeta.normLen)
                 )
@@ -644,7 +644,7 @@ class BigIntAccumulator private constructor (
                 when {
                     cmp > 0 -> {
                         ensureCapacityDiscard(xMeta.normLen)
-                        meta = Meta(
+                        _meta = Meta(
                             xMeta.signBit,
                             Mago.setSub(magia, x, xMeta.normLen, y, yMeta.normLen)
                         )
@@ -652,7 +652,7 @@ class BigIntAccumulator private constructor (
 
                     cmp < 0 -> {
                         ensureCapacityDiscard(yMeta.normLen)
-                        meta = Meta(
+                        _meta = Meta(
                             yMeta.signBit,
                             Mago.setSub(magia, y, yMeta.normLen, x, xMeta.normLen)
                         )
@@ -704,7 +704,7 @@ class BigIntAccumulator private constructor (
     private fun setMulImpl(xMeta: Meta, x: Magia, wSign: Boolean, w: UInt): BigIntAccumulator {
         val xNormLen = xMeta.normLen
         ensureTmp1Capacity(xNormLen + 1)
-        meta = Meta(
+        _meta = Meta(
             xMeta.signFlag xor wSign,
             Mago.setMul(tmp1, x, xNormLen, w)
         )
@@ -715,7 +715,7 @@ class BigIntAccumulator private constructor (
     private fun setMulImpl(xMeta: Meta, x: Magia, wSign: Boolean, dw: ULong): BigIntAccumulator {
         val xNormLen = xMeta.normLen
         ensureTmp1Capacity(xNormLen + 2)
-        meta = Meta(
+        _meta = Meta(
             xMeta.signFlag xor wSign,
             Mago.setMul(tmp1, x, xNormLen, dw)
         )
@@ -727,7 +727,7 @@ class BigIntAccumulator private constructor (
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
         ensureTmp1Capacity(xNormLen + yNormLen)
-        meta = Meta(
+        _meta = Meta(
             xMeta.signBit xor yMeta.signBit,
             Mago.setMul(tmp1, x, xNormLen, y, yNormLen)
         )
@@ -760,7 +760,7 @@ class BigIntAccumulator private constructor (
         check(Mago.isNormalized(x, xMeta.normLen))
         val xNormLen = xMeta.normLen
         ensureTmp1CapacityZeroed(xNormLen + xNormLen)
-        meta = Meta(
+        _meta = Meta(
             0,
             Mago.setSqr(tmp1, x, xNormLen)
         )
@@ -789,7 +789,7 @@ class BigIntAccumulator private constructor (
             return this
         ensureTmp1Capacity(xMeta.normLen + 1)
         val normLen = Mago.setDiv64(magia, xMagia, xMeta.normLen, tmp1, yDw)
-        meta = Meta(xMeta.signFlag xor ySign, normLen)
+        _meta = Meta(xMeta.signFlag xor ySign, normLen)
         return this
     }
 
@@ -799,7 +799,7 @@ class BigIntAccumulator private constructor (
             return this
         ensureTmp1Capacity(xMeta.normLen + 1)
         ensureTmp2Capacity(yMeta.normLen)
-        meta = Meta(xMeta.signBit xor yMeta.signBit,
+        _meta = Meta(xMeta.signBit xor yMeta.signBit,
             Mago.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, tmp2))
         return this
     }
@@ -809,7 +809,7 @@ class BigIntAccumulator private constructor (
         val qNormLen = Mago.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
         if (qNormLen < 0)
             return false
-        meta = Meta(qSignFlag, qNormLen)
+        _meta = Meta(qSignFlag, qNormLen)
         return true
     }
 
@@ -818,7 +818,7 @@ class BigIntAccumulator private constructor (
         val qNormLen = Mago.trySetDivFastPath64(this.magia, xMagia, xMeta.normLen, yDw)
         if (qNormLen < 0)
             return false
-        meta = Meta(qSignFlag, qNormLen)
+        _meta = Meta(qSignFlag, qNormLen)
         return true
     }
 
@@ -827,7 +827,7 @@ class BigIntAccumulator private constructor (
         val rNormLen = Mago.trySetRemFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
         if (rNormLen < 0)
             return false
-        meta = Meta(rSignFlag, rNormLen)
+        _meta = Meta(rSignFlag, rNormLen)
         return true
     }
 
@@ -847,7 +847,7 @@ class BigIntAccumulator private constructor (
         ensureTmp1Capacity(xMeta.normLen + 1)
         ensureTmp2Capacity(yMeta.normLen)
         val rNormLen = Mago.setRem(magia, xMagia, xMeta.normLen, tmp1, yMagia, yMeta.normLen, tmp2)
-        meta = Meta(xMeta.signBit, rNormLen)
+        _meta = Meta(xMeta.signBit, rNormLen)
         return this
     }
 
@@ -1114,7 +1114,7 @@ class BigIntAccumulator private constructor (
                 val xBitLen = Mago.bitLen(x, xMeta.normLen)
                 val zBitLen = xBitLen + bitCount
                 ensureBitCapacityDiscard(zBitLen)
-                meta = Meta(meta.signBit,
+                _meta = Meta(meta.signBit,
                     Mago.setShiftLeft(magia, x, xMeta.normLen, bitCount)
                     )
                 return this
@@ -1164,7 +1164,7 @@ class BigIntAccumulator private constructor (
             zBitLen <= 0 -> setZero()
             else -> {
                 ensureBitCapacityDiscard(zBitLen)
-                meta = Meta(0,
+                _meta = Meta(0,
                     Mago.setShiftRight(magia, x, xMeta.normLen, bitCount))
                 this
             }
@@ -1222,7 +1222,7 @@ class BigIntAccumulator private constructor (
                     ensureBitCapacityCopy(zBitLen + 1)
                     normLen = Mago.setAdd(magia, magia, normLen, 1u)
                 }
-                meta = Meta(xMeta.signFlag, normLen)
+                _meta = Meta(xMeta.signFlag, normLen)
             }
             bitCount == 0 -> {}
             else -> throw IllegalArgumentException("bitCount < 0")
@@ -1248,7 +1248,7 @@ class BigIntAccumulator private constructor (
             }
             ensureCapacityZeroed(wordIndex + 1)
             magia[wordIndex] = isolatedBit
-            meta = Meta(meta.signBit, wordIndex + 1)
+            _meta = Meta(meta.signBit, wordIndex + 1)
             return this
         }
         throw IllegalArgumentException()
@@ -1266,7 +1266,7 @@ class BigIntAccumulator private constructor (
             if (wordIndex < meta.normLen) {
                 val isolatedBitMask = (1 shl (bitIndex and 0x1F)).inv()
                 magia[wordIndex] = magia[wordIndex] and isolatedBitMask
-                meta = Meta(meta.signBit, Mago.normLen(magia, meta.normLen))
+                _meta = Meta(meta.signBit, Mago.normLen(magia, meta.normLen))
             }
             return this
         }
@@ -1297,7 +1297,7 @@ class BigIntAccumulator private constructor (
                 val limbIndex = (bitIndex ushr 5)
                 magia.fill(0, 0, limbIndex)
                 magia[limbIndex] = 1 shl (bitIndex and 0x1F)
-                meta = Meta(limbIndex + 1)
+                _meta = Meta(limbIndex + 1)
                 check (isNormalized())
                 return this
             }
@@ -1312,7 +1312,7 @@ class BigIntAccumulator private constructor (
         val ctz = bitIndex and 0x1F
         magia[loIndex] = magia[loIndex] and (-1 shl ctz)
         val normLen = Mago.normLen(magia, normLen0)
-        meta = Meta(normLen)
+        _meta = Meta(normLen)
         check (isNormalized())
         return this
     }
@@ -1500,7 +1500,7 @@ class BigIntAccumulator private constructor (
                 //Magia.mutateSub(magia, meta.normLen, dw)
                 //val normLen = Magia.normLen(magia, meta.normLen)
                 val normLen = Mago.setSub(magia, magia, meta.normLen, dw)
-                meta = Meta(signFlag, normLen)
+                _meta = Meta(signFlag, normLen)
             }
             rawULong < dw -> set(otherSign, dw - rawULong)
             else -> setZero()
@@ -1538,11 +1538,11 @@ class BigIntAccumulator private constructor (
         }
         val cmp = Mago.compare(magia, normLen, y, yMeta.normLen)
         when {
-            cmp > 0 -> meta = Meta(signBit,
+            cmp > 0 -> _meta = Meta(signBit,
                 Mago.setSub(magia, magia, normLen, y, yMeta.normLen))
             cmp < 0 -> {
                 ensureCapacityCopy(yMeta.normLen)
-                meta = Meta(yMeta.signBit,
+                _meta = Meta(yMeta.signBit,
                     Mago.setSub(magia, y, yMeta.normLen, magia, normLen))
             }
             else -> setZero()
@@ -1565,7 +1565,7 @@ class BigIntAccumulator private constructor (
     private fun mutateAddMagImpl(dw: ULong) {
         ensureCapacityCopy(normLen + 2)
         val normLen = Mago.setAdd(magia, magia, normLen, dw)
-        meta = Meta(signBit, normLen)
+        _meta = Meta(signBit, normLen)
         validate()
     }
 
@@ -1584,7 +1584,7 @@ class BigIntAccumulator private constructor (
      */
     private fun mutateAddMagImpl(yMeta: Meta, y: Magia) {
         ensureCapacityCopy(yMeta.normLen + 1)
-        meta = Meta(signBit,
+        _meta = Meta(signBit,
             Mago.setAdd(magia, magia, normLen, y, yMeta.normLen))
         validate()
     }
@@ -1634,7 +1634,7 @@ class BigIntAccumulator private constructor (
             return
         }
         ensureCapacityCopy(normLen + 1)
-        meta = Meta(signFlag xor wSign, Mago.setMul(magia, magia, normLen, w))
+        _meta = Meta(signFlag xor wSign, Mago.setMul(magia, magia, normLen, w))
         validate()
     }
 
@@ -1660,7 +1660,7 @@ class BigIntAccumulator private constructor (
         if (normLen == 0)
             return
         ensureCapacityCopy(normLen + 2)
-        meta = Meta(signFlag xor dwSign, Mago.setMul(magia, magia, normLen, dw))
+        _meta = Meta(signFlag xor dwSign, Mago.setMul(magia, magia, normLen, dw))
         validate()
     }
 
@@ -1688,7 +1688,7 @@ class BigIntAccumulator private constructor (
         ensureTmp1Capacity(normLen + yMeta.normLen + 1)
         swapTmp1Copy()
         val normLen = Mago.setMul(magia, tmp1, normLen, y, yMeta.normLen)
-        meta = Meta(signBit xor yMeta.signBit, normLen)
+        _meta = Meta(signBit xor yMeta.signBit, normLen)
         validate()
     }
 
@@ -1706,7 +1706,7 @@ class BigIntAccumulator private constructor (
             val newLimbLenMax = normLen * 2
             ensureTmp1CapacityZeroed(newLimbLenMax)
             swapTmp1()
-            meta = Meta(0,
+            _meta = Meta(0,
                 Mago.setSqr(magia, tmp1, meta.normLen))
         }
     }
@@ -1714,7 +1714,7 @@ class BigIntAccumulator private constructor (
     private fun mutateDivImpl(wSign: Boolean, w: UInt) {
         validate()
         val normLen = Mago.setDiv(magia, magia, meta.normLen, w)
-        meta = Meta(meta.signFlag xor wSign, normLen)
+        _meta = Meta(meta.signFlag xor wSign, normLen)
         validate()
     }
 
@@ -1723,21 +1723,21 @@ class BigIntAccumulator private constructor (
         ensureTmp1Capacity(max(1, meta.normLen)) // dw might be a single limb
         val normLen = Mago.setDiv64(tmp1, magia, meta.normLen, unBuf=null, dw)
         swapTmp1()
-        meta = Meta(meta.signFlag xor wSign, normLen)
+        _meta = Meta(meta.signFlag xor wSign, normLen)
         validate()
     }
 
     private fun mutateRemImpl(w: UInt) {
         validate()
         val normLen = Mago.setRem(magia, magia, meta.normLen, w)
-        meta = Meta(meta.signFlag, normLen)
+        _meta = Meta(meta.signFlag, normLen)
         validate()
     }
 
     private fun mutateRemImpl(dw: ULong) {
         validate()
         val normLen = Mago.setRem(magia, magia, meta.normLen, dw)
-        meta = Meta(meta.signFlag, normLen)
+        _meta = Meta(meta.signFlag, normLen)
         validate()
     }
 
