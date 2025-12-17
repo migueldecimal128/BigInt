@@ -744,16 +744,17 @@ class BigIntAccumulator private constructor (
         return true
     }
 
-    fun setRem(x: BigIntAccumulator, n: Int): BigIntAccumulator =
+    fun setRem(x: BigIntBase, n: Int): BigIntAccumulator =
         setRemImpl(x.meta, x.magia , n.absoluteValue.toUInt().toULong())
-    fun setRem(x: BigIntAccumulator, w: UInt): BigIntAccumulator =
+    fun setRem(x: BigIntBase, w: UInt): BigIntAccumulator =
         setRemImpl(x.meta, x.magia , w.toULong())
-    fun setRem(x: BigIntAccumulator, l: Long): BigIntAccumulator =
+    fun setRem(x: BigIntBase, l: Long): BigIntAccumulator =
         setRemImpl(x.meta, x.magia , l.absoluteValue.toULong())
-    fun setRem(x: BigIntAccumulator, dw: ULong): BigIntAccumulator =
+    fun setRem(x: BigIntBase, dw: ULong): BigIntAccumulator =
         setRemImpl(x.meta, x.magia , dw)
     fun setRem(x: BigIntBase, y: BigIntBase): BigIntAccumulator =
         setRemImpl(x.meta, x.magia, y.meta, y.magia)
+
 
     private fun setRemImpl(xMeta: Meta, xMagia: Magia, yDw: ULong): BigIntAccumulator {
         ensureTmp1Capacity(xMeta.normLen + 1)
@@ -771,6 +772,32 @@ class BigIntAccumulator private constructor (
         ensureTmp2Capacity(yMeta.normLen)
         val rNormLen = Mago.setRem(magia, xMagia, xMeta.normLen, tmp1, yMagia, yMeta.normLen, tmp2)
         _meta = Meta(xMeta.signBit, rNormLen)
+        return this
+    }
+
+    fun setMod(x: BigIntBase, n: Int): BigIntAccumulator =
+        setModImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
+    fun setMod(x: BigIntBase, w: UInt): BigIntAccumulator =
+        setModImpl(x, false, w.toULong())
+    fun setMod(x: BigIntBase, l: Long): BigIntAccumulator =
+        setModImpl(x, l < 0, l.absoluteValue.toULong())
+    fun setMod(x: BigIntBase, dw: ULong): BigIntAccumulator =
+        setModImpl(x, false, dw)
+    fun setMod(x: BigIntBase, y: BigIntBase): BigIntAccumulator {
+        if (y.meta.isNegative)
+            throw ArithmeticException("cannot take modulus of a negative number")
+        setRem(x, y)
+        if (isNegative())
+            setAdd(this, y)
+        return this
+    }
+
+    private fun setModImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+        if (ySign)
+            throw ArithmeticException("cannot take modulus of a negative number")
+        setRem(x, yDw)
+        if (isNegative())
+            setAdd(this, yDw)
         return this
     }
 
