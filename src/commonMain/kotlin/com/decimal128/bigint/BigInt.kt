@@ -9,7 +9,6 @@ import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
-import kotlin.text.HexFormat
 
 /**
  * Arbitrary-precision signed integers for Kotlin Multiplatform, serving as a
