@@ -726,78 +726,27 @@ class BigIntAccumulator private constructor (
     }
 
     fun setDiv(x: BigIntAccumulator, yDw: ULong): BigIntAccumulator =
-        setDivImpl(x, false, yDw)
+        setDivImpl(x.meta, x.magia , false, yDw)
 
     fun setDiv(x: BigInt, y: BigInt): BigIntAccumulator =
         setDivImpl(x.meta, x.magia, y.meta, y.magia)
 
     fun setDiv(x: BigInt, y: BigIntAccumulator): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia, y)
+        setDivImpl(x.meta, x.magia, y.meta, y.magia)
 
     fun setDiv(x: BigIntAccumulator, y: BigInt): BigIntAccumulator =
-        if (this !== x)
-            setDivImpl(x, y.meta, y.magia)
-        else
-            mutateDivImpl(y.meta, y.magia)
+        setDivImpl(x.meta, x.magia, y.meta, y.magia)
 
     fun setDiv(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
-        if (this !== x)
-            setDivImpl(x, y.meta, y.magia)
-        else
-            setDivImpl(x.meta, x.magia, y)
+        setDivImpl(x.meta, x.magia, y.meta, y.magia)
 
-    private fun setDivImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
-        val yMagia = y.magia
-        ensureCapacityDiscard(xMeta.normLen - y.meta.normLen + 1)
-        if (trySetDivFastPath(xMeta, xMagia, y.meta, yMagia))
+    private fun setDivImpl(xMeta: Meta, xMagia: Magia, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+        ensureCapacityDiscard(xMeta.normLen - 1 + 1) // yDw might represent a single limb
+        if (trySetDivFastPath64(xMeta, xMagia, ySign, yDw))
             return this
-        check (xMagia !== yMagia)
-        this.ensureTmp1Capacity(max(xMagia.size, xMeta.normLen + 1))
-        y.ensureTmp1Capacity(y.meta.normLen)
-        meta = Meta(xMeta.signFlag xor y.meta.signFlag,
-            Mago.setDiv(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, y.meta.normLen, y.tmp1))
-        return this
-    }
-
-    private fun setDivImpl(x: BigIntAccumulator, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        // save these early so that they won't be lost
-        // when we resize the quotient ... in case of aliasing
-        val xMagia = x.magia
-        ensureCapacityDiscard(x.meta.normLen - yMeta.normLen + 1)
-        if (trySetDivFastPath(x.meta, x.magia, yMeta, yMagia))
-            return this
-        check (xMagia !== yMagia)
-        x.ensureTmp1Capacity(max(xMagia.size, x.meta.normLen + 1))
-        this.ensureTmp1Capacity(yMagia.size)
-        meta = Meta(x.meta.signFlag xor yMeta.signFlag,
-            Mago.setDiv(magia, xMagia, x.meta.normLen, x.tmp1, yMagia, yMeta.normLen, this.tmp1))
-        return this
-    }
-
-    private fun setDivImpl(x: BigIntAccumulator, ySign: Boolean, yDw: ULong): BigIntAccumulator {
-        check (this !== x)
-        check ((yDw shr 32) != 0uL)
-        // save these early so that they won't be lost
-        // when we resize the quotient ... in case of aliasing
-        val xMagia = x.magia
-        ensureCapacityDiscard(x.meta.normLen - 2 + 1)
-        if (trySetDivFastPath64(x.meta, x.magia, ySign, yDw))
-            return this
-        val unBuf =
-            if (this !== x) {x.ensureTmp1Capacity(x.meta.normLen + 1); x.tmp1}
-            else Magia(x.meta.normLen + 1)
-        val normLen = Mago.setDiv64(magia, xMagia, x.meta.normLen, unBuf, yDw)
-        meta = Meta(x.meta.signFlag xor ySign, normLen)
-        return this
-    }
-
-    private fun mutateDivImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        this.ensureTmp1Capacity(meta.normLen - yMeta.normLen + 1)
-        swapTmp1()
-        if (trySetDivFastPath(meta, tmp1, yMeta, yMagia))
-            return this
-        meta = Meta(meta.signBit,
-            Mago.setDiv(magia, tmp1, meta.normLen, null, yMagia, yMeta.normLen, null))
+        ensureTmp1Capacity(xMeta.normLen + 1)
+        val normLen = Mago.setDiv64(magia, xMagia, xMeta.normLen, tmp1, yDw)
+        meta = Meta(xMeta.signFlag xor ySign, normLen)
         return this
     }
 
@@ -806,8 +755,9 @@ class BigIntAccumulator private constructor (
         if (trySetDivFastPath(xMeta, x, yMeta, y))
             return this
         ensureTmp1Capacity(xMeta.normLen + 1)
+        ensureTmp2Capacity(yMeta.normLen)
         meta = Meta(xMeta.signBit xor yMeta.signBit,
-            Mago.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, null))
+            Mago.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, tmp2))
         return this
     }
 
@@ -841,69 +791,22 @@ class BigIntAccumulator private constructor (
     fun setRem(x: BigInt, y: BigInt): BigIntAccumulator =
         setRemImpl(x.meta, x.magia, y.meta, y.magia)
     fun setRem(x: BigInt, y: BigIntAccumulator): BigIntAccumulator =
-        setRemImpl(x.meta, x.magia, y)
+        setRemImpl(x.meta, x.magia, y.meta, y.magia)
     fun setRem(x: BigIntAccumulator, y: BigInt): BigIntAccumulator =
-        if (this !== x)
-            setRemImpl(x, y.meta, y.magia)
-        else
-            mutRemImpl(y.meta, y.magia)
-
+        setRemImpl(x.meta, x.magia, y.meta, y.magia)
     fun setRem(x: BigIntAccumulator, y: BigIntAccumulator): BigIntAccumulator =
-        if (this !== x)
-            setRemImpl(x, y.meta, y.magia)
-        else
-            setRemImpl(x.meta, x.magia, y)
-
-    private fun setRemImpl(xMeta: Meta, xMagia: Magia, y: BigIntAccumulator): BigIntAccumulator {
-        val yMagia = y.magia
-        ensureCapacityDiscard(y.meta.normLen)
-        if (trySetRemFastPath(xMeta, xMagia, y.meta, yMagia))
-            return this
-        check (xMagia !== yMagia)
-        this.ensureTmp1Capacity(max(xMagia.size, xMeta.normLen + 1))
-        y.ensureTmp1Capacity(y.meta.normLen)
-        meta = Meta(xMeta.signBit,
-            Mago.setRem(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, y.meta.normLen, y.tmp1))
-        return this
-    }
-
-    private fun setRemImpl(x: BigIntAccumulator, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        // NOTE: Aliasing where this === y is not a problem in this case
-        // because r does not get written until the end
-        val xMagia = x.magia
-        ensureCapacityDiscard(yMeta.normLen)
-        if (trySetRemFastPath(x.meta, xMagia, yMeta, yMagia))
-            return this
-        check (xMagia !== yMagia)
-        x.ensureTmp1Capacity(max(xMagia.size, x.meta.normLen + 1))
-        this.ensureTmp1Capacity(yMeta.normLen)
-        meta = Meta(x.meta.signBit,
-            Mago.setRem(magia, xMagia, x.meta.normLen, x.tmp1, yMagia, yMeta.normLen, this.tmp1))
-        return this
-    }
+        setRemImpl(x.meta, x.magia, y.meta, y.magia)
 
     private fun setRemImpl(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
         ensureCapacityDiscard(yMeta.normLen)
         if (trySetRemFastPath(xMeta, xMagia, yMeta, yMagia))
             return this
-        check (this.magia !== xMagia)
-        check (this.magia !== yMagia)
         ensureTmp1Capacity(xMeta.normLen + 1)
-        val rNormLen = Mago.setRem(magia, xMagia, xMeta.normLen, this.tmp1, yMagia, yMeta.normLen, null)
+        ensureTmp2Capacity(yMeta.normLen)
+        val rNormLen = Mago.setRem(magia, xMagia, xMeta.normLen, tmp1, yMagia, yMeta.normLen, tmp2)
         meta = Meta(xMeta.signBit, rNormLen)
         return this
     }
-
-    private fun mutRemImpl(yMeta: Meta, yMagia: Magia): BigIntAccumulator {
-        this.ensureTmp1Capacity(yMeta.normLen)
-        swapTmp1()
-        if (trySetRemFastPath(meta, tmp1, yMeta, yMagia))
-            return this
-        meta = Meta(meta.signBit,
-            Mago.setRem(magia, tmp1, meta.normLen, null, yMagia, yMeta.normLen, null))
-        return this
-    }
-
 
     /**
      * Adds the given Int value to this accumulator.
@@ -1121,7 +1024,7 @@ class BigIntAccumulator private constructor (
 
     operator fun divAssign(dw: ULong) = mutateDivImpl(false, dw)
 
-    operator fun divAssign(bi: BigInt) { mutateDivImpl(bi.meta, bi.magia) }
+    operator fun divAssign(bi: BigInt) { setDiv(this, bi) }
 
     operator fun divAssign(acc: BigIntAccumulator) { setDiv(this, acc) }
 
@@ -1774,7 +1677,7 @@ class BigIntAccumulator private constructor (
 
     private fun mutateDivImpl(wSign: Boolean, dw: ULong) {
         validate()
-        ensureTmp1Capacity(max(1, meta.normLen)) // remember that dw is not normalized
+        ensureTmp1Capacity(max(1, meta.normLen)) // dw might be a single limb
         val normLen = Mago.setDiv64(tmp1, magia, meta.normLen, unBuf=null, dw)
         swapTmp1()
         meta = Meta(meta.signFlag xor wSign, normLen)
