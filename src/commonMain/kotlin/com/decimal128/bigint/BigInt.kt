@@ -1450,6 +1450,8 @@ class BigInt private constructor(
         return result
     }
 
+    override fun compareTo(other: BigInt): Int = super.compareTo(other)
+
     /**
      * Internal helper for addition or subtraction between two BigInts.
      *
@@ -1563,6 +1565,8 @@ class BigInt private constructor(
         }
         return ret
     }
+
+
 
 }
 

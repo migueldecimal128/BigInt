@@ -53,7 +53,7 @@ sealed class BigIntBase(
     /**
      * Returns `true` if this value is odd.
      *
-     * Zero is not considered odd.
+     * Zero is considered even, not odd.
      */
     fun isOdd() = isNotZero() && (magia[0] and 1) != 0
 
@@ -61,7 +61,22 @@ sealed class BigIntBase(
      * Returns `true` if the magnitude of this BigInt is a power of two
      * (exactly one bit set).
      */
-    fun isMagnitudePowerOfTwo(): Boolean = Zoro.isMagnitudePowerOfTwo(meta, magia)
+    fun isMagnitudePowerOfTwo(): Boolean = Mago.isPowerOfTwo(magia, meta.normLen)
+
+    /**
+     * Returns `true` if this value is in normalized form.
+     *
+     * A `BigInt` is normalized when:
+     *  - it is exactly the canonical zero (`BigInt.ZERO`), or
+     *  - its magnitude array does not contain unused leading zero limbs
+     *    (i.e., the most significant limb is non-zero).
+     *
+     * Normalization is not required for correctness, but a normalized
+     * representation avoids unnecessary high-order zero limbs.
+     */
+    internal fun isNormalized(): Boolean = Zoro.isNormalized(meta, magia)
+
+    internal fun isSuperNormalized(): Boolean = Zoro.isSuperNormalized(meta, magia)
 
     /**
      * Returns `true` if this value is exactly representable as a 32-bit
@@ -70,25 +85,41 @@ sealed class BigIntBase(
      * Only values whose magnitude fits in one 32-bit limb (or zero) pass
      * this check.
      */
-    fun fitsInt(): Boolean = Zoro.fitsInt(meta, magia)
+    fun fitsInt(): Boolean {
+        if (meta.isZero)
+            return true
+        if (meta.normLen > 1)
+            return false
+        val limb = magia[0]
+        if (limb >= 0)
+            return true
+        return meta.isNegative && limb == Int.MIN_VALUE
+    }
 
     /**
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 32-bit integer (`0 .. UInt.MAX_VALUE`).
      */
-    fun fitsUInt(): Boolean = Zoro.fitsUInt(meta)
+    fun fitsUInt(): Boolean = meta.isPositive && meta.normLen <= 1
 
     /**
      * Returns `true` if this value fits in a signed 64-bit integer
      * (`Long.MIN_VALUE .. Long.MAX_VALUE`).
      */
-    fun fitsLong(): Boolean = Zoro.fitsLong(meta, magia)
+    fun fitsLong(): Boolean {
+        return when {
+            meta.normLen > 2 -> false
+            meta.normLen < 2 -> true
+            magia[1] >= 0 -> true
+            else -> meta.isNegative && magia[1] == Int.MIN_VALUE && magia[0] == 0
+        }
+    }
 
     /**
      * Returns `true` if this value is non-negative and fits in an unsigned
      * 64-bit integer (`0 .. ULong.MAX_VALUE`).
      */
-    fun fitsULong(): Boolean = Zoro.fitsULong(meta)
+    fun fitsULong(): Boolean = meta.isPositive && meta.normLen <= 2
 
     /**
      * Returns the low 32 bits of this value, interpreted as a signed
@@ -102,14 +133,19 @@ sealed class BigIntBase(
      *
      * See also: `toIntClamped()` for a range-checked conversion.
      */
-    fun toInt() = Zoro.toInt(meta, magia)
+    fun toInt() =
+        if (isZero()) 0 else (magia[0] xor meta.signMask) - meta.signMask
 
     /**
      * Returns this value as a signed `Int`, throwing an [ArithmeticException]
      * if it cannot be represented exactly. Unlike [toInt], this performs a
      * strict range check instead of truncating the upper bits.
      */
-    fun toIntExact(): Int = Zoro.toIntExact(meta, magia)
+    fun toIntExact(): Int =
+        if (fitsInt())
+            toInt()
+        else
+            throw ArithmeticException("BigInt out of Int range")
 
     /**
      * Returns this BigInt as a signed Int, clamped to `Int.MIN_VALUE..Int.MAX_VALUE`.
@@ -117,20 +153,28 @@ sealed class BigIntBase(
      * Values greater than `Int.MAX_VALUE` return `Int.MAX_VALUE`.
      * Values less than `Int.MIN_VALUE` return `Int.MIN_VALUE`.
      */
-    fun toIntClamped(): Int = Zoro.toIntClamped(meta, magia)
+    fun toIntClamped(): Int = when {
+        magnitudeBitLen() <= 31 -> toInt()
+        meta.isPositive -> Int.MAX_VALUE
+        else -> Int.MIN_VALUE
+    }
 
     /**
      * Returns the low 32 bits of this value interpreted as an unsigned
      * two’s-complement `UInt` (i.e., wraps modulo 2³², like `Long.toUInt()`).
      */
-    fun toUInt(): UInt = Zoro.toUInt(meta, magia)
+    fun toUInt(): UInt = toInt().toUInt()
 
     /**
      * Returns this value as a `UInt`, throwing an [ArithmeticException]
      * if it cannot be represented exactly. Unlike [toUInt], this checks
      * that the value is within the unsigned 32-bit range.
      */
-    fun toUIntExact(): UInt = Zoro.toUIntExact(meta, magia)
+    fun toUIntExact(): UInt =
+        if (fitsUInt())
+            toUInt()
+        else
+            throw ArithmeticException("out of UInt range")
 
     /**
      * Returns this BigInt as an unsigned UInt, clamped to `0..UInt.MAX_VALUE`.
@@ -138,7 +182,11 @@ sealed class BigIntBase(
      * Values greater than `UInt.MAX_VALUE` return `UInt.MAX_VALUE`.
      * Negative values return 0.
      */
-    fun toUIntClamped(): UInt = Zoro.toUIntClamped(meta, magia)
+    fun toUIntClamped(): UInt = when {
+        meta.isNegative -> 0u
+        magnitudeBitLen() <= 32 -> toUInt()
+        else -> UInt.MAX_VALUE
+    }
 
     /**
      * Returns the low 64 bits of this value as a signed two’s-complement `Long`.
@@ -147,14 +195,26 @@ sealed class BigIntBase(
      * sign applied afterward; upper bits are discarded (wraps modulo 2⁶⁴),
      * matching `Long` conversion behavior.
      */
-    fun toLong(): Long = Zoro.toLong(meta, magia)
+    fun toLong(): Long {
+        val l = when (meta.normLen) {
+            0 -> 0L
+            1 -> magia[0].toUInt().toLong()
+            else -> (magia[1].toLong() shl 32) or magia[0].toUInt().toLong()
+        }
+        val mask = meta.signMask.toLong()
+        return (l xor mask) - mask
+    }
 
     /**
      * Returns this value as a `Long`, throwing an [ArithmeticException]
      * if it cannot be represented exactly. Unlike [toLong], this checks
      * that the value lies within the signed 64-bit range.
      */
-    fun toLongExact(): Long = Zoro.toLongExact(meta, magia)
+    fun toLongExact(): Long =
+        if (fitsLong())
+            toLong()
+        else
+            throw ArithmeticException("out of Long range")
 
     /**
      * Returns this BigInt as a signed Long, clamped to `Long.MIN_VALUE..Long.MAX_VALUE`.
@@ -162,20 +222,29 @@ sealed class BigIntBase(
      * Values greater than `Long.MAX_VALUE` return `Long.MAX_VALUE`.
      * Values less than `Long.MIN_VALUE` return `Long.MIN_VALUE`.
      */
-    fun toLongClamped(): Long = Zoro.toLongClamped(meta, magia)
+    fun toLongClamped(): Long = when {
+        magnitudeBitLen() <= 63 -> toLong()
+        meta.isPositive -> Long.MAX_VALUE
+        else -> Long.MIN_VALUE
+    }
+
 
     /**
      * Returns the low 64 bits of this value interpreted as an unsigned
      * two’s-complement `ULong` (wraps modulo 2⁶⁴, like `Long.toULong()`).
      */
-    fun toULong(): ULong = Zoro.toULong(meta, magia)
+    fun toULong(): ULong = toLong().toULong()
 
     /**
      * Returns this value as a `ULong`, throwing an [ArithmeticException]
      * if it cannot be represented exactly. Unlike [toULong], this checks
      * that the value is within the unsigned 64-bit range.
      */
-    fun toULongExact(): ULong = Zoro.toULongExact(meta, magia)
+    fun toULongExact(): ULong =
+        if (fitsULong())
+            toULong()
+        else
+            throw ArithmeticException("out of ULong range")
 
     /**
      * Returns this BigInt as an unsigned ULong, clamped to `0..ULong.MAX_VALUE`.
@@ -183,19 +252,30 @@ sealed class BigIntBase(
      * Values greater than `ULong.MAX_VALUE` return `ULong.MAX_VALUE`.
      * Negative values return 0.
      */
-    fun toULongClamped(): ULong = Zoro.toULongClamped(meta, magia)
+    fun toULongClamped(): ULong = when {
+        meta.isNegative -> 0uL
+        magnitudeBitLen() <= 64 -> toULong()
+        else -> ULong.MAX_VALUE
+    }
 
     /**
      * Returns the low 32 bits of the magnitude as a `UInt`
      * (ignores the sign).
      */
-    fun toUIntMagnitude(): UInt = Zoro.toUIntMagnitude(meta, magia)
+    fun toUIntMagnitude(): UInt =
+        if (meta.normLen == 0) 0u else magia[0].toUInt()
 
     /**
      * Returns the low 64 bits of the magnitude as a `ULong`
      * (ignores the sign).
      */
-    fun toULongMagnitude(): ULong = Zoro.toULongMagnitude(meta, magia)
+    fun toULongMagnitude(): ULong {
+        return when {
+            magia.isEmpty() -> 0uL
+            magia.size == 1 -> magia[0].toUInt().toULong()
+            else -> (magia[1].toULong() shl 32) or magia[0].toUInt().toULong()
+        }
+    }
 
     /**
      * Extracts a 64-bit unsigned value from the magnitude of this number,
@@ -205,14 +285,14 @@ sealed class BigIntBase(
      * @throws IllegalArgumentException if `bitIndex` is negative.
      */
     fun extractULongAtBitIndex(bitIndex: Int): ULong =
-        Zoro.extractULongAtBitIndex(meta, magia, bitIndex)
+        Mago.extractULongAtBitIndex(magia, meta.normLen, bitIndex)
 
     /**
      * Returns the bit-length of the magnitude of this BigInt.
      *
      * Equivalent to the number of bits required to represent the absolute value.
      */
-    fun magnitudeBitLen() = Zoro.magnitudeBitLen(meta, magia)
+    fun magnitudeBitLen() = Mago.bitLen(magia, meta.normLen)
 
     /**
      * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
@@ -230,14 +310,12 @@ sealed class BigIntBase(
     /**
      * Returns the number of 32-bit integers required to store the binary magnitude.
      */
-    fun magnitudeIntArrayLen() =
-        Zoro.magnitudeIntArrayLen(meta, magia)
+    fun magnitudeIntArrayLen() = (magnitudeBitLen() + 31) ushr 5
 
     /**
      * Returns the number of 64-bit longs required to store the binary magnitude.
      */
-    fun magnitudeLongArrayLen() =
-        Zoro.magnitudeLongArrayLen(meta, magia)
+    fun magnitudeLongArrayLen() = (magnitudeBitLen() + 63) ushr 6
 
     /**
      * Computes the number of bytes needed to represent this BigInt
@@ -257,12 +335,24 @@ sealed class BigIntBase(
      *
      * @return bit index of the lowest set bit, or -1 if ZERO
      */
-    fun countTrailingZeroBits(): Int = Zoro.countTrailingZeroBits(meta, magia)
+    fun countTrailingZeroBits(): Int = Mago.ctz(magia, meta.normLen)
 
     /**
-     * Returns the number of bits set in the magnitude, ignoring the sign.
+     * Counts the number of set bits (population count) in the normalized magnitude.
+     *
+     * @return the total number of set bits in the magnitude.
+     *
+     * @throws IllegalStateException if `meta.normLen` is out of bounds.
      */
-    fun magnitudeCountOneBits(): Int = Zoro.magnitudeCountOneBits(meta, magia)
+    fun magnitudeCountOneBits(): Int {
+        if (meta.normLen >= 0 && meta.normLen <= magia.size) { // BCE
+            var popCount = 0
+            for (i in 0..<meta.normLen)
+                popCount += magia[i].countOneBits()
+            return popCount
+        }
+        throw IllegalStateException()
+    }
 
     /**
      * Tests whether the magnitude bit at [bitIndex] is set.
@@ -270,7 +360,7 @@ sealed class BigIntBase(
      * @param bitIndex 0-based, starting from the least-significant bit
      * @return true if the bit is set, false otherwise
      */
-    fun testBit(bitIndex: Int): Boolean = Zoro.testBit(meta, magia, bitIndex)
+    fun testBit(bitIndex: Int): Boolean = Mago.testBit(magia, meta.normLen, bitIndex)
 
     /**
      * Compares this [BigInt] with another [BigInt] for order.
@@ -285,25 +375,12 @@ sealed class BigIntBase(
      *  * `0` if this value is equal to [other],
      *  * `1` if this value is greater than [other].
      */
-    operator fun compareTo(other: BigInt): Int =
-        Zoro.compare(meta, magia, other.meta, other.magia)
-
-    /**
-     * Compares this [BigInt] with a [BigIntAccumulator] for
-     * numerical order.
-     *
-     * The comparison is performed according to mathematical value:
-     * - A negative number is always less than a positive number.
-     * - If both numbers have the same sign, their magnitudes are compared.
-     *
-     * @param other the [BigIntAccumulator] to compare this value against.
-     * @return
-     *  * `-1` if this value is less than [other],
-     *  * `0` if this value is equal to [other],
-     *  * `1` if this value is greater than [other].
-     */
-    operator fun compareTo(other: BigIntAccumulator): Int =
-        Zoro.compare(meta, magia, other.meta, other.magia)
+    operator fun compareTo(other: BigIntBase): Int {
+        if (meta.signMask != other.meta.signMask)
+            return meta.signMask or 1
+        val cmp = Mago.compare(magia, meta.normLen, other.magia, other.meta.normLen)
+        return meta.negateIfNegative(cmp)
+    }
 
     /**
      * Compares this [BigInt] with a 32-bit signed integer value.
@@ -318,7 +395,7 @@ sealed class BigIntBase(
      *  * `0` if this value is equal to [n],
      *  * `1` if this value is greater than [n].
      */
-    operator fun compareTo(n: Int): Int = Zoro.compare(meta, magia, n)
+    operator fun compareTo(n: Int): Int = compareToHelper(n < 0, n.absoluteValue.toUInt().toULong())
 
     /**
      * Compares this [BigInt] with an unsigned 32-bit integer value.
@@ -332,7 +409,7 @@ sealed class BigIntBase(
      *  * `0` if this value is equal to [w],
      *  * `1` if this value is greater than [w].
      */
-    operator fun compareTo(w: UInt): Int = Zoro.compare(meta, magia, w)
+    operator fun compareTo(w: UInt): Int = compareToHelper(false, w.toULong())
 
     /**
      * Compares this [BigInt] with a 64-bit signed integer value.
@@ -347,7 +424,7 @@ sealed class BigIntBase(
      *  * `0` if this value is equal to [l],
      *  * `1` if this value is greater than [l].
      */
-    operator fun compareTo(l: Long): Int = Zoro.compare(meta, magia, l)
+    operator fun compareTo(l: Long): Int = compareToHelper(l < 0, l.absoluteValue.toULong())
 
     /**
      * Compares this [BigInt] with an unsigned 64-bit integer value.
@@ -361,7 +438,7 @@ sealed class BigIntBase(
      *  * `0` if this value is equal to [dw],
      *  * `1` if this value is greater than [dw].
      */
-    operator fun compareTo(dw: ULong): Int = Zoro.compare(meta, magia, dw)
+    operator fun compareTo(dw: ULong): Int = compareToHelper(false, dw)
 
     /**
      * Helper for comparing this BigInt to an unsigned 64-bit integer.
@@ -370,8 +447,12 @@ sealed class BigIntBase(
      * @param dwMag the ULong magnitude
      * @return -1 if this < ulMag, 0 if equal, 1 if this > ulMag
      */
-    fun compareToHelper(dwSign: Boolean, dwMag: ULong): Int =
-        Zoro.compareHelper(meta, magia, dwSign, dwMag)
+    fun compareToHelper(dwSign: Boolean, dwMag: ULong): Int {
+        if (meta.isNegative != dwSign)
+            return meta.signMask or 1
+        val cmp = Mago.compare(magia, meta.normLen, dwMag)
+        return if (dwSign) -cmp else cmp
+    }
 
 
     /**
@@ -379,25 +460,24 @@ sealed class BigIntBase(
      *
      * @return -1,0,1
      */
-    fun magnitudeCompareTo(other: BigInt) =
-        Zoro.magnitudeCompare(meta, magia, other.meta, other.magia)
-    fun magnitudeCompareTo(other: BigIntAccumulator) =
-        Zoro.magnitudeCompare(meta, magia, other.meta, other.magia)
     fun magnitudeCompareTo(w: UInt) =
-        Zoro.magnitudeCompare(meta, magia, w)
+        Mago.compare(magia, meta.normLen, w.toULong())
     fun magnitudeCompareTo(dw: ULong) =
-        Zoro.magnitudeCompare(meta, magia, dw)
+        Mago.compare(magia, meta.normLen, dw)
     fun magnitudeCompareTo(littleEndianIntArray: IntArray) =
-        Zoro.magnitudeCompare(meta, magia, littleEndianIntArray)
+        Mago.compare(magia, meta.normLen, littleEndianIntArray, Mago.normLen(littleEndianIntArray))
+    fun magnitudeCompareTo(other: BigIntBase): Int =
+        Mago.compare(magia, meta.normLen, other.magia, other.meta.normLen)
 
     /**
-     * Comparison predicate for numerical equality with another [BigInt].
+     * Comparison predicate for numerical equality with another [BigInt] or
+     * [BigIntAccumulator].
      *
-     * @param other the [BigInt] to compare with
+     * @param other the [BigInt] or [BigIntAccumulator] to compare with
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
-    infix fun EQ(other: BigInt): Boolean =
-        Zoro.compare(meta, magia, other.meta, other.magia) == 0
+    infix fun EQ(other: BigIntBase): Boolean =
+        compareTo(other) == 0
 
     /**
      * Comparison predicate for numerical equality with the current
@@ -705,21 +785,6 @@ sealed class BigIntBase(
      */
     fun magnitudeToLittleEndianLongArray(): LongArray =
         Zoro.magnitudeToLittleEndianLongArray(meta, magia)
-
-    /**
-     * Returns `true` if this value is in normalized form.
-     *
-     * A `BigInt` is normalized when:
-     *  - it is exactly the canonical zero (`BigInt.ZERO`), or
-     *  - its magnitude array does not contain unused leading zero limbs
-     *    (i.e., the most significant limb is non-zero).
-     *
-     * Normalization is not required for correctness, but a normalized
-     * representation avoids unnecessary high-order zero limbs.
-     */
-    fun isNormalized(): Boolean = Zoro.isNormalized(meta, magia)
-
-    fun isSuperNormalized(): Boolean = Zoro.isSuperNormalized(meta, magia)
 
 
     // <<<<<<<<<<<<<<<<<< END OF SHARED TEXT SOURCE CODE >>>>>>>>>>>>>>>>>>>>>>
