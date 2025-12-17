@@ -589,7 +589,7 @@ class BigIntAccumulator private constructor (
             yMeta.isZero -> set(xMeta, x)
             xMeta.isZero -> set(yMeta, y)
             xMeta.signBit == yMeta.signBit -> {
-                ensureCapacityDiscard(xMeta.normLen + yMeta.normLen + 1)
+                ensureCapacityDiscard(max(xMeta.normLen, yMeta.normLen) + 1)
                 meta = Meta(
                     xMeta.signBit,
                     Mago.setAdd(magia, x, xMeta.normLen, y, yMeta.normLen)
@@ -661,22 +661,22 @@ class BigIntAccumulator private constructor (
     private fun setMulImpl(xMeta: Meta, x: Magia, wSign: Boolean, w: UInt): BigIntAccumulator {
         val xNormLen = xMeta.normLen
         ensureTmp1Capacity(xNormLen + 1)
-        swapTmp1()
         meta = Meta(
             xMeta.signFlag xor wSign,
-            Mago.setMul(magia, x, xNormLen, w)
+            Mago.setMul(tmp1, x, xNormLen, w)
         )
+        swapTmp1()
         return this
     }
 
     private fun setMulImpl(xMeta: Meta, x: Magia, wSign: Boolean, dw: ULong): BigIntAccumulator {
         val xNormLen = xMeta.normLen
-        ensureTmp1Capacity(xNormLen + 1)
-        swapTmp1()
+        ensureTmp1Capacity(xNormLen + 2)
         meta = Meta(
             xMeta.signFlag xor wSign,
-            Mago.setMul(magia, x, xNormLen, dw)
+            Mago.setMul(tmp1, x, xNormLen, dw)
         )
+        swapTmp1()
         return this
     }
 
@@ -684,11 +684,11 @@ class BigIntAccumulator private constructor (
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
         ensureTmp1Capacity(xNormLen + yNormLen)
-        swapTmp1()
         meta = Meta(
             xMeta.signBit xor yMeta.signBit,
-            Mago.setMul(magia, x, xNormLen, y, yNormLen)
+            Mago.setMul(tmp1, x, xNormLen, y, yNormLen)
         )
+        swapTmp1()
         return this
     }
 
@@ -717,11 +717,11 @@ class BigIntAccumulator private constructor (
         check(Mago.isNormalized(x, xMeta.normLen))
         val xNormLen = xMeta.normLen
         ensureTmp1CapacityZeroed(xNormLen + xNormLen)
-        swapTmp1()
         meta = Meta(
             0,
-            Mago.setSqr(magia, x, xNormLen)
+            Mago.setSqr(tmp1, x, xNormLen)
         )
+        swapTmp1()
         return this
     }
 
