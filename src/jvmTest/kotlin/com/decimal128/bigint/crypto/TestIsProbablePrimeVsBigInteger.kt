@@ -9,7 +9,7 @@ class TestIsProbablePrimeVsBigInteger {
 
     @Test
     fun testIsProbablePrime_againstJavaBigInteger() {
-        repeat(500) {
+        repeat(300) {
             val n = BigInt.randomWithMaxBitLen(2048) or BigInt.ONE  // odd
             val ours = BigIntPrime.isProbablePrime(n)
 

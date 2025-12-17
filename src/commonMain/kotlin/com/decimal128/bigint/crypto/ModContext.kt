@@ -2,6 +2,8 @@ package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntAccumulator
+import com.decimal128.bigint.toBigInt
+import kotlin.math.absoluteValue
 
 /**
  * Provides a reusable modular-arithmetic context for a fixed modulus [m].
@@ -51,6 +53,19 @@ class ModContext(val m: BigInt) {
 
     private val impl = Barrett(m)
 
+    private val tmp = BigIntAccumulator()
+
+    fun modSet(a: Int, out: BigIntAccumulator) {
+        if (a >= 0 && m > a)
+            out.set(a)
+        else {
+            tmp.set(a)
+            out.setRem(tmp, m)
+            if (out.isNegative())
+                out += m
+        }
+    }
+
     /**
      * Computes `(a + b) mod m`.
      *
@@ -83,6 +98,16 @@ class ModContext(val m: BigInt) {
      * @param out destination accumulator for the result
      */
     fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) =
+        impl.modMul(a, b, out)
+
+    /**
+     * Computes `(a * b) mod m`.
+     *
+     * @param a first multiplicand
+     * @param b second multiplicand
+     * @param out destination accumulator for the result
+     */
+    fun modMul(a: BigIntAccumulator, b: Int, out: BigIntAccumulator) =
         impl.modMul(a, b, out)
 
     /**
@@ -256,6 +281,8 @@ class ModContext(val m: BigInt) {
         fun reduceInto(x: BigIntAccumulator, out: BigIntAccumulator) {
             check(out !== q && out !== r1 && out !== r2 && out !== mulTmp)
 
+            if (x < 0)
+                println("snafu!")
             require (x >= 0)
             require (x < mSquared)
             if (x < m) {
@@ -298,10 +325,34 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
+        fun modMul(a: BigInt, b: Int, out: BigIntAccumulator) {
+            check (out !== mulTmp)
+            mulTmp.setMul(a, b)
+            reduceInto(mulTmp, out)
+        }
+
+        /**
+         * Computes `(a * b) mod m`.
+         */
         fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) {
             check (out !== mulTmp)
             mulTmp.setMul(a, b)
             reduceInto(mulTmp, out)
+        }
+
+        /**
+         * Computes `(a * b) mod m`.
+         */
+        fun modMul(a: BigIntAccumulator, b: Int, out: BigIntAccumulator) {
+            check (a !== mulTmp && out !== mulTmp)
+            if (b != 0) {
+                mulTmp.setMul(a, b.absoluteValue.toUInt())
+                reduceInto(mulTmp, out)
+                if (b < 0 && out.isNotZero())
+                    out.setSub(m, out)
+            } else {
+                out.setZero()
+            }
         }
 
         /**

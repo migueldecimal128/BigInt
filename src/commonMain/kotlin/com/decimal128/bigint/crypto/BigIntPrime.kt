@@ -282,8 +282,17 @@ object BigIntPrime {
         val s = n1.countTrailingZeroBits()
         val d = n1 shr s
 
+        val modCtx = ModContext(n)
         // U_d, V_d, Q^d (all normalized mod n)
-        val (U, V, Qk) = lucasUVQk(n, d, params.D, params.Q)
+        //val (Ux, Vx, Qk) = lucasUVQk(n, d, params.D, params.Q)
+        val (U, V, Qk) = lucasUVQk_2(modCtx, d, params.D, params.Q)
+        //if (U NE Ux || V NE Vx || Qk NE Qkx) {
+        //    println("snafu!")
+        //    println(" U:$U  V:$V  Qk:$Qk")
+        //    println("Ux:$U Vx:$Vx Qkx:$Qkx")
+        //    println("--")
+        //    throw IllegalStateException()
+        //}
 
         if (U.isZero()) return true
 
@@ -359,5 +368,77 @@ object BigIntPrime {
         }
 
         return Triple(U, V, Qk)
+    }
+
+    fun lucasUVQk_2(
+        modCtx: ModContext,
+        d: BigInt,   // odd
+        D: Int,
+        Q: Int
+    ): Triple<BigInt, BigInt, BigInt> {
+
+        var U = 1.toBigIntAccumulator()
+        var V = 1.toBigIntAccumulator()
+        var Qk = BigIntAccumulator()
+        modCtx.modSet(Q, Qk)
+
+        var U2m = BigIntAccumulator()
+        var V2m = BigIntAccumulator()
+        var V2 = BigIntAccumulator()
+        var QkDoubled = BigIntAccumulator()
+        var Q2m = BigIntAccumulator()
+        var U2m1 = BigIntAccumulator()
+        var V2m1 = BigIntAccumulator()
+        var Q2m1 = BigIntAccumulator()
+        val tmp1 = BigIntAccumulator()
+        val tmp2 = BigIntAccumulator()
+
+        for (i in d.magnitudeBitLen() - 2 downTo 0) {
+
+            val bit = d.testBit(i)
+
+            //val U2m = (U * V) mod n
+            modCtx.modMul(U, V, U2m)
+
+            //val V2m = (V * V - (Qk shl 1)) mod n
+            modCtx.modSqr(V, V2)
+            modCtx.modAdd(Qk, Qk, QkDoubled)
+            modCtx.modSub(V2, QkDoubled, V2m)
+
+            //val Q2m = (Qk * Qk) mod n
+            modCtx.modSqr(Qk, Q2m)
+
+            if (!bit) {
+                //U = U2m
+                val swapU = U; U = U2m; U2m = swapU
+                //V = V2m
+                val swapV = V; V = V2m; V2m = swapV
+                //Qk = Q2m
+                val swapQk = Qk; Qk = Q2m; Q2m = swapQk
+            } else {
+                //val U2m1 = modHalfLucas((U2m + V2m) mod n, n)
+                modCtx.modAdd(U2m, V2m, tmp1)
+                modCtx.modHalfLucas(tmp1, U2m1)
+
+                //val V2m1 = modHalfLucas((V2m + (U2m * D)) mod n, n)
+                modCtx.modMul(U2m, D, tmp1)
+                modCtx.modAdd(V2m, tmp1, tmp2)
+                modCtx.modHalfLucas(tmp2, V2m1)
+
+                //val Q2m1 = (Q2m * Q) mod n
+                modCtx.modMul(Q2m, Q, Q2m1)
+
+                //U = U2m1
+                val swapU = U; U = U2m1; U2m1 = swapU
+
+                // V = V2m1
+                val swapV = V; V = V2m1; V2m1 = swapV
+
+                //Qk = Q2m1
+                val swapQk = Qk; Qk = Q2m1; Q2m1 = swapQk
+            }
+        }
+
+        return Triple(U.toBigInt(), V.toBigInt(), Qk.toBigInt())
     }
 }
