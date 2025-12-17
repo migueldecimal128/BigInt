@@ -23,7 +23,7 @@ internal object Zoro {
      *
      * @return -1 if negative, 0 if zero, 1 if positive
      */
-    inline fun signum(meta: Meta) = (meta.meta shr 31) or ((-meta.meta) ushr 31)
+    inline fun signum(meta: Meta) = (meta._meta shr 31) or ((-meta._meta) ushr 31)
 
     /**
      * Returns `true` if the magnitude of this BigInt is a power of two

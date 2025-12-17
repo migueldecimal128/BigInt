@@ -29,7 +29,7 @@ import kotlin.jvm.JvmInline
  *
  */
 @JvmInline
-value class Meta internal constructor(val meta: Int) {
+value class Meta internal constructor(val _meta: Int) {
     companion object {
 
         /**
@@ -85,47 +85,47 @@ value class Meta internal constructor(val meta: Int) {
 
     /** Returns `true` if the sign bit is set (i.e., the value is negative). */
     val signFlag: Boolean
-        get() = meta < 0
+        get() = _meta < 0
     /**
      * Returns the sign as a single bit: **0** for non-negative,
      * **1** for negative.
      */
     val signBit: Int
-        get() = meta ushr 31
+        get() = _meta ushr 31
 
     /** Sign mask: 0 for non-negative, -1 for negative.
      *
      * Useful for masking and negating.
      */
     val signMask: Int
-        get() = meta shr 31
+        get() = _meta shr 31
 
     /**
      * Returns `true` if the sign is negative.
      */
     val isNegative: Boolean
-        get() = meta < 0
+        get() = _meta < 0
 
     /**
      * Returns `true` if the sign is positive ... or at least non-negative.
      */
     val isPositive: Boolean
-        get() = meta >= 0
+        get() = _meta >= 0
 
     val isZero: Boolean
-        get() = meta == 0
+        get() = _meta == 0
 
     /**
      * Returns the negation of the sign with the same normLen magnitude.
      *
      * Do not allow negative zero.
      */
-    fun negate() = Meta((meta xor Int.MIN_VALUE) and (-(meta and Int.MAX_VALUE) shr 31))
+    fun negate() = Meta((_meta xor Int.MIN_VALUE) and (-(_meta and Int.MAX_VALUE) shr 31))
 
     /**
      * Returns a meta with non-negative sign and the same normLen magnitude.
      */
-    fun abs() = Meta(meta and Int.MAX_VALUE)
+    fun abs() = Meta(_meta and Int.MAX_VALUE)
 
     /**
      * Negates the parameter x if this `Meta` is negative.
@@ -142,6 +142,6 @@ value class Meta internal constructor(val meta: Int) {
         get() = signMask or 1
 
     val normLen: Int
-        get() = meta and Int.MAX_VALUE
+        get() = _meta and Int.MAX_VALUE
 
 }
