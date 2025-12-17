@@ -1398,7 +1398,7 @@ class BigIntAccumulator private constructor (
 
     private fun mutateRemImpl(w: UInt) {
         validate()
-        val normLen = Mago.setRem(magia, magia, meta.normLen, w)
+        val normLen = Mago.setRem32(magia, magia, meta.normLen, w)
         _meta = Meta(meta.signFlag, normLen)
         validate()
     }

@@ -2002,24 +2002,6 @@ internal object Mago {
     }
 
     /**
-     * Divides the normalized limb array `x[0‥xNormLen)` by `y[0‥yNormLen)` and
-     * writes the quotient into `z` (supports in-place use when `z === x` or
-     * `z === y`).
-     *
-     * Handles all structured cases:
-     * - If `y` fits in one limb, dispatches to the single-limb division routine.
-     * - If `x < y`, the quotient is zero.
-     * - If `x == y`, the quotient is 1.
-     * - Otherwise performs full Knuth division.
-     *
-     * @return the normalized limb length of the quotient.
-     * @throws ArithmeticException if `yNormLen == 0` (division by zero)
-     * @throws IllegalArgumentException if `z` is too small to hold the quotient
-     */
-    fun setDiv(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int =
-        setDiv(z, x, xNormLen, null, y, yNormLen, null)
-
-    /**
      * Divides the normalized integer [x] by [y] using Knuth division.
      *
      * @param z destination limb array for the quotient; must have size ≥ `xNormLen - yNormLen + 1`.
@@ -2042,6 +2024,8 @@ internal object Mago {
         check (isNormalized(y, yNormLen))
         check (xTmp == null || xTmp.size >= xNormLen + 1)
         check (yTmp == null || yTmp.size >= yNormLen)
+        if (xNormLen < yNormLen || yNormLen < 2)
+            throw IllegalArgumentException()
         val m = xNormLen
         val n = yNormLen
         val u = x
@@ -2050,7 +2034,12 @@ internal object Mago {
             throw IllegalArgumentException()
         val q = z
         val r = null
-        val qNormLen = knuthDivide(q, r, u, v, m, n, xTmp, yTmp)
+        if (yNormLen > 2) {
+            val qNormLen = knuthDivide(q, r, u, v, m, n, xTmp, yTmp)
+            return qNormLen
+        }
+        val vDw: ULong = (v[1].toULong() shl 32) or (v[0].toUInt().toULong())
+        val qNormLen = knuthDivide64(q, r, u, vDw, m, xTmp).toInt()
         return qNormLen
     }
 
@@ -2072,7 +2061,7 @@ internal object Mago {
      * Returns `1` if a non-zero remainder was written, or `0` if the remainder is
      * zero. Uses a fast path for 1–2 limb values, otherwise delegates to `calcRem`.
      */
-    fun setRem(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
+    fun setRem32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         check (isNormalized(x, xNormLen))
         if (xNormLen > 0) {
             val rem = calcRem32(x, xNormLen, w)
@@ -2101,7 +2090,7 @@ internal object Mago {
     fun setRem64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         check (isNormalized(x, xNormLen))
         return when {
-            (dw shr 32) == 0uL -> setRem(z, x, xNormLen, dw.toUInt())
+            (dw shr 32) == 0uL -> setRem32(z, x, xNormLen, dw.toUInt())
             xNormLen == 0 -> 0
             xNormLen <= 2 -> setULong(z, toRawULong(x, xNormLen) % dw)
             else -> setRem(z, x, xNormLen, intArrayOf(dw.toInt(), (dw shr 32).toInt()), 2)
@@ -2189,7 +2178,7 @@ internal object Mago {
             }
             yNormLen == 2 && xNormLen <= 2 ->
                 return setULong(zMagia, toRawULong(xMagia, xNormLen) % toRawULong(yMagia, yNormLen))
-            yNormLen == 1 -> return setRem(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
+            yNormLen == 1 -> return setRem32(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
             // note that this will handle aliasing
             // when x === yMeta,yMagia
             xNormLen == yNormLen -> {
@@ -2222,15 +2211,21 @@ internal object Mago {
         check (isNormalized(y, yNormLen))
         check (xTmp == null || xTmp.size >= xNormLen + 1)
         check (yTmp == null || yTmp.size >= yNormLen)
+        if (xNormLen < yNormLen || yNormLen < 2)
+            throw IllegalArgumentException()
         val m = xNormLen
         val n = yNormLen
         val u = x
         val v = y
-        val q = null
         if (z.size < yNormLen)
             throw IllegalArgumentException()
         val r = z
-        val rNormLen = knuthDivide(q, r, u, v, m, n, xTmp, yTmp)
+        if (yNormLen > 2) {
+            val rNormLen = knuthDivide(q=null, r, u, v, m, n, xTmp, yTmp)
+            return rNormLen
+        }
+        val vDw: ULong = (v[1].toULong() shl 32) or (v[0].toUInt().toULong())
+        val rNormLen = knuthDivide64(q=null, r, u, vDw, m, xTmp).toInt()
         return rNormLen
     }
 
