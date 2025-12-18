@@ -482,6 +482,8 @@ sealed class BigIntBase(
         Mago.compare(magia, meta.normLen, littleEndianIntArray, Mago.normLen(littleEndianIntArray))
     fun magnitudeCompareTo(other: BigIntBase): Int =
         Mago.compare(magia, meta.normLen, other.magia, other.meta.normLen)
+    internal fun magnitudeCompareTo(otherMeta: Meta, otherMagia: Magia) =
+        Mago.compare(magia, meta.normLen, otherMagia, otherMeta.normLen)
 
     /**
      * Comparison predicate for numerical equality with another [BigInt] or

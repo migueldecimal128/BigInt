@@ -531,7 +531,7 @@ class BigIntAccumulator private constructor (
     fun setAdd(x: BigIntBase, dw: ULong) =
         setAddImpl(x, false, dw)
     fun setAdd(x: BigIntBase, y: BigIntBase) =
-        setAddImpl(x, isSub=false, y)
+        setAddImpl(x, y.meta, y.magia)
 
     fun setSub(x: BigIntBase, n: Int) =
         setAddImpl(x, n >= 0, n.absoluteValue.toUInt().toULong())
@@ -542,7 +542,7 @@ class BigIntAccumulator private constructor (
     fun setSub(x: BigIntBase, dw: ULong) =
         setAddImpl(x, true, dw)
     fun setSub(x: BigIntBase, y: BigIntBase) =
-        setAddImpl(x, isSub = true, y)
+        setAddImpl(x, y.meta.negate(), y.magia)
 
     private fun setAddImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
         check (x.isNormalized())
@@ -575,77 +575,36 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun setAddImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
-        check (Mago.isNormalized(x, xMeta.normLen))
-        check (Mago.isNormalized(y, yMeta.normLen))
+    private fun setAddImpl(x: BigIntBase, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
+        check (x.isNormalized())
+        check (Mago.isNormalized(yMagia, yMeta.normLen))
+        val xMagia = x.magia // save for aliasing
         when {
-            yMeta.isZero -> set(xMeta, x)
-            xMeta.isZero -> set(yMeta, y)
-            xMeta.signBit == yMeta.signBit -> {
-                ensureCapacityDiscard(max(xMeta.normLen, yMeta.normLen) + 1)
+            yMeta.isZero -> set(x)
+            x.isZero() -> set(yMeta, yMagia)
+            x.meta.signFlag == yMeta.signFlag -> {
+                ensureCapacityDiscard(max(x.meta.normLen, yMeta.normLen) + 1)
                 _meta = Meta(
-                    xMeta.signBit,
-                    Mago.setAdd(magia, x, xMeta.normLen, y, yMeta.normLen)
+                    x.meta.signBit,
+                    Mago.setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
                 )
             }
 
             else -> {
-                val cmp: Int = Mago.compare(x, xMeta.normLen, y, yMeta.normLen)
+                val cmp: Int = x.magnitudeCompareTo(yMeta, yMagia)
                 when {
                     cmp > 0 -> {
-                        ensureCapacityDiscard(xMeta.normLen)
+                        ensureCapacityDiscard(x.meta.normLen)
                         _meta = Meta(
-                            xMeta.signBit,
-                            Mago.setSub(magia, x, xMeta.normLen, y, yMeta.normLen)
-                        )
+                            x.meta.signBit,
+                            Mago.setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen))
                     }
 
                     cmp < 0 -> {
                         ensureCapacityDiscard(yMeta.normLen)
                         _meta = Meta(
                             yMeta.signBit,
-                            Mago.setSub(magia, y, yMeta.normLen, x, xMeta.normLen)
-                        )
-                    }
-
-                    else -> setZero()
-                }
-            }
-        }
-        return this
-    }
-
-    private fun setAddImpl(x: BigIntBase, isSub: Boolean, y: BigIntBase): BigIntAccumulator {
-        check (x.isNormalized())
-        check (y.isNormalized())
-        val xMagia = x.magia // save for aliasing
-        val yMagia = y.magia // save for aliasing
-        when {
-            y.isZero() -> set(x)
-            x.isZero() -> { set(y); if (isSub) mutNegate() }
-            x.meta.signFlag == isSub xor y.meta.signFlag -> {
-                ensureCapacityDiscard(max(x.meta.normLen, y.meta.normLen) + 1)
-                _meta = Meta(
-                    x.meta.signBit,
-                    Mago.setAdd(magia, xMagia, x.meta.normLen, yMagia, y.meta.normLen)
-                )
-            }
-
-            else -> {
-                val cmp: Int = x.magnitudeCompareTo(y)
-                when {
-                    cmp > 0 -> {
-                        ensureCapacityDiscard(x.meta.normLen)
-                        _meta = Meta(
-                            x.meta.signBit,
-                            Mago.setSub(magia, xMagia, x.meta.normLen, yMagia, y.meta.normLen))
-                    }
-
-                    cmp < 0 -> {
-                        ensureCapacityDiscard(y.meta.normLen)
-                        _meta = Meta(
-                            y.meta.signFlag xor isSub,
-                            Mago.setSub(magia, yMagia, y.meta.normLen, xMagia, x.meta.normLen))
+                            Mago.setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen))
                     }
 
                     else -> setZero()
@@ -1292,7 +1251,7 @@ class BigIntAccumulator private constructor (
         tmp1[2] = hi64.toInt()
         tmp1[3] = (hi64 shr 32).toInt()
         val normLen = Mago.normLen(tmp1, 4)
-        setAddImpl(meta, magia, Meta(0, normLen), tmp1)
+        setAddImpl(this, Meta(0, normLen), tmp1)
     }
 
     /**
@@ -1304,7 +1263,7 @@ class BigIntAccumulator private constructor (
     fun addSquareOf(bi: BigIntBase) {
         ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
         val normLenSqr = Mago.setSqr(tmp1, bi.magia, bi.meta.normLen)
-        setAddImpl(this.meta, this.magia, Meta(0, normLenSqr), tmp1)
+        setAddImpl(this, Meta(0, normLenSqr), tmp1)
         validate()
     }
 
@@ -1348,7 +1307,7 @@ class BigIntAccumulator private constructor (
      * @see addAbsValueOf(Long)
      */
     fun addAbsValueOf(bi: BigIntBase) =
-        setAddImpl(meta, magia, bi.meta.abs(), bi.magia)
+        setAddImpl(this, bi.meta.abs(), bi.magia) // add if it is positive, subtract if it is negative
 
     /**
      * Returns the current value of this accumulator as a raw unsigned 64-bit value.
