@@ -2567,6 +2567,7 @@ internal object Mago {
     /**
      * Converts a multi-limb integer to its decimal string representation.
      *
+     *
      * @param isNegative whether the resulting string should include a leading minus sign.
      * @param x the array of 32-bit limbs representing the integer (least-significant limb first).
      * @param xNormLen the number of significant limbs to consider from `x`.
@@ -2574,7 +2575,8 @@ internal object Mago {
      */
     fun toString(isNegative: Boolean, x: Magia, xNormLen: Int): String {
         if (xNormLen >= 0 && xNormLen <= x.size) {
-            check (isNormalized(x, xNormLen))
+            if (! isNormalized(x, xNormLen))
+                return "[not-normalized]"
             val bitLen = bitLen(x, xNormLen)
             if (bitLen < 2) {
                 if (bitLen == 0)

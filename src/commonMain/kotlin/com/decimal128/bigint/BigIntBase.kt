@@ -662,7 +662,7 @@ sealed class BigIntBase(
      *
      * @return a decimal string representing the value of this BigInt
      */
-    override fun toString() = Zoro.toString(meta, magia)
+    override fun toString() = Mago.toString(meta.isNegative, magia, meta.normLen)
 
     /**
      * Returns the hexadecimal string representation of this BigInt.
