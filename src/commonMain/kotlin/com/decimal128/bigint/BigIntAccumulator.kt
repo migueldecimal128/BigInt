@@ -258,7 +258,7 @@ class BigIntAccumulator private constructor (
      *
      * @param newLimbLen the required limb length to be zeroed.
      */
-    private inline fun ensureCapacityZeroed(newLimbLen: Int) {
+    private inline fun ensureCapacityCopyZeroed(newLimbLen: Int) {
         if (newLimbLen <= magia.size) {
             if (newLimbLen > meta.normLen)
                 magia.fill(0, meta.normLen, newLimbLen)
@@ -1115,7 +1115,7 @@ class BigIntAccumulator private constructor (
                 magia[wordIndex] = magia[wordIndex] or isolatedBit
                 return this
             }
-            ensureCapacityZeroed(wordIndex + 1)
+            ensureCapacityCopyZeroed(wordIndex + 1)
             magia[wordIndex] = isolatedBit
             _meta = Meta(meta.signBit, wordIndex + 1)
             return this
