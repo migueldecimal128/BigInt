@@ -782,7 +782,7 @@ class BigIntAccumulator private constructor (
         setModImpl(x, false, dw)
     fun setMod(x: BigIntBase, y: BigIntBase): BigIntAccumulator {
         if (y.meta.isNegative)
-            throw ArithmeticException("cannot take modulus of a negative number")
+            throw ArithmeticException("modulus of a negative number is undefined")
         setRem(x, y)
         if (isNegative())
             setAdd(this, y)
@@ -791,7 +791,7 @@ class BigIntAccumulator private constructor (
 
     private fun setModImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
         if (ySign)
-            throw ArithmeticException("cannot take modulus of a negative number")
+            throw ArithmeticException("modulus of a negative number is undefined")
         setRem(x, yDw)
         if (isNegative())
             setAdd(this, yDw)
@@ -976,23 +976,148 @@ class BigIntAccumulator private constructor (
 
     operator fun divAssign(l: Long) { setDiv(this, l) }
 
-    operator fun divAssign(dw: ULong) = mutateDivImpl(false, dw)
+    operator fun divAssign(dw: ULong) { setDiv(this, dw) }
 
     operator fun divAssign(bi: BigInt) { setDiv(this, bi) }
 
     operator fun divAssign(acc: BigIntAccumulator) { setDiv(this, acc) }
 
-    operator fun remAssign(n: Int) = mutateRemImpl(n.absoluteValue.toUInt())
+    operator fun remAssign(n: Int) { setRem(this, n) }
 
-    operator fun remAssign(w: UInt) = mutateRemImpl(w)
+    operator fun remAssign(w: UInt) { setRem(this, w) }
 
-    operator fun remAssign(l: Long) = mutateRemImpl(l.absoluteValue.toULong())
+    operator fun remAssign(l: Long) { setRem(this, l) }
 
-    operator fun remAssign(dw: ULong) = mutateRemImpl(dw)
+    operator fun remAssign(dw: ULong) { setRem(this, dw) }
 
     operator fun remAssign(bi: BigInt) { setRem(this, bi) }
 
     operator fun remAssign(acc: BigIntAccumulator) { setRem(this, acc) }
+
+    /**
+     * Adds the square of the given value to this accumulator in-place.
+     *
+     * The `addSquareOf` methods efficiently compute the square of the operand
+     * and add it to this accumulator. Supported operand types include:
+     * - [Int], [Long], [UInt], [ULong]
+     * - [BigInt]
+     * - [BigIntAccumulator]
+     *
+     * The magnitude is squared before addition. The internal tmp buffer
+     * is reused to minimize heap allocation during the operation.
+     *
+     * These methods mutate the accumulator in place. They are safe to use even
+     * when the source is the same instance as the accumulator (`this`), as
+     * squaring is performed into temporary storage before addition.
+     *
+     * Example usage:
+     * ```
+     * val sumSqr = BigIntAccumulator()
+     * for (v in data) {
+     *     sumSqr.addSquareOf(v)
+     * }
+     * val totalSquares = sumSqr.toBigInt()
+     * ```
+     *
+     * @param n the integer value to square and add.
+     */
+    fun addSquareOf(n: Int) = setAdd(this, n.toLong() * n.toLong())
+
+    /**
+     * Adds the square of the given UInt value to this accumulator.
+     *
+     * @param w the value to square and add.
+     * @see addSquareOf(ULong)
+     */
+    fun addSquareOf(w: UInt) = setAdd(this, w.toULong() * w.toULong())
+
+    /**
+     * Adds the square of the given Long value to this accumulator.
+     *
+     * @param l the value to square and add.
+     * @see addSquareOf(ULong)
+     */
+    fun addSquareOf(l: Long) = addSquareOf(l.absoluteValue.toULong())
+
+    /**
+     * Adds the square of the given ULong value to this accumulator.
+     *
+     * This method is the canonical implementation for adding squares. It handles
+     * internal limb arithmetic efficiently and updates the accumulator in place.
+     *
+     * @param dw the value to square and add.
+     */
+    fun addSquareOf(dw: ULong) {
+        val lo64 = dw * dw
+        if ((dw shr 32) == 0uL) {
+            setAdd(this, lo64)
+            return
+        }
+        val hi64 = unsignedMulHi(dw, dw)
+        if (tmp1.size < 4)
+            tmp1 = Magia(4)
+        tmp1[0] = lo64.toInt()
+        tmp1[1] = (lo64 shr 32).toInt()
+        tmp1[2] = hi64.toInt()
+        tmp1[3] = (hi64 shr 32).toInt()
+        val normLen = Mago.normLen(tmp1, 4)
+        setAddImpl(this, Meta(0, normLen), tmp1)
+    }
+
+    /**
+     * Adds the square of the given BigInt value to this accumulator.
+     *
+     * @param bi the value to square and add.
+     * @see addSquareOf(ULong)
+     */
+    fun addSquareOf(bi: BigIntBase) {
+        ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
+        val normLenSqr = Mago.setSqr(tmp1, bi.magia, bi.meta.normLen)
+        setAddImpl(this, Meta(0, normLenSqr), tmp1)
+        validate()
+    }
+
+    /**
+     * Adds the absolute value of the given Int to this accumulator.
+     *
+     * @param n the value to add.
+     * @see addAbsValueOf(Long)
+     */
+    fun addAbsValueOf(n: Int) = plusAssign(n.absoluteValue.toUInt())
+
+    /**
+     * Adds the absolute value of the given operand to this accumulator in place.
+     *
+     * Supported operand types include integer primitives ([Int], [Long]) and
+     * arbitrary-precision values ([BigInt], [BigIntAccumulator]).
+     *
+     * This operation does not support unsigned types since they are always
+     * non-negative ... use `+=`
+     *
+     * Example usage:
+     * ```
+     * val sumAbs = BigIntAccumulator()
+     * for (v in data) {
+     *     sumAbs.addAbsValueOf(v)
+     * }
+     * val totalAbs = sumAbs.toBigInt()
+     * ```
+     *
+     * This is the canonical overload for absolute values.
+     *
+     * @param l the value to add.
+     */
+    fun addAbsValueOf(l: Long) = plusAssign(l.absoluteValue.toULong())
+
+    /**
+     * Adds the absolute value of the given [BigInt] or
+     * [BigIntAccumulator] to this accumulator.
+     *
+     * @param hi the value to add.
+     * @see addAbsValueOf(Long)
+     */
+    fun addAbsValueOf(bi: BigIntBase) =
+        setAddImpl(this, bi.meta.abs(), bi.magia) // add if it is positive, subtract if it is negative
 
     /**
      * Mutates accumulator `this <<= bitCount`.
@@ -1183,131 +1308,6 @@ class BigIntAccumulator private constructor (
     }
 
     /**
-     * Adds the square of the given value to this accumulator in-place.
-     *
-     * The `addSquareOf` methods efficiently compute the square of the operand
-     * and add it to this accumulator. Supported operand types include:
-     * - [Int], [Long], [UInt], [ULong]
-     * - [BigInt]
-     * - [BigIntAccumulator]
-     *
-     * The magnitude is squared before addition. The internal tmp buffer
-     * is reused to minimize heap allocation during the operation.
-     *
-     * These methods mutate the accumulator in place. They are safe to use even
-     * when the source is the same instance as the accumulator (`this`), as
-     * squaring is performed into temporary storage before addition.
-     *
-     * Example usage:
-     * ```
-     * val sumSqr = BigIntAccumulator()
-     * for (v in data) {
-     *     sumSqr.addSquareOf(v)
-     * }
-     * val totalSquares = sumSqr.toBigInt()
-     * ```
-     *
-     * @param n the integer value to square and add.
-     */
-    fun addSquareOf(n: Int) = setAdd(this, n.toLong() * n.toLong())
-
-    /**
-     * Adds the square of the given UInt value to this accumulator.
-     *
-     * @param w the value to square and add.
-     * @see addSquareOf(ULong)
-     */
-    fun addSquareOf(w: UInt) = setAdd(this, w.toULong() * w.toULong())
-
-    /**
-     * Adds the square of the given Long value to this accumulator.
-     *
-     * @param l the value to square and add.
-     * @see addSquareOf(ULong)
-     */
-    fun addSquareOf(l: Long) = addSquareOf(l.absoluteValue.toULong())
-
-    /**
-     * Adds the square of the given ULong value to this accumulator.
-     *
-     * This method is the canonical implementation for adding squares. It handles
-     * internal limb arithmetic efficiently and updates the accumulator in place.
-     *
-     * @param dw the value to square and add.
-     */
-    fun addSquareOf(dw: ULong) {
-        val lo64 = dw * dw
-        if ((dw shr 32) == 0uL) {
-            setAdd(this, lo64)
-            return
-        }
-        val hi64 = unsignedMulHi(dw, dw)
-        if (tmp1.size < 4)
-            tmp1 = Magia(4)
-        tmp1[0] = lo64.toInt()
-        tmp1[1] = (lo64 shr 32).toInt()
-        tmp1[2] = hi64.toInt()
-        tmp1[3] = (hi64 shr 32).toInt()
-        val normLen = Mago.normLen(tmp1, 4)
-        setAddImpl(this, Meta(0, normLen), tmp1)
-    }
-
-    /**
-     * Adds the square of the given BigInt value to this accumulator.
-     *
-     * @param bi the value to square and add.
-     * @see addSquareOf(ULong)
-     */
-    fun addSquareOf(bi: BigIntBase) {
-        ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
-        val normLenSqr = Mago.setSqr(tmp1, bi.magia, bi.meta.normLen)
-        setAddImpl(this, Meta(0, normLenSqr), tmp1)
-        validate()
-    }
-
-    /**
-     * Adds the absolute value of the given Int to this accumulator.
-     *
-     * @param n the value to add.
-     * @see addAbsValueOf(Long)
-     */
-    fun addAbsValueOf(n: Int) = plusAssign(n.absoluteValue.toUInt())
-
-    /**
-     * Adds the absolute value of the given operand to this accumulator in place.
-     *
-     * Supported operand types include integer primitives ([Int], [Long]) and
-     * arbitrary-precision values ([BigInt], [BigIntAccumulator]).
-     *
-     * This operation does not support unsigned types since they are always
-     * non-negative ... use `+=`
-     *
-     * Example usage:
-     * ```
-     * val sumAbs = BigIntAccumulator()
-     * for (v in data) {
-     *     sumAbs.addAbsValueOf(v)
-     * }
-     * val totalAbs = sumAbs.toBigInt()
-     * ```
-     *
-     * This is the canonical overload for absolute values.
-     *
-     * @param l the value to add.
-     */
-    fun addAbsValueOf(l: Long) = plusAssign(l.absoluteValue.toULong())
-
-    /**
-     * Adds the absolute value of the given [BigInt] or
-     * [BigIntAccumulator] to this accumulator.
-     *
-     * @param hi the value to add.
-     * @see addAbsValueOf(Long)
-     */
-    fun addAbsValueOf(bi: BigIntBase) =
-        setAddImpl(this, bi.meta.abs(), bi.magia) // add if it is positive, subtract if it is negative
-
-    /**
      * Returns the current value of this accumulator as a raw unsigned 64-bit value.
      *
      * This method is intended for internal use. It converts the accumulator
@@ -1323,41 +1323,10 @@ class BigIntAccumulator private constructor (
         //    limbLen >= 2 -> (dw32(magia[1]) shl 32) or dw32(magia[0])
         //    else -> 0uL
         //}
-        val dw = (dw32(magia[1]) shl 32) or dw32(magia[0])
+        val dw = (magia[1].toULong() shl 32) or magia[0].toUInt().toULong()
         val nonZeroMask = ((-normLen).toLong() shr 63).toULong()
         val gt32Mask = ((1 - normLen) shr 31).toLong().toULong() or 0xFFFF_FFFFuL
         return dw and gt32Mask and nonZeroMask
-    }
-
-
-    private fun mutateDivImpl(wSign: Boolean, w: UInt) {
-        validate()
-        val normLen = Mago.setDiv32(magia, magia, meta.normLen, w)
-        _meta = Meta(meta.signFlag xor wSign, normLen)
-        validate()
-    }
-
-    private fun mutateDivImpl(wSign: Boolean, dw: ULong) {
-        validate()
-        ensureTmp1Capacity(max(1, meta.normLen)) // dw might be a single limb
-        val normLen = Mago.setDiv64(tmp1, magia, meta.normLen, unBuf=null, dw)
-        swapTmp1()
-        _meta = Meta(meta.signFlag xor wSign, normLen)
-        validate()
-    }
-
-    private fun mutateRemImpl(w: UInt) {
-        validate()
-        val normLen = Mago.setRem32(magia, magia, meta.normLen, w)
-        _meta = Meta(meta.signFlag, normLen)
-        validate()
-    }
-
-    private fun mutateRemImpl(dw: ULong) {
-        validate()
-        val normLen = Mago.setRem64(magia, magia, meta.normLen, dw)
-        _meta = Meta(meta.signFlag, normLen)
-        validate()
     }
 
     /**
@@ -1398,16 +1367,3 @@ class BigIntAccumulator private constructor (
             "mutable BigIntAccumulator is an invalid key in collections")
 
 }
-
-/**
- * Converts a 32-bit [Int] to a 64-bit [ULong] with zero-extension.
- *
- * This method treats the input [n] as an unsigned 32-bit value and
- * returns it as a [ULong] where the upper 32 bits are zero. In
- * this context it is used for consistently extracting 64-bit
- * zero-extended limbs from signed [IntArray] elements.
- *
- * @param n the 32-bit integer to convert.
- * @return the zero-extended 64-bit unsigned value.
- */
-private inline fun dw32(n: Int) = n.toUInt().toULong()
