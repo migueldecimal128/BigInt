@@ -372,13 +372,13 @@ object BigIntParsePrint {
      *
      * @return a hexadecimal string representing the value of this BigInt
      */
-    fun toHexString(meta: Meta, magia: Magia): String =
-        toHexString(meta, magia, HEX_PREFIX_UTF8_0x, useUpperCase = true, minPrintLength = 1, HEX_SUFFIX_UTF8_nada)
+    fun toHexString(bi: BigIntBase): String =
+        toHexString(bi, HEX_PREFIX_UTF8_0x, useUpperCase = true, minPrintLength = 1, HEX_SUFFIX_UTF8_nada)
 
-    fun toHexString(meta: Meta, magia: Magia, hexFormat: HexFormat): String {
+    fun toHexString(bi: BigIntBase, hexFormat: HexFormat): String {
         if (hexFormat === HexFormat.UpperCase)
-            return toHexString(meta, magia)
-        return toHexString(meta, magia,
+            return toHexString(bi)
+        return toHexString(bi,
             hexFormat.number.prefix.encodeToByteArray(),
             hexFormat.upperCase,
             hexFormat.number.minLength,
@@ -386,10 +386,10 @@ object BigIntParsePrint {
         )
     }
 
-    private fun toHexString(meta: Meta, magia: Magia, prefixUtf8: ByteArray, useUpperCase: Boolean, minPrintLength: Int, suffixUtf8: ByteArray): String {
-        val signCount = meta.signBit
+    private fun toHexString(bi: BigIntBase, prefixUtf8: ByteArray, useUpperCase: Boolean, minPrintLength: Int, suffixUtf8: ByteArray): String {
+        val signCount = bi.meta.signBit
         val prefixCount = prefixUtf8.size
-        val nybbleCount = max((bitLen(magia, meta.normLen) + 3) / 4, minPrintLength)
+        val nybbleCount = max((bitLen(bi.magia, bi.meta.normLen) + 3) / 4, minPrintLength)
         val suffixCount = suffixUtf8.size
         val totalLen = signCount + prefixCount + nybbleCount + suffixCount
         val utf8 = ByteArray(totalLen)
@@ -399,7 +399,7 @@ object BigIntParsePrint {
             utf8[ich] = b
             ++ich
         }
-        toHexUtf8(magia, meta.normLen, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
+        toHexUtf8(bi, utf8, signCount + prefixCount, nybbleCount, useUpperCase)
         ich += nybbleCount
         for (b in suffixUtf8) {
             utf8[ich] = b
@@ -408,8 +408,8 @@ object BigIntParsePrint {
         return utf8.decodeToString()
     }
 
-    fun toHexUtf8(x: Magia, xNormLen: Int, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
-        check (isNormalized(x, xNormLen))
+    fun toHexUtf8(bi: BigIntBase, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
+        check (bi.isNormalized())
         val alfaBase = if (useUpperCase) 'A' else 'a'
         var ichMax = off + digitCount
         var limbIndex = 0
@@ -417,13 +417,13 @@ object BigIntParsePrint {
         var w = 0
         while (ichMax > off) {
             if (nybblesRemaining == 0) {
-                if (limbIndex == xNormLen) {
+                if (limbIndex == bi.meta.normLen) {
                     // if there are no limbs left then take as
                     // many zero nybbles as you want
                     nybblesRemaining = Int.MAX_VALUE
                     check (w == 0)
                 } else {
-                    w = x[limbIndex]
+                    w = bi.magia[limbIndex]
                     ++limbIndex
                     nybblesRemaining = 8
                 }

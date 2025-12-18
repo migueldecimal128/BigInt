@@ -683,10 +683,10 @@ sealed class BigIntBase(
      *
      * @return a hexadecimal string representing the value of this BigInt
      */
-    fun toHexString(): String = BigIntParsePrint.toHexString(meta, magia)
+    fun toHexString(): String = BigIntParsePrint.toHexString(this)
 
     fun toHexString(hexFormat: HexFormat): String =
-        BigIntParsePrint.toHexString(meta, magia, hexFormat)
+        BigIntParsePrint.toHexString(this, hexFormat)
 
     /**
      * Converts this [BigInt] to a **big-endian two's-complement** byte array.
@@ -818,6 +818,9 @@ sealed class BigIntBase(
         }
         return h
     }
+
+    override fun equals(other: Any?): Boolean =
+        throw UnsupportedOperationException()
 
     override fun hashCode(): Int =
         throw UnsupportedOperationException()
