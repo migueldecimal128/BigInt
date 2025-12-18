@@ -523,24 +523,24 @@ class BigIntAccumulator private constructor (
         BigInt.fromLittleEndianIntArray(meta.signFlag, magia, meta.normLen)
 
     fun setAdd(x: BigIntBase, n: Int) =
-        setAddImpl(x.meta, x.magia, n < 0, n.absoluteValue.toUInt().toULong())
+        setAddImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
     fun setAdd(x: BigIntBase, w: UInt) =
-        setAddImpl(x.meta, x.magia, false, w.toULong())
+        setAddImpl(x, false, w.toULong())
     fun setAdd(x: BigIntBase, l: Long) =
-        setAddImpl(x.meta, x.magia, l < 0, l.absoluteValue.toULong())
+        setAddImpl(x, l < 0, l.absoluteValue.toULong())
     fun setAdd(x: BigIntBase, dw: ULong) =
-        setAddImpl(x.meta, x.magia, false, dw)
+        setAddImpl(x, false, dw)
     fun setAdd(x: BigIntBase, y: BigIntBase) =
         setAddImpl(x.meta, x.magia, y.meta, y.magia)
 
     fun setSub(x: BigIntBase, n: Int) =
-        setAddImpl(x.meta, x.magia, n >= 0, n.absoluteValue.toUInt().toULong())
+        setAddImpl(x, n >= 0, n.absoluteValue.toUInt().toULong())
     fun setSub(x: BigIntBase, w: UInt) =
-        setAddImpl(x.meta, x.magia, true, w.toULong())
+        setAddImpl(x, true, w.toULong())
     fun setSub(x: BigIntBase, l: Long) =
-        setAddImpl(x.meta, x.magia, l >= 0L, l.absoluteValue.toULong())
+        setAddImpl(x, l >= 0L, l.absoluteValue.toULong())
     fun setSub(x: BigIntBase, dw: ULong) =
-        setAddImpl(x.meta, x.magia, true, dw)
+        setAddImpl(x, true, dw)
     fun setSub(x: BigIntBase, y: BigIntBase) =
         setAddImpl(x.meta, x.magia, y.meta.negate(), y.magia)
 
@@ -564,6 +564,37 @@ class BigIntAccumulator private constructor (
                         _meta = Meta(
                             xMeta.signBit,
                             Mago.setSub64(magia, xMagia, xMeta.normLen, yDw)
+                        )
+                    }
+                    cmp < 0 -> set(ySign, yDw - toRawULong())
+                    else -> setZero()
+                }
+            }
+        }
+        return this
+    }
+
+    private fun setAddImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+        check (x.isNormalized())
+        val xMagia = x.magia // use only xMagia in here because of aliasing
+        when {
+            yDw == 0uL -> set(x)
+            x.isZero() -> set(ySign, yDw)
+            x.meta.signFlag == ySign -> {
+                ensureCapacityDiscard(max(x.meta.normLen, 2) + 1)
+                _meta = Meta(
+                    x.meta.signBit,
+                    Mago.setAdd64(magia, xMagia, x.meta.normLen, yDw)
+                )
+            }
+            else -> {
+                val cmp: Int = x.magnitudeCompareTo(yDw)
+                when {
+                    cmp > 0 -> {
+                        ensureCapacityDiscard(x.meta.normLen)
+                        _meta = Meta(
+                            x.meta.signBit,
+                            Mago.setSub64(magia, xMagia, x.meta.normLen, yDw)
                         )
                     }
                     cmp < 0 -> set(ySign, yDw - toRawULong())
