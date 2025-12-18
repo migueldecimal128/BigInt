@@ -597,7 +597,8 @@ class BigInt private constructor(
                 var zeroTest = 0
                 val magia = Mago.newWithBitLen(maxBitLen)
                 val topBits = maxBitLen and 0x1F
-                var mask = (if (topBits == 0) 0 else (1 shl topBits)) - 1
+                // note parenthesization on this mask creation ... 0 - 1
+                var mask = ((-topBits ushr 31) shl topBits) - 1
                 for (i in magia.lastIndex downTo 0) {
                     val rand = rng.nextInt() and mask
                     magia[i] = rand
@@ -613,6 +614,7 @@ class BigInt private constructor(
             if (maxBitLen == 0)
                 return ZERO
             throw IllegalArgumentException("bitLen must be > 0")
+
         }
 
         /**
@@ -648,11 +650,11 @@ class BigInt private constructor(
             bitLen: Int,
             rng: Random = Random.Default,
             withRandomSign: Boolean = false
-        ): BigInt {
-            if (bitLen > 0) {
+        ): BigInt = when {
+            bitLen > 0 -> {
                 val magia = Mago.newWithBitLen(bitLen)
                 val topBits = bitLen and 0x1F
-                var mask = (if (topBits == 0) 0 else (1 shl topBits)) - 1
+                var mask = ((-topBits ushr 31) shl topBits) - 1
                 for (i in magia.lastIndex downTo 0) {
                     val rand = rng.nextInt() and mask
                     magia[i] = rand
@@ -662,14 +664,11 @@ class BigInt private constructor(
                 val limbIndex = topBitIndex ushr 5
                 check (limbIndex == magia.size - 1)
                 magia[limbIndex] = magia[limbIndex] or (1 shl (topBitIndex and 0x1F))
-                return if (!withRandomSign)
-                    fromNormalizedNonZero(magia)
-                else
-                    fromNormalizedNonZero(rng.nextBoolean(), magia)
+                val sign = withRandomSign && rng.nextBoolean()
+                fromNormalizedNonZero(sign, magia)
             }
-            if (bitLen == 0)
-                return ZERO
-            throw IllegalArgumentException("bitLen must be >= 0")
+            bitLen == 0 -> ZERO
+            else -> throw IllegalArgumentException("bitLen must be >= 0")
         }
 
         /**
