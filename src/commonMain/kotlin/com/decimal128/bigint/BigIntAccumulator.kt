@@ -12,7 +12,7 @@ import kotlin.math.min
 /**
  * A mutable arbitrary-precision integer accumulator for efficient series operations.
  *
- * `BigIntAccumulator` provides mutable arithmetic operations optimized for
+ * [BigIntAccumulator] provides mutable arithmetic operations optimized for
  * accumulation tasks commonly encountered when processing numerical series.
  * Supported operations include:
  *

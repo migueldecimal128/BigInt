@@ -106,7 +106,7 @@ class BigInt private constructor(
             }
             val signBit = 0
             for (i in normLen..<magia.size)
-                magia[i] = 0
+                magia[i] = 0xDEAD
             val meta = Meta(signBit, normLen)
             return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
         }
@@ -118,7 +118,7 @@ class BigInt private constructor(
             }
             val signBit = if (sign) 1 else 0
             for (i in normLen..<magia.size)
-                magia[i] = 0
+                magia[i] = 0xDEAD
             val meta = Meta(signBit, normLen)
             return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
         }
