@@ -1046,6 +1046,7 @@ class BigIntAccumulator private constructor (
             bitCount == 0 -> set(x)
             zBitLen <= 0 -> setZero()
             else -> {
+                // if aliasing then we are shrinking
                 ensureBitCapacityDiscard(zBitLen)
                 _meta = Meta(
                     0,
@@ -1056,30 +1057,6 @@ class BigIntAccumulator private constructor (
     }
 
     /**
-     * Sets this accumulator to `x >> bitCount`.
-     *
-     * Follows arithmetic shift right semantics if `x` is negative,
-     * effectively treating the resulting value as if it were
-     * stored in twos-complement.
-     *
-     * Throws if [bitCount] is negative.
-     */
-    fun setShr(x: BigInt, bitCount: Int): BigIntAccumulator =
-        setShrImpl(x.meta, x.magia, bitCount)
-
-    /**
-     * Sets this accumulator to `x >> bitCount`.
-     *
-     * Follows arithmetic shift right semantics if `x` is negative,
-     * effectively treating the resulting value as if it were
-     * stored in twos-complement.
-     *
-     * Throws if [bitCount] is negative.
-     */
-    fun setShr(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
-        setShrImpl(x.meta, x.magia, bitCount)
-
-    /**
      * Mutates this accumulator `x >>= bitCount`.
      *
      * Follows arithmetic shift right semantics ...
@@ -1088,28 +1065,36 @@ class BigIntAccumulator private constructor (
      *
      * Throws if [bitCount] is negative.
      */
-    fun mutShr(bitCount: Int): BigIntAccumulator =
-        setShrImpl(meta, magia, bitCount)
+    fun mutShr(bitCount: Int): BigIntAccumulator = setShr(this, bitCount)
 
-    private fun setShrImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
+    /**
+     * Sets this accumulator to `x >> bitCount`.
+     *
+     * Follows arithmetic shift right semantics if `x` is negative,
+     * effectively treating the resulting value as if it were
+     * stored in twos-complement.
+     *
+     * Throws if [bitCount] is negative.
+     */
+    fun setShr(x: BigIntBase, bitCount: Int): BigIntAccumulator {
+        val zBitLen = x.magnitudeBitLen() - bitCount
         when {
-            bitCount > 0 -> {
-                val bitLen = Mago.bitLen(x, xMeta.normLen)
-                val zBitLen = bitLen - bitCount
-                if (zBitLen <= 0)
-                    return if (xMeta.isNegative) set (-1) else setZero()
-                val needsIncrement = xMeta.isNegative && Mago.testAnyBitInLowerN(x, bitCount)
+            bitCount < 0 -> throw IllegalArgumentException("bitCount < 0")
+            bitCount == 0 -> set(x)
+            zBitLen <= 0 && x.meta.isNegative -> set(-1)
+            zBitLen <= 0 -> setZero()
+            else -> {
+                val needsIncrement = x.meta.isNegative && Mago.testAnyBitInLowerN(x.magia, bitCount)
+                // if aliasing then we are shrinking
                 ensureBitCapacityDiscard(zBitLen)
-                var normLen = Mago.setShiftRight(magia, x, xMeta.normLen, bitCount)
+                var normLen = Mago.setShiftRight(magia, x.magia, x.meta.normLen, bitCount)
                 check (normLen > 0)
                 if (needsIncrement) {
                     ensureBitCapacityCopy(zBitLen + 1)
                     normLen = Mago.setAdd64(magia, magia, normLen, 1u)
                 }
-                _meta = Meta(xMeta.signFlag, normLen)
+                _meta = Meta(x.meta.signFlag, normLen)
             }
-            bitCount == 0 -> {}
-            else -> throw IllegalArgumentException("bitCount < 0")
         }
         return this
     }
