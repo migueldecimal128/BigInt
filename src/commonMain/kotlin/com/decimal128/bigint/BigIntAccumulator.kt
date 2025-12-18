@@ -646,13 +646,13 @@ class BigIntAccumulator private constructor (
     }
 
     fun setMul(x: BigIntBase, n: Int) =
-        setMulImpl(x.meta, x.magia, n < 0, n.absoluteValue.toUInt())
+        setMulImpl(x, n < 0, n.absoluteValue.toUInt())
     fun setMul(x: BigIntBase, w: UInt) =
-        setMulImpl(x.meta, x.magia, false, w)
+        setMulImpl(x, false, w)
     fun setMul(x: BigIntBase, l: Long) =
-        setMulImpl(x.meta, x.magia, l < 0, l.absoluteValue.toULong())
+        setMulImpl(x, l < 0, l.absoluteValue.toULong())
     fun setMul(x: BigIntBase, dw: ULong) =
-        setMulImpl(x.meta, x.magia, false, dw)
+        setMulImpl(x, false, dw)
     fun setMul(x: BigIntBase, y: BigIntBase) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
 
@@ -667,6 +667,26 @@ class BigIntAccumulator private constructor (
         return this
     }
 
+    private fun setMulImpl(x: BigIntBase, wSign: Boolean, w: UInt): BigIntAccumulator {
+        val xMagia = x.magia
+        ensureCapacityDiscard(x.meta.normLen + 1)
+        _meta = Meta(
+            x.meta.signFlag xor wSign,
+            Mago.setMul32(magia, xMagia, x.meta.normLen, w)
+        )
+        return this
+    }
+
+    private fun setMulImpl(x: BigIntBase, dwSign: Boolean, dw: ULong): BigIntAccumulator {
+        val xMagia = x.magia
+        ensureCapacityDiscard(x.meta.normLen + 2)
+        _meta = Meta(
+            x.meta.signFlag xor dwSign,
+            Mago.setMul64(magia, xMagia, x.meta.normLen, dw)
+        )
+        return this
+    }
+
     private fun setMulImpl(xMeta: Meta, x: Magia, wSign: Boolean, dw: ULong): BigIntAccumulator {
         val xNormLen = xMeta.normLen
         ensureTmp1Capacity(xNormLen + 2)
@@ -677,6 +697,7 @@ class BigIntAccumulator private constructor (
         swapTmp1()
         return this
     }
+
 
     private fun setMulImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
         val xNormLen = xMeta.normLen
