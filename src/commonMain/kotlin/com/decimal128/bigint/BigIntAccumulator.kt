@@ -688,49 +688,47 @@ class BigIntAccumulator private constructor (
     }
 
     fun setDiv(x: BigIntAccumulator, n: Int): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia , n < 0, n.absoluteValue.toUInt().toULong())
+        setDivImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
     fun setDiv(x: BigIntAccumulator, w: UInt): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia , false, w.toULong())
+        setDivImpl(x, false, w.toULong())
     fun setDiv(x: BigIntAccumulator, l: Long): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia , l < 0L, l.absoluteValue.toULong())
+        setDivImpl(x, l < 0L, l.absoluteValue.toULong())
     fun setDiv(x: BigIntAccumulator, dw: ULong): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia , false, dw)
-    fun setDiv(x: BigIntBase, y: BigIntBase): BigIntAccumulator =
-        setDivImpl(x.meta, x.magia, y.meta, y.magia)
-
-    private fun setDivImpl(xMeta: Meta, xMagia: Magia, ySign: Boolean, yDw: ULong): BigIntAccumulator {
-        ensureCapacityDiscard(xMeta.normLen - 1 + 1) // yDw might represent a single limb
-        if (trySetDivFastPath64(xMeta, xMagia, ySign, yDw))
+        setDivImpl(x, false, dw)
+    fun setDiv(x: BigIntBase, y: BigIntBase): BigIntAccumulator {
+        ensureCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
+        if (trySetDivFastPath(x, y))
             return this
-        ensureTmp1Capacity(xMeta.normLen + 1)
-        val normLen = Mago.setDiv64(magia, xMagia, xMeta.normLen, tmp1, yDw)
-        _meta = Meta(xMeta.signFlag xor ySign, normLen)
+        ensureTmp1Capacity(x.meta.normLen + 1)
+        ensureTmp2Capacity(y.meta.normLen)
+        _meta = Meta(x.meta.signBit xor y.meta.signBit,
+            Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2))
         return this
     }
 
-    private fun setDivImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
-        ensureCapacityDiscard(xMeta.normLen - yMeta.normLen + 1)
-        if (trySetDivFastPath(xMeta, x, yMeta, y))
+    private fun setDivImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+        ensureCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
+        if (trySetDivFastPath64(x, ySign, yDw))
             return this
-        ensureTmp1Capacity(xMeta.normLen + 1)
-        ensureTmp2Capacity(yMeta.normLen)
-        _meta = Meta(xMeta.signBit xor yMeta.signBit,
-            Mago.setDiv(magia, x, xMeta.normLen, tmp1, y, yMeta.normLen, tmp2))
+        ensureTmp1Capacity(x.meta.normLen + 1)
+        val normLen = Mago.setDiv64(magia, x.magia, x.meta.normLen, tmp1, yDw)
+        _meta = Meta(x.meta.signFlag xor ySign, normLen)
         return this
     }
 
-    private fun trySetDivFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
-        val qSignFlag = xMeta.signFlag xor yMeta.signFlag
-        val qNormLen = Mago.trySetDivFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+
+    private fun trySetDivFastPath(x: BigIntBase, y: BigIntBase): Boolean {
+        val qSignFlag = x.meta.signFlag xor y.meta.signFlag
+        val qNormLen = Mago.trySetDivFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
         if (qNormLen < 0)
             return false
         _meta = Meta(qSignFlag, qNormLen)
         return true
     }
 
-    private fun trySetDivFastPath64(xMeta: Meta, xMagia: Magia, ySign: Boolean, yDw: ULong): Boolean {
-        val qSignFlag = xMeta.signFlag xor ySign
-        val qNormLen = Mago.trySetDivFastPath64(this.magia, xMagia, xMeta.normLen, yDw)
+    private fun trySetDivFastPath64(x: BigIntBase, ySign: Boolean, yDw: ULong): Boolean {
+        val qSignFlag = x.meta.signFlag xor ySign
+        val qNormLen = Mago.trySetDivFastPath64(this.magia, x.magia, x.meta.normLen, yDw)
         if (qNormLen < 0)
             return false
         _meta = Meta(qSignFlag, qNormLen)
