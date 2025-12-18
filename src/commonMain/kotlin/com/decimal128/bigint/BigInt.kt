@@ -85,42 +85,44 @@ class BigInt private constructor(
             val normLen = Mago.normLen(magia)
             if (normLen == 0)
                 return ZERO
+            check (injectPoison(magia, normLen))
             val meta = Meta(signBit, normLen)
             return BigInt(meta, magia)
         }
 
         internal operator fun invoke(magia: Magia): BigInt {
-            if (magia.isEmpty()) {
-                check (magia === Mago.ZERO)
-                return ZERO
+            if (magia.isNotEmpty()) {
+                val signBit = 0
+                val meta = Meta(signBit, magia)
+                if (meta.normLen > 0) {
+                    check(injectPoison(magia, meta.normLen))
+                    return BigInt(meta, magia)
+                }
             }
-            val signBit = 0
-            val meta = Meta(signBit, magia)
-            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
+            return ZERO
         }
 
         internal operator fun invoke(magia: Magia, normLen: Int): BigInt {
-            if (magia.isEmpty()) {
-                check (magia === Mago.ZERO)
-                return ZERO
+            if (magia.isNotEmpty()) {
+                check(Mago.isNormalized(magia, normLen))
+                val meta = Meta(0, normLen)
+                if (meta.normLen > 0) {
+                    check(injectPoison(magia, normLen))
+                    return BigInt(meta, magia)
+                }
             }
-            val signBit = 0
-            for (i in normLen..<magia.size)
-                magia[i] = 0xDEAD
-            val meta = Meta(signBit, normLen)
-            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
+            return ZERO
         }
 
         internal operator fun invoke(sign: Boolean, magia: Magia, normLen: Int): BigInt {
-            if (magia.isEmpty()) {
-                check (magia === Mago.ZERO)
-                return ZERO
+            if (normLen > 0) {
+                check (Mago.isNormalized(magia, normLen))
+                val signBit = if (sign) 1 else 0
+                val meta = Meta(signBit, normLen)
+                check (injectPoison(magia, normLen))
+                return BigInt(meta, magia)
             }
-            val signBit = if (sign) 1 else 0
-            for (i in normLen..<magia.size)
-                magia[i] = 0xDEAD
-            val meta = Meta(signBit, normLen)
-            return if (meta.normLen > 0) BigInt(meta, magia) else ZERO
+            return ZERO
         }
 
         internal operator fun invoke(sign: Boolean, biMagnitude: BigInt): BigInt =
@@ -153,7 +155,6 @@ class BigInt private constructor(
 
         internal fun fromNonNormalizedNonZero(sign: Boolean, magia: Magia): BigInt {
             val normLen = Mago.normLen(magia)
-            // FIXME - inject poison here
             check (normLen > 0)
             return BigInt(Meta(sign, normLen), magia)
         }
@@ -169,6 +170,11 @@ class BigInt private constructor(
             return ZERO
         }
 
+        fun injectPoison(magia: Magia, normLen: Int): Boolean {
+            for (i in normLen..<magia.size)
+                magia[i] = 0xDEAD
+            return true
+        }
 
         /**
          * Converts a 32-bit signed [Int] into a signed [BigInt].
