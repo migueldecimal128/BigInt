@@ -1009,41 +1009,17 @@ class BigIntAccumulator private constructor (
      * Sets this accumulator to `x << bitCount`. Allocates space for the
      * resulting bit length. Throws if [bitCount] is negative.
      */
-    fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator {
-        return when {
-            bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
-            bitCount == 0 || x.isZero() -> set(x)
-            else -> {
-                val xMagia = x.magia
-                ensureBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
-                _meta = Meta(meta.signBit,
-                    Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount))
-                return this
-            }
+    fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator = when {
+        bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
+        bitCount == 0 || x.isZero() -> set(x)
+        else -> {
+            val xMagia = x.magia
+            ensureBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
+            _meta = Meta(meta.signBit,
+                Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount))
+            this
         }
     }
-
-    /**
-     * Sets this accumulator to `x >>> bitCount`.
-     *
-     * The sign of `x` is ignored and the resulting value is the
-     * non-negative magnitude.
-     *
-     * Throws if [bitCount] is negative.
-     */
-    fun setUshr(x: BigInt, bitCount: Int): BigIntAccumulator =
-        setUshrImpl(x.meta, x.magia, bitCount)
-
-    /**
-     * Sets this accumulator to `x >>> bitCount`.
-     *
-     * The sign of `x` is ignored and the resulting value is the
-     * non-negative magnitude.
-     *
-     * Throws if [bitCount] is negative.
-     */
-    fun setUshr(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
-        setUshrImpl(x.meta, x.magia, bitCount)
 
     /**
      * Mutates this accumulator `this >>>= bitCount`.
@@ -1053,20 +1029,27 @@ class BigIntAccumulator private constructor (
      *
      * Throws if [bitCount] is negative.
      */
-    fun mutUshr(bitCount: Int): BigIntAccumulator =
-        setUshrImpl(meta, magia, bitCount)
+    fun mutUshr(bitCount: Int): BigIntAccumulator = setUshr(this, bitCount)
 
-    private fun setUshrImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
-        val xBitLen = Mago.bitLen(x, xMeta.normLen)
-        val zBitLen = xBitLen - bitCount
+    /**
+     * Sets this accumulator to `x >>> bitCount`.
+     *
+     * The sign of `x` is ignored and the resulting value is the
+     * non-negative magnitude.
+     *
+     * Throws if [bitCount] is negative.
+     */
+    fun setUshr(x: BigIntBase, bitCount: Int): BigIntAccumulator {
+        val zBitLen = x.magnitudeBitLen() - bitCount
         return when {
             bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
-            bitCount == 0 -> set(xMeta, x)
+            bitCount == 0 -> set(x)
             zBitLen <= 0 -> setZero()
             else -> {
                 ensureBitCapacityDiscard(zBitLen)
-                _meta = Meta(0,
-                    Mago.setShiftRight(magia, x, xMeta.normLen, bitCount))
+                _meta = Meta(
+                    0,
+                    Mago.setShiftRight(magia, x.magia, x.meta.normLen, bitCount))
                 this
             }
         }
