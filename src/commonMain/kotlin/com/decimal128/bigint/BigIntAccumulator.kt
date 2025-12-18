@@ -258,7 +258,7 @@ class BigIntAccumulator private constructor (
      *
      * @param newLimbLen the required limb length to be zeroed.
      */
-    private inline fun ensureCapacityCopyZeroed(newLimbLen: Int) {
+    private inline fun ensureCapacityCopyZeroExtend(newLimbLen: Int) {
         if (newLimbLen <= magia.size) {
             if (newLimbLen > meta.normLen)
                 magia.fill(0, meta.normLen, newLimbLen)
@@ -1115,7 +1115,7 @@ class BigIntAccumulator private constructor (
                 magia[wordIndex] = magia[wordIndex] or isolatedBit
                 return this
             }
-            ensureCapacityCopyZeroed(wordIndex + 1)
+            ensureCapacityCopyZeroExtend(wordIndex + 1)
             magia[wordIndex] = isolatedBit
             _meta = Meta(meta.signBit, wordIndex + 1)
             return this
@@ -1187,7 +1187,7 @@ class BigIntAccumulator private constructor (
     }
 
     /**
-     * Adds the square of the given value to this accumulator in place.
+     * Adds the square of the given value to this accumulator in-place.
      *
      * The `addSquareOf` methods efficiently compute the square of the operand
      * and add it to this accumulator. Supported operand types include:
@@ -1213,7 +1213,7 @@ class BigIntAccumulator private constructor (
      *
      * @param n the integer value to square and add.
      */
-    fun addSquareOf(n: Int) = addSquareOf(n.absoluteValue.toUInt())
+    fun addSquareOf(n: Int) = setAdd(this, n.toLong() * n.toLong())
 
     /**
      * Adds the square of the given UInt value to this accumulator.
@@ -1221,7 +1221,7 @@ class BigIntAccumulator private constructor (
      * @param w the value to square and add.
      * @see addSquareOf(ULong)
      */
-    fun addSquareOf(w: UInt) = plusAssign(w.toULong() * w.toULong())
+    fun addSquareOf(w: UInt) = setAdd(this, w.toULong() * w.toULong())
 
     /**
      * Adds the square of the given Long value to this accumulator.
@@ -1262,19 +1262,11 @@ class BigIntAccumulator private constructor (
      * @param bi the value to square and add.
      * @see addSquareOf(ULong)
      */
-    fun addSquareOf(bi: BigInt) = addSquareOfImpl(bi.magia, bi.meta.normLen)
-
-    /**
-     * Adds the square of the given BigIntAccumulator value to this accumulator.
-     *
-     * @param other the value to square and add.
-     * @see addSquareOf(ULong)
-     */
-    fun addSquareOf(other: BigIntAccumulator) {
-        // this works OK when this == other because
-        // addSquareOfImpl multiplies into tmp1 before the add operation
-        if (other.normLen > 0)
-            addSquareOfImpl(other.magia, other.normLen)
+    fun addSquareOf(bi: BigIntBase) {
+        ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
+        val normLenSqr = Mago.setSqr(tmp1, bi.magia, bi.meta.normLen)
+        setAddImpl(this.meta, this.magia, Meta(0, normLenSqr), tmp1)
+        validate()
     }
 
     /**
@@ -1341,30 +1333,6 @@ class BigIntAccumulator private constructor (
         return dw and gt32Mask and nonZeroMask
     }
 
-    /**
-     * Adds the square of a multi-limb integer to this accumulator in place.
-     *
-     * This is a low-level internal helper used by `addSquareOf` for [BigInt]
-     * and [BigIntAccumulator] operands. The operation squares the first [yNormLen]
-     * limbs of [y] and adds the result to this accumulator’s value.
-     *
-     * The array [y] is interpreted as little-endian (least significant limb first),
-     * and only the first [yNormLen] limbs are considered. This method is safe to call
-     * even if the source array belongs to this accumulator.
-     *
-     * @param y the array of limbs representing the operand's magnitude.
-     * @param yNormLen the number of active limbs in [y] to square and add.
-     */
-    private inline fun addSquareOfImpl(y: Magia, yNormLen: Int) {
-        val sqrLenMax = yNormLen * 2
-        if (tmp1.size < sqrLenMax)
-            tmp1 = Mago.newWithFloorLen(sqrLenMax)
-        else
-            tmp1.fill(0, 0, sqrLenMax)
-        val normLenSqr = Mago.setSqr(tmp1, y, yNormLen)
-        setAddImpl(this.meta, this.magia, Meta(0, normLenSqr), tmp1)
-        validate()
-    }
 
     private fun mutateDivImpl(wSign: Boolean, w: UInt) {
         validate()
