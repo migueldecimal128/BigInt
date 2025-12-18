@@ -261,6 +261,11 @@ class BigInt private constructor(
         }
 
         /**
+         * Constructs a new [BigInt] from a [BigIntAccumulator] or another [BigInt].
+         */
+        fun from(other: BigIntBase): BigInt = BigInt(other.meta, other.magia)
+
+        /**
          * Parses a [String] representation of an integer into a [BigInt].
          *
          * Supported syntax:

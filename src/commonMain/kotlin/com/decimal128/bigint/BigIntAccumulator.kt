@@ -519,8 +519,7 @@ class BigIntAccumulator private constructor (
      *
      * @return a new [BigInt] containing the current value of this accumulator.
      */
-    fun toBigInt(): BigInt =
-        BigInt.fromLittleEndianIntArray(meta.signFlag, magia, meta.normLen)
+    fun toBigInt(): BigInt = BigInt.from(this)
 
     fun setAdd(x: BigIntBase, n: Int) =
         setAddImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
@@ -978,9 +977,7 @@ class BigIntAccumulator private constructor (
 
     operator fun divAssign(dw: ULong) { setDiv(this, dw) }
 
-    operator fun divAssign(bi: BigInt) { setDiv(this, bi) }
-
-    operator fun divAssign(acc: BigIntAccumulator) { setDiv(this, acc) }
+    operator fun divAssign(bi: BigIntBase) { setDiv(this, bi) }
 
     operator fun remAssign(n: Int) { setRem(this, n) }
 
@@ -990,9 +987,7 @@ class BigIntAccumulator private constructor (
 
     operator fun remAssign(dw: ULong) { setRem(this, dw) }
 
-    operator fun remAssign(bi: BigInt) { setRem(this, bi) }
-
-    operator fun remAssign(acc: BigIntAccumulator) { setRem(this, acc) }
+    operator fun remAssign(bi: BigIntBase) { setRem(this, bi) }
 
     /**
      * Adds the square of the given value to this accumulator in-place.
@@ -1345,8 +1340,7 @@ class BigIntAccumulator private constructor (
      */
     override fun equals(other: Any?): Boolean {
         return when (other) {
-            is BigIntAccumulator -> this EQ other
-            is BigInt -> this EQ other
+            is BigIntBase -> this EQ other
             is Int -> this EQ other
             is Long -> this EQ other
             is UInt -> this EQ other
