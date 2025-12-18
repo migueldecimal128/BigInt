@@ -214,4 +214,12 @@ fun BigInt.pow(exp: Int): BigInt = BigIntAlgorithms.pow(this, exp)
 fun BigInt.isqrt(): BigInt = BigIntAlgorithms.isqrt(this)
 
 
+fun BigInt.toBigIntAccumulator() = BigIntAccumulator.from(this)
+
+fun Int.toBigIntAccumulator() = BigIntAccumulator().set(this)
+fun UInt.toBigIntAccumulator() = BigIntAccumulator().set(this)
+fun Long.toBigIntAccumulator() = BigIntAccumulator().set(this)
+fun ULong.toBigIntAccumulator() = BigIntAccumulator().set(this)
+
+fun String.toBigIntAccumulator() = this.toBigInt().toBigIntAccumulator()
 

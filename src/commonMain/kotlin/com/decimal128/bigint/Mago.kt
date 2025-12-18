@@ -4,7 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.min
 import kotlin.math.max
 
@@ -13,25 +12,6 @@ import kotlin.math.max
 // Mago = MAGnitude Operations
 
 typealias Magia = IntArray
-
-private const val BARRETT_MU_1E9: ULong = 0x44B82FA09uL       // floor(2^64 / 1e9)
-private const val ONE_E_9: ULong = 1_000_000_000uL
-
-private const val M_U32_DIV_1E1 = 0xCCCCCCCDuL
-private const val S_U32_DIV_1E1 = 35
-
-private const val M_U32_DIV_1E2 = 0x51EB851FuL
-private const val S_U32_DIV_1E2 = 37
-
-private const val M_U64_DIV_1E4 = 0x346DC5D63886594BuL
-private const val S_U64_DIV_1E4 = 11 // + 64 high
-
-// these magic reciprocal constants only work for values up to
-// 10**9 / 10**4
-private const val M_1E9_DIV_1E4 = 879_609_303uL
-private const val S_1E9_DIV_1E4 = 43
-
-private const val LOG2_10_CEIL_32 = 14_267_572_565uL
 
 private const val ERROR_ADD_OVERFLOW = "add overflow ... destination too small"
 private const val ERROR_SUB_UNDERFLOW = "sub underflow ... minuend too small for subtrahend"
