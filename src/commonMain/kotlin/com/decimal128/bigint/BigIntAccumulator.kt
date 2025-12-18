@@ -999,39 +999,25 @@ class BigIntAccumulator private constructor (
     operator fun remAssign(acc: BigIntAccumulator) { setRem(this, acc) }
 
     /**
-     * Sets this accumulator to `x << bitCount`. Allocates space for the
-     * resulting bit length. Throws if [bitCount] is negative.
-     */
-    fun setShl(x: BigInt, bitCount: Int): BigIntAccumulator =
-        setShlImpl(x.meta, x.magia, bitCount)
-
-    /**
-     * Sets this accumulator to `x << bitCount`. Allocates space for the
-     * resulting bit length. Throws if [bitCount] is negative.
-     */
-    fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator =
-        setShlImpl(x.meta, x.magia, bitCount)
-
-    /**
      * Mutates accumulator `this <<= bitCount`.
      * Sign remains the same.
      * Throws if [bitCount] is negative.
      */
-    fun mutShl(bitCount: Int): BigIntAccumulator =
-        setShlImpl(meta, magia, bitCount)
+    fun mutShl(bitCount: Int): BigIntAccumulator = setShl(this, bitCount)
 
-    private fun setShlImpl(xMeta: Meta, x: Magia, bitCount: Int): BigIntAccumulator {
+    /**
+     * Sets this accumulator to `x << bitCount`. Allocates space for the
+     * resulting bit length. Throws if [bitCount] is negative.
+     */
+    fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator {
         return when {
             bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
-            bitCount == 0 -> set(xMeta, x)
-            xMeta.isZero -> setZero()
+            bitCount == 0 || x.isZero() -> set(x)
             else -> {
-                val xBitLen = Mago.bitLen(x, xMeta.normLen)
-                val zBitLen = xBitLen + bitCount
-                ensureBitCapacityDiscard(zBitLen)
+                val xMagia = x.magia
+                ensureBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
                 _meta = Meta(meta.signBit,
-                    Mago.setShiftLeft(magia, x, xMeta.normLen, bitCount)
-                    )
+                    Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount))
                 return this
             }
         }
