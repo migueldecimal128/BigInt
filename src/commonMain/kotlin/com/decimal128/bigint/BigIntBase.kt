@@ -1,5 +1,6 @@
 package com.decimal128.bigint
 
+import com.decimal128.bigint.Zoro.isPowerOfTwo
 import kotlin.math.absoluteValue
 
 sealed class BigIntBase(
@@ -305,7 +306,7 @@ sealed class BigIntBase(
      * Example: `BigInteger("-1").bitLength() == 0` ... think about ie :)
      */
     fun bitLengthBigIntegerStyle(): Int =
-        Zoro.bitLengthBigIntegerStyle(meta, magia)
+        Mago.bitLengthBigIntegerStyle(meta.signFlag, magia, meta.normLen)
 
     /**
      * Returns the number of 32-bit integers required to store the binary magnitude.
@@ -323,8 +324,15 @@ sealed class BigIntBase(
      *
      * Always returns at least 1 for zero.
      */
-    fun calcTwosComplementByteLength(): Int =
-        Zoro.calcTwosComplementByteLength(meta, magia)
+    fun calcTwosComplementByteLength(): Int {
+        if (meta.isZero)
+            return 1
+        // add one for the sign bit ...
+        // ... since bitLengthBigIntegerStyle does not include the sign bit
+        val bitLen2sComplement = bitLengthBigIntegerStyle() + 1
+        val byteLength = (bitLen2sComplement + 7) ushr 3
+        return byteLength
+    }
 
     /**
      * Returns the index of the rightmost set bit (number of trailing zeros).
@@ -662,7 +670,7 @@ sealed class BigIntBase(
      *
      * @return a decimal string representing the value of this BigInt
      */
-    override fun toString() = Mago.toString(meta.isNegative, magia, meta.normLen)
+    override fun toString() = BigIntParsePrint.toString(meta.isNegative, magia, meta.normLen)
 
     /**
      * Returns the hexadecimal string representation of this BigInt.
@@ -673,10 +681,10 @@ sealed class BigIntBase(
      *
      * @return a hexadecimal string representing the value of this BigInt
      */
-    fun toHexString(): String = Zoro.toHexString(meta, magia)
+    fun toHexString(): String = BigIntParsePrint.toHexString(meta, magia)
 
     fun toHexString(hexFormat: HexFormat): String =
-        Zoro.toHexString(meta, magia, hexFormat)
+        BigIntParsePrint.toHexString(meta, magia, hexFormat)
 
     /**
      * Converts this [BigInt] to a **big-endian two's-complement** byte array.
@@ -765,8 +773,5 @@ sealed class BigIntBase(
      */
     fun magnitudeToLittleEndianLongArray(): LongArray =
         Zoro.magnitudeToLittleEndianLongArray(meta, magia)
-
-
-    // <<<<<<<<<<<<<<<<<< END OF SHARED TEXT SOURCE CODE >>>>>>>>>>>>>>>>>>>>>>
 
 }

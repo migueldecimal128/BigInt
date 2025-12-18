@@ -1,25 +1,21 @@
+// SPDX-License-Identifier: MIT
+
 @file:Suppress("NOTHING_TO_INLINE")
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.Mago.ZERO
+import com.decimal128.bigint.Mago.bitLen
 import com.decimal128.bigint.Mago.isNormalized
+import com.decimal128.bigint.Mago.mutateFmaPow10
+import com.decimal128.bigint.Mago.newCopyWithExactLimbLen
+import com.decimal128.bigint.Mago.newWithBitLen
 import com.decimal128.bigint.Mago.normLen
+import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.max
+import kotlin.math.min
 
-/**
- * These are operations that are layered above Magia and
- * below [BigInt] and [BigIntAccumulator].
- *
- * Zoro is short for Zoroaster ...
- * - interpreter of metadata
- * - wielder of magia
- */
-internal object Zoro {
-
-
-
-    private val HEX_PREFIX_UTF8_0x = byteArrayOf('0'.code.toByte(), 'x'.code.toByte())
-    private val HEX_SUFFIX_UTF8_nada = ByteArray(0)
+object BigIntSerde {
 
     /**
      * Converts the value described by [meta] and [magia] to a big-endian two’s-complement
@@ -33,8 +29,8 @@ internal object Zoro {
      * @param magia magnitude limb array in little-endian order.
      * @return a big-endian two’s-complement byte array.
      */
-    fun toTwosComplementBigEndianByteArray(meta: Meta, magia: Magia): ByteArray =
-        toBinaryByteArray(meta, magia, isTwosComplement = true, isBigEndian = true)
+    fun toTwosComplementBigEndianByteArray(bi: BigIntBase): ByteArray =
+        toBinaryByteArray(bi, isTwosComplement = true, isBigEndian = true)
 
     /**
      * Converts the value described by [meta] and [magia] to a binary [ByteArray].
@@ -51,15 +47,16 @@ internal object Zoro {
      *
      * @throws IllegalArgumentException if the magnitude is not normalized.
      */
-    fun toBinaryByteArray(meta: Meta, magia: Magia, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
-        check (isNormalized(magia, meta.normLen))
-        if (meta.normLen >= 0 && meta.normLen <= magia.size) {
+    fun toBinaryByteArray(bi: BigIntBase, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
+        check (bi.isNormalized())
+        if (bi.meta.normLen >= 0 && bi.meta.normLen <= bi.magia.size) {
             val bitLen =
-                if (isTwosComplement) bitLengthBigIntegerStyle(meta, magia) + 1
-                else max(magnitudeBitLen(meta, magia), 1)
+                if (isTwosComplement)
+                    bi.bitLengthBigIntegerStyle() + 1
+                else max(bi.magnitudeBitLen(), 1)
             val byteLen = (bitLen + 7) ushr 3
             val bytes = ByteArray(byteLen)
-            toBinaryBytes(meta, magia, isTwosComplement, isBigEndian, bytes, 0, byteLen)
+            toBinaryBytes(bi, isTwosComplement, isBigEndian, bytes, 0, byteLen)
             return bytes
         } else {
             throw IllegalArgumentException()
@@ -87,19 +84,19 @@ internal object Zoro {
      * @throws IndexOutOfBoundsException if [bytes] is too small.
      * @throws IllegalStateException if [meta] normLen does not fit size of [magia]
      */
-    fun toBinaryBytes(meta: Meta, magia: Magia,
-        isTwosComplement: Boolean, isBigEndian: Boolean,
-        bytes: ByteArray, offset: Int = 0, requestedLen: Int = -1
+    fun toBinaryBytes(bi: BigIntBase,
+                      isTwosComplement: Boolean, isBigEndian: Boolean,
+                      bytes: ByteArray, offset: Int = 0, requestedLen: Int = -1
     ): Int {
-        check (isNormalized(magia, meta.normLen))
-        if (meta.normLen >= 0 && meta.normLen <= magia.size &&
+        check (bi.isNormalized())
+        if (bi.meta.normLen >= 0 && bi.meta.normLen <= bi.magia.size &&
             offset >= 0 && (requestedLen <= 0 || requestedLen <= bytes.size - offset)) {
 
             val actualLen = if (requestedLen > 0) requestedLen else {
                 val bitLen = if (isTwosComplement)
-                    bitLengthBigIntegerStyle(meta, magia) + 1
+                    bi.bitLengthBigIntegerStyle() + 1
                 else
-                    max(magnitudeBitLen(meta, magia), 1)
+                    max(bi.magnitudeBitLen(), 1)
                 (bitLen + 7) ushr 3
             }
 
@@ -114,7 +111,7 @@ internal object Zoro {
             val ibLsb = if (isBigEndian) ibLast else offset // index Least significant byte
             val ibMsb = if (isBigEndian) offset else ibLast // index Most significant byte
 
-            val negativeMask = if (meta.isNegative) -1 else 0
+            val negativeMask = if (bi.meta.isNegative) -1 else 0
 
             var remaining = actualLen
 
@@ -123,8 +120,8 @@ internal object Zoro {
 
             var carry = -negativeMask.toLong() // if (isNegative) then carry = 1 else 0
 
-            while (remaining >= 4 && iw < meta.normLen) {
-                val v = magia[iw++]
+            while (remaining >= 4 && iw < bi.meta.normLen) {
+                val v = bi.magia[iw++]
                 carry += (v xor negativeMask).toLong() and 0xFFFF_FFFFL
                 val w = carry.toInt()
                 carry = carry shr 32
@@ -143,7 +140,7 @@ internal object Zoro {
                 remaining -= 4
             }
             if (remaining > 0) {
-                val v = if (iw < meta.normLen) magia[iw++] else 0
+                val v = if (iw < bi.meta.normLen) bi.magia[iw++] else 0
                 var w = (v xor negativeMask).toLong() + carry.toInt()
                 do {
                     bytes[ib] = w.toByte()
@@ -151,7 +148,7 @@ internal object Zoro {
                     w = w shr 8
                 } while (--remaining > 0)
             }
-            check (iw == meta.normLen)
+            check (iw == bi.meta.normLen)
             check(ib - step1LoToHi == ibMsb)
             return actualLen
         }
@@ -252,7 +249,8 @@ internal object Zoro {
      *
      * @return a new IntArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianIntArray(meta: Meta, magia: Magia): IntArray = Mago.newNormalizedCopy(magia, meta.normLen)
+    fun magnitudeToLittleEndianIntArray(meta: Meta, magia: Magia): IntArray =
+        Mago.newNormalizedCopy(magia, meta.normLen)
 
     /**
      * Returns a copy of the magnitude as a little-endian LongArray.
@@ -263,181 +261,22 @@ internal object Zoro {
      *
      * @return a new LongArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianLongArray(meta: Meta, magia: Magia): LongArray {
-        val intLen = meta.normLen
+    fun magnitudeToLittleEndianLongArray(bi: BigIntBase): LongArray {
+        val intLen = bi.meta.normLen
         val longLen = (intLen + 1) ushr 1
         val z = LongArray(longLen)
         var iw = 0
         var il = 0
         while (intLen - iw >= 2) {
-            val lo = magia[iw].toUInt().toLong()
-            val hi = magia[iw + 1].toLong() shl 32
+            val lo = bi.magia[iw].toUInt().toLong()
+            val hi = bi.magia[iw + 1].toLong() shl 32
             z[il] = hi or lo
             ++il
             iw += 2
         }
         if (iw < intLen)
-            z[il] = magia[iw].toUInt().toLong()
+            z[il] = bi.magia[iw].toUInt().toLong()
         return z
-    }
-
-    /**
-     * Returns the bit-length of the magnitude of this BigInt.
-     *
-     * Equivalent to the number of bits required to represent the absolute value.
-     */
-    fun magnitudeBitLen(meta: Meta, magia: Magia): Int =
-        Mago.bitLen(magia, meta.normLen)
-
-    /**
-     * Returns the number of 32-bit integers required to store the binary magnitude.
-     */
-    fun magnitudeIntArrayLen(meta: Meta, magia: Magia) =
-        (magnitudeBitLen(meta, magia) + 31) ushr 5
-
-    /**
-     * Returns the number of 64-bit longs required to store the binary magnitude.
-     */
-    fun magnitudeLongArrayLen(meta: Meta, magia: Magia) =
-        (magnitudeBitLen(meta, magia) + 63) ushr 6
-
-    /**
-     * Computes the number of bytes needed to represent this BigInt
-     * in two's-complement format.
-     *
-     * Always returns at least 1 for zero.
-     */
-    fun calcTwosComplementByteLength(meta: Meta, magia: Magia): Int {
-        if (meta.isZero)
-            return 1
-        // add one for the sign bit ...
-        // ... since bitLengthBigIntegerStyle does not include the sign bit
-        val bitLen2sComplement = bitLengthBigIntegerStyle(meta, magia) + 1
-        val byteLength = (bitLen2sComplement + 7) ushr 3
-        return byteLength
-    }
-
-    /**
-     * Returns `true` if this value is in normalized form.
-     *
-     * A `BigInt` is normalized when:
-     *  - it is exactly the canonical zero (`BigInt.ZERO`), or
-     *  - its magnitude array does not contain unused leading zero limbs
-     *    (i.e., the most significant limb is non-zero).
-     *
-     * Normalization is not required for correctness, but a normalized
-     * representation avoids unnecessary high-order zero limbs.
-     */
-    fun isNormalized(meta: Meta, magia: Magia): Boolean =
-        Mago.isNormalized(magia, meta.normLen)
-
-    /**
-     * A superNormal value is one where there are no unused limbs in the
-     * magia.
-     *
-     * That is, the normalized length == magia.size && magia[magia.lastIndex] != 0
-     *
-     * This is really only used internally in some unit tests to help confirm
-     * that normalization is working correctly.
-     */
-    fun isSuperNormalized(meta: Meta, magia: Magia): Boolean =
-        meta.normLen == magia.size && Mago.isNormalized(magia, meta.normLen)
-
-
-    /**
-     * Computes a hash code for the magnitude [x], ignoring any leading
-     * zero limbs. The effective length is determined by [normLen],
-     * ensuring that numerically equal magnitudes with different limb
-     * capacities produce the same hash.
-     *
-     * The hash is a standard polynomial hash using multiplier 31,
-     * identical to applying:
-     *
-     *     h = 31 * h + limb
-     *
-     * for each non-zero limb in order.
-     *
-     * The loop over limbs is manually unrolled in groups of four solely
-     * for performance. The result is **bit-for-bit identical** to the
-     * non-unrolled version.
-     *
-     * This function is used by [BigInt.hashCode] so that the hash depends
-     * only on the numeric value, not on redundant leading zero limbs or
-     * array capacity.
-     *
-     * @param x the magnitude array in little-endian limb order
-     * @return a hash code consistent with numeric equality of magnitudes
-     */
-    fun normalizedHashCode(x: Magia, xNormLen: Int): Int {
-        check (isNormalized(x, xNormLen))
-        var h = 0
-        var i = 0
-        while (i + 3 < xNormLen) {
-            h = 31 * 31 * 31 * 31 * h +
-                    31 * 31 * 31 * x[i] +
-                    31 * 31 * x[i + 1] +
-                    31 * x[i + 2] +
-                    x[i + 3]
-            i += 4
-        }
-        while (i < xNormLen) {
-            h = 31 * h + x[i]
-            ++i
-        }
-        return h
-    }
-
-    /**
-     * Returns true if the value represented by the lower [xLen] limbs of [x]
-     * is an exact power of two.
-     *
-     * A power of two has exactly one bit set in its binary representation.
-     * Limbs above [xLen] are ignored.
-     *
-     * @param x the array of limbs, in little-endian order.
-     * @param xLen the number of valid limbs to examine.
-     * @return true if the value is a power of two; false otherwise.
-     */
-    fun isPowerOfTwo(x: Magia, xNormLen: Int): Boolean {
-        check (isNormalized(x, xNormLen))
-        if (xNormLen >= 0 && xNormLen <= x.size) {
-            var bitSeen = false
-            for (i in 0..<xNormLen) {
-                val w = x[i]
-                if (w != 0) {
-                    if (bitSeen || (w and (w - 1)) != 0)
-                        return false
-                    bitSeen = true
-                }
-            }
-            return bitSeen
-        } else {
-            throw IllegalArgumentException()
-        }
-    }
-
-    /**
-     * Computes the bit length using Java `BigInteger` semantics.
-     *
-     * Returns the number of bits required to represent the value in two’s-complement
-     * form, excluding the sign bit. For negative values that are exact powers of two,
-     * the result is one less than the magnitude bit length.
-     *
-     * @param meta metadata providing the sign and normalized limb length.
-     * @param magia magnitude limb array in little-endian order.
-     * @return the bit length following `BigInteger.bitLength()` semantics.
-     *
-     * @throws IllegalStateException if the magnitude is not normalized.
-     */
-    fun bitLengthBigIntegerStyle(meta: Meta, magia: Magia): Int {
-        check (isNormalized(magia, meta.normLen))
-        if (meta.normLen >= 0 && meta.normLen <= magia.size) {
-            val bitLen = magnitudeBitLen(meta, magia)
-            val isNegPowerOfTwo = meta.signFlag && isPowerOfTwo(magia, meta.normLen)
-            val bitLengthBigIntegerStyle = bitLen - if (isNegPowerOfTwo) 1 else 0
-            return bitLengthBigIntegerStyle
-        }
-        throw IllegalStateException()
     }
 
 }

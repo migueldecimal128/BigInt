@@ -57,9 +57,9 @@ class TestMagia {
         val str2 = MagiaTransducer.magiaToString(car)
         Assertions.assertEquals(str, str2)
 
-        val car3 = Mago.from(str)
+        val car3 = BigIntParsePrint.from(str)
         assert(Mago.EQ(car, Mago.normLen(car), car3, Mago.normLen(car3)))
-        val str3 = Mago.toString(car3)
+        val str3 = BigIntParsePrint.toString(car3)
         Assertions.assertEquals(str, str3)
     }
 
