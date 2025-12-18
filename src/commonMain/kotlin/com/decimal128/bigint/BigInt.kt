@@ -853,7 +853,7 @@ class BigInt private constructor(
             if (length > 0) {
                 val ibSign = offset - 1 + (if (isBigEndian) 1 else length)
                 val isNegative = isTwosComplement && bytes[ibSign] < 0
-                val magia = Zoro.fromBinaryBytes(
+                val magia = BigIntSerde.fromBinaryBytes(
                     isNegative, isBigEndian, bytes, offset,
                     length
                 )
@@ -1445,7 +1445,7 @@ class BigInt private constructor(
      */
     override fun hashCode(): Int {
         var result = meta.isNegative.hashCode()
-        result = 31 * result + Zoro.normalizedHashCode(magia, meta.normLen)
+        result = 31 * result + magnitudeHashCode()
         return result
     }
 

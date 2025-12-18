@@ -4,16 +4,7 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Mago.ZERO
-import com.decimal128.bigint.Mago.bitLen
-import com.decimal128.bigint.Mago.isNormalized
-import com.decimal128.bigint.Mago.mutateFmaPow10
-import com.decimal128.bigint.Mago.newCopyWithExactLimbLen
-import com.decimal128.bigint.Mago.newWithBitLen
-import com.decimal128.bigint.Mago.normLen
-import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.max
-import kotlin.math.min
 
 object BigIntSerde {
 
@@ -249,8 +240,8 @@ object BigIntSerde {
      *
      * @return a new IntArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianIntArray(meta: Meta, magia: Magia): IntArray =
-        Mago.newNormalizedCopy(magia, meta.normLen)
+    fun magnitudeToLittleEndianIntArray(bi: BigIntBase): IntArray =
+        bi.magia.copyOf(bi.meta.normLen)
 
     /**
      * Returns a copy of the magnitude as a little-endian LongArray.

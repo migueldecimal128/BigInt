@@ -389,7 +389,7 @@ object BigIntParsePrint {
     private fun toHexString(meta: Meta, magia: Magia, prefixUtf8: ByteArray, useUpperCase: Boolean, minPrintLength: Int, suffixUtf8: ByteArray): String {
         val signCount = meta.signBit
         val prefixCount = prefixUtf8.size
-        val nybbleCount = max((Zoro.magnitudeBitLen(meta, magia) + 3) / 4, minPrintLength)
+        val nybbleCount = max((bitLen(magia, meta.normLen) + 3) / 4, minPrintLength)
         val suffixCount = suffixUtf8.size
         val totalLen = signCount + prefixCount + nybbleCount + suffixCount
         val utf8 = ByteArray(totalLen)

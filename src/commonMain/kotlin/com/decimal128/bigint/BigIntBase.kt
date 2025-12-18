@@ -1,6 +1,6 @@
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Zoro.isPowerOfTwo
+import com.decimal128.bigint.Mago.normLen
 import kotlin.math.absoluteValue
 
 sealed class BigIntBase(
@@ -75,9 +75,11 @@ sealed class BigIntBase(
      * Normalization is not required for correctness, but a normalized
      * representation avoids unnecessary high-order zero limbs.
      */
-    internal fun isNormalized(): Boolean = Zoro.isNormalized(meta, magia)
+    internal fun isNormalized(): Boolean =
+        Mago.isNormalized(magia, meta.normLen) && meta._meta != Int.MIN_VALUE
 
-    internal fun isSuperNormalized(): Boolean = Zoro.isSuperNormalized(meta, magia)
+    internal fun isSuperNormalized(): Boolean =
+        isNormalized() && meta.normLen == magia.size
 
     /**
      * Returns `true` if this value is exactly representable as a 32-bit
@@ -697,7 +699,7 @@ sealed class BigIntBase(
      * @return a new [ByteArray] containing the two's-complement representation
      */
     fun toTwosComplementBigEndianByteArray(): ByteArray =
-        Zoro.toTwosComplementBigEndianByteArray(meta, magia)
+        BigIntSerde.toTwosComplementBigEndianByteArray(this)
 
     /**
      * Converts this [BigInt] to a [ByteArray] in the requested binary format.
@@ -711,7 +713,7 @@ sealed class BigIntBase(
      * @return a new [ByteArray] containing the binary representation
      */
     fun toBinaryByteArray(isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray =
-        Zoro.toBinaryByteArray(meta, magia, isTwosComplement, isBigEndian)
+        BigIntSerde.toBinaryByteArray(this, isTwosComplement, isBigEndian)
 
     /**
      * Writes this [BigInt] into the provided [bytes] array in the requested binary format.
@@ -747,7 +749,7 @@ sealed class BigIntBase(
         isTwosComplement: Boolean, isBigEndian: Boolean,
         bytes: ByteArray, offset: Int = 0, requestedLength: Int = -1
     ): Int =
-        Zoro.toBinaryBytes(meta, magia,
+        BigIntSerde.toBinaryBytes(this,
             isTwosComplement, isBigEndian,
             bytes, offset, requestedLength)
 
@@ -760,7 +762,7 @@ sealed class BigIntBase(
      * @return a new IntArray containing the magnitude in little-endian order
      */
     fun magnitudeToLittleEndianIntArray(): IntArray =
-        Zoro.magnitudeToLittleEndianIntArray(meta, magia)
+        BigIntSerde.magnitudeToLittleEndianIntArray(this)
 
     /**
      * Returns a copy of the magnitude as a little-endian LongArray.
@@ -772,6 +774,52 @@ sealed class BigIntBase(
      * @return a new LongArray containing the magnitude in little-endian order
      */
     fun magnitudeToLittleEndianLongArray(): LongArray =
-        Zoro.magnitudeToLittleEndianLongArray(meta, magia)
+        BigIntSerde.magnitudeToLittleEndianLongArray(this)
+
+    /**
+     * Computes a hash code for the magnitude [x], ignoring any leading
+     * zero limbs. The effective length is determined by [normLen],
+     * ensuring that numerically equal magnitudes with different limb
+     * capacities produce the same hash.
+     *
+     * The hash is a standard polynomial hash using multiplier 31,
+     * identical to applying:
+     *
+     *     h = 31 * h + limb
+     *
+     * for each non-zero limb in order.
+     *
+     * The loop over limbs is manually unrolled in groups of four solely
+     * for performance. The result is **bit-for-bit identical** to the
+     * non-unrolled version.
+     *
+     * This function is used by [BigInt.hashCode] so that the hash depends
+     * only on the numeric value, not on redundant leading zero limbs or
+     * array capacity.
+     *
+     * @param x the magnitude array in little-endian limb order
+     * @return a hash code consistent with numeric equality of magnitudes
+     */
+    fun magnitudeHashCode(): Int {
+        check (isNormalized())
+        var h = 0
+        var i = 0
+        while (i + 3 < meta.normLen) {
+            h = 31 * 31 * 31 * 31 * h +
+                    31 * 31 * 31 * magia[i] +
+                    31 * 31 * magia[i + 1] +
+                    31 * magia[i + 2] +
+                    magia[i + 3]
+            i += 4
+        }
+        while (i < meta.normLen) {
+            h = 31 * h + magia[i]
+            ++i
+        }
+        return h
+    }
+
+    override fun hashCode(): Int =
+        throw UnsupportedOperationException()
 
 }
