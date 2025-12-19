@@ -199,6 +199,8 @@ class BigInt private constructor(
          * @return the corresponding [BigInt] representation.
          */
         fun from(n: Int): BigInt = when {
+            // FIXME - consider a small cache of small values
+            //  that is lazily filled in
             n > 0 -> fromNormalizedNonZero(intArrayOf(n))
             n < 0 -> fromNormalizedNonZero(sign=true, intArrayOf(-n))
             else -> ZERO
@@ -593,27 +595,25 @@ class BigInt private constructor(
             rng: Random = Random.Default,
             withRandomSign: Boolean = false
         ): BigInt {
-            if (maxBitLen > 0) {
-                var zeroTest = 0
-                val magia = Mago.newWithBitLen(maxBitLen)
-                val topBits = maxBitLen and 0x1F
-                // note parenthesization on this mask creation ... 0 - 1
-                var mask = ((-topBits ushr 31) shl topBits) - 1
-                for (i in magia.lastIndex downTo 0) {
-                    val rand = rng.nextInt() and mask
-                    magia[i] = rand
-                    zeroTest = zeroTest or rand
-                    mask = -1
+            return when {
+                maxBitLen > 0 -> {
+                    var zeroTest = 0
+                    val magia = Mago.newWithBitLen(maxBitLen)
+                    val topBits = maxBitLen and 0x1F
+                    // note parenthesization on this mask creation ... 0 - 1
+                    var mask = ((-topBits ushr 31) shl topBits) - 1
+                    for (i in magia.lastIndex downTo 0) {
+                        val rand = rng.nextInt() and mask
+                        magia[i] = rand
+                        zeroTest = zeroTest or rand
+                        mask = -1
+                    }
+                    val sign = withRandomSign && rng.nextBoolean()
+                    if (zeroTest == 0) ZERO else fromNonNormalizedNonZero(sign, magia)
                 }
-                return when {
-                    zeroTest == 0 -> ZERO
-                    !withRandomSign -> fromNonNormalizedNonZero(magia)
-                    else -> fromNonNormalizedNonZero(rng.nextBoolean(), magia)
-                }
+                maxBitLen == 0 -> ZERO
+                else -> throw IllegalArgumentException("bitLen must be > 0")
             }
-            if (maxBitLen == 0)
-                return ZERO
-            throw IllegalArgumentException("bitLen must be > 0")
 
         }
 
@@ -790,23 +790,6 @@ class BigInt private constructor(
         }
 
         /**
-         * Constructs a [BigInt] from a Big-Endian two’s-complement byte array.
-         *
-         * This behaves like the `java.math.BigInteger(byte[])` constructor and is the
-         * conventional external representation for signed binary integers.
-         *
-         * The sign is determined by the most significant bit of the first byte.
-         * An empty array returns [ZERO].
-         *
-         * For Little-Endian or unsigned data, use [fromBinaryBytes] directly.
-         *
-         * @param bytes  The source byte array.
-         * @return The corresponding [BigInt] value.
-         */
-        fun fromTwosComplementBigEndianBytes(bytes: ByteArray): BigInt =
-            fromTwosComplementBigEndianBytes(bytes, 0, bytes.size)
-
-        /**
          * Constructs a [BigInt] from a subrange of a Big-Endian two’s-complement byte array.
          *
          * This behaves like the `java.math.BigInteger(byte[], offset, length)` pattern.
@@ -821,31 +804,9 @@ class BigInt private constructor(
          * @return The corresponding [BigInt] value.
          * @throws IllegalArgumentException if [offset] or [length] specify an invalid range.
          */
-        fun fromTwosComplementBigEndianBytes(bytes: ByteArray, offset: Int, length: Int): BigInt =
+        fun fromTwosComplementBigEndianBytes(bytes: ByteArray,
+                                             offset: Int = 0, length: Int = bytes.size): BigInt =
             fromBinaryBytes(isTwosComplement = true, isBigEndian = true, bytes, offset, length)
-
-        /**
-         * Creates a [BigInt] from an array of raw binary bytes.
-         *
-         * The input bytes represent either an unsigned integer or a two’s-complement
-         * signed integer, depending on [isTwosComplement]. If [isTwosComplement] is `true`,
-         * the most significant bit of the first byte determines the sign, and the bytes are
-         * interpreted according to two’s-complement encoding. If [isTwosComplement] is `false`,
-         * the bytes are treated as a non-negative unsigned value.
-         *
-         * The byte order is determined by [isBigEndian].
-         *
-         * @param isTwosComplement `true` if bytes use two’s-complement encoding, `false` if unsigned.
-         * @param isBigEndian `true` if bytes are in big-endian order, `false` for little-endian.
-         * @param bytes Source byte array containing the integer representation.
-         * @return A [BigInt] representing the value of the specified byte range.
-         * @throws IllegalArgumentException if the range `[offset, offset + length)` is invalid.
-         */
-        fun fromBinaryBytes(
-            isTwosComplement: Boolean, isBigEndian: Boolean,
-            bytes: ByteArray
-        ): BigInt =
-            fromBinaryBytes(isTwosComplement, isBigEndian, bytes, 0, bytes.size)
 
         /**
          * Creates a [BigInt] from a sequence of raw binary bytes.
@@ -868,7 +829,7 @@ class BigInt private constructor(
          */
         fun fromBinaryBytes(
             isTwosComplement: Boolean, isBigEndian: Boolean,
-            bytes: ByteArray, offset: Int, length: Int
+            bytes: ByteArray, offset: Int = 0, length: Int = bytes.size
         ): BigInt {
             if (offset < 0 || length < 0 || length > bytes.size - offset)
                 throw IllegalArgumentException()
@@ -888,13 +849,8 @@ class BigInt private constructor(
         /**
          * Converts a Little-Endian IntArray to a BigInt with the specified sign.
          */
-        fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray): BigInt =
-            fromLittleEndianIntArray(sign, littleEndianIntArray, littleEndianIntArray.size)
-
-        /**
-         * Converts a Little-Endian IntArray to a BigInt with the specified sign.
-         */
-        fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray, len: Int): BigInt {
+        fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray,
+                                     len: Int = littleEndianIntArray.size): BigInt {
             if (len >= 0 && len <= littleEndianIntArray.size) {
                 val normLen = Mago.normLen(littleEndianIntArray, len)
                 if (normLen > 0)
@@ -916,7 +872,8 @@ class BigInt private constructor(
                 throw IllegalArgumentException("negative bitIndex:$bitIndex")
             if (bitIndex == 0)
                 return ONE
-            val magia = Mago.newWithSetBit(bitIndex)
+            val magia = Mago.newWithBitLen(bitIndex + 1)
+            magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
             return fromNormalizedNonZero(magia)
         }
 
@@ -1016,9 +973,6 @@ class BigInt private constructor(
             }
             throw IllegalArgumentException()
         }
-
-        private val HEX_PREFIX_UTF8_0x = byteArrayOf('0'.code.toByte(), 'x'.code.toByte())
-        private val HEX_SUFFIX_UTF8_nada = ByteArray(0)
 
         /**
          * Returns `n!` as a [BigInt].

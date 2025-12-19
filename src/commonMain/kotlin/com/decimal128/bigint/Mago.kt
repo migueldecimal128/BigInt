@@ -1487,33 +1487,6 @@ internal object Mago {
     }
 
     /**
-     * Creates a new limb array with a single bit set at [bitIndex].
-     *
-     * The resulting array has the minimum length needed to contain that bit.
-     *
-     * @throws IllegalArgumentException if [bitIndex] is negative.
-     */
-    inline fun newWithSetBit(bitIndex: Int): Magia {
-        if (bitIndex >= 0) {
-            val magia = Mago.newWithBitLen(bitIndex + 1)
-            magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
-            return magia
-        }
-        throw IllegalArgumentException()
-    }
-
-    /**
-     * Tests whether the bit at the specified [bitIndex] is set in the given unsigned integer.
-     *
-     * This is a convenience overload that considers all limbs in [x].
-     *
-     * @param x the array of 32-bit limbs representing the integer.
-     * @param bitIndex the zero-based index of the bit to test (0 is least significant bit).
-     * @return `true` if the specified bit is set, `false` otherwise.
-     */
-    fun testBit(x: Magia, bitIndex: Int): Boolean = testBit(x, x.size, bitIndex)
-
-    /**
      * Tests whether the bit at the specified [bitIndex] is set in the given unsigned integer.
      *
      * @param x the array of 32-bit limbs representing the integer.
