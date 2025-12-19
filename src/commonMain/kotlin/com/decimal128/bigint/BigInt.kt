@@ -1457,33 +1457,6 @@ class BigInt private constructor(
     }
 
     /**
-     * Internal helper for addition or subtraction with a UInt operand.
-     *
-     * @param signFlipThis true to flip the sign of this BigInt before operation
-     * @param otherSign the sign of the UInt operand
-     * @param w the UInt operand
-     * @return a new BigInt representing the result
-     */
-    fun addImpl(signFlipThis: Boolean, otherSign: Boolean, w: UInt): BigInt {
-        val thisSign = this.meta.signFlag xor signFlipThis
-        when {
-            w == 0u && signFlipThis -> return this.negate()
-            w == 0u -> return this
-            this.isZero() -> return BigInt(otherSign, intArrayOf(w.toInt()))
-            thisSign == otherSign ->
-                return BigInt(thisSign,
-                    Mago.newAdd(this.magia, this.meta.normLen, w.toULong()))
-        }
-        val cmp = this.magnitudeCompareTo(w)
-        val ret = when {
-            cmp > 0 -> BigInt(thisSign, Mago.newSub(this.magia, this.meta.normLen, w))
-            cmp < 0 -> BigInt(otherSign, intArrayOf(w.toInt() - this.magia[0]))
-            else -> ZERO
-        }
-        return ret
-    }
-
-    /**
      * Internal helper for addition or subtraction with a ULong operand.
      *
      * @param signFlipThis true to flip the sign of this BigInt before operation
@@ -1494,8 +1467,12 @@ class BigInt private constructor(
     fun addImpl(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
         val thisSign = this.meta.signFlag xor signFlipThis
         when {
-            (dw shr 32) == 0uL -> return addImpl(signFlipThis, otherSign, dw.toUInt())
-            this.isZero() -> return BigInt(otherSign, intArrayOf(dw.toInt(), (dw shr 32).toInt()))
+            dw == 0uL && signFlipThis -> return this.negate()
+            dw == 0uL -> return this
+            this.isZero() && (dw shr 32) == 0uL->
+                return BigInt(otherSign, intArrayOf(dw.toInt()))
+            this.isZero() ->
+                return BigInt(otherSign, intArrayOf(dw.toInt(), (dw shr 32).toInt()))
             thisSign == otherSign ->
                 return BigInt(thisSign, Mago.newAdd(this.magia, this.meta.normLen, dw))
         }
@@ -1507,7 +1484,6 @@ class BigInt private constructor(
                 val diff = dw - thisMag
                 BigInt(otherSign, Mago.newFromULong(diff))
             }
-
             else -> ZERO
         }
         return ret
