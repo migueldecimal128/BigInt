@@ -3,7 +3,7 @@
 `BigInt` is currently **EXPERIMENTAL**. 
 Aspects of the API are still subject to change. 
 
-`BigInt` is a lightweight, high-performance arbitrary-precision
+`BigInt` is a high-performance arbitrary-precision
 signed integer type for **Kotlin Multiplatform**, designed to
 bring efficient big-integer arithmetic to 
 **JVM, Native, and JavaScript** with **no external dependencies**.
@@ -69,13 +69,13 @@ val hex   = "0xCAFE_BABE_FACE_DEAD_BEEF_CEDE_FEED_BEAD_FADE".toBigInt()
 
 ```kotlin
 val a = "123456789012345678901234567890".toBigInt()
-val b = 987654321.toBigInt()
+val b = "9999999999888888888877777777776666666666".toBigInt()
 
-val sum  = a + b
-val diff = a - b
+val sum  = a + 123
+val diff = a - 678
 val prod = a * b
 val quot = a / b
-val rem  = a % b
+val rem  = a % 1_000_000_000_000_000_000uL
 ```
 
 ### Mixed primitive operations
@@ -86,7 +86,7 @@ val y = a * 42u        // UInt
 val z = a - 123456789L // Long
 ```
 
-All without boxing.
+All without boxing!
 
 ---
 
@@ -97,17 +97,18 @@ All without boxing.
 
 ---
 
-## 🧮 BigIntAccumulator
+## 🧮 MutableBigInt
 
-`BigIntAccumulator` is a mutable companion type for
+`MutableBigInt` is a mutable companion type for
 **efficient in-place accumulation**, dramatically reducing 
-temporary heap allocations during summation-heavy workloads.
+temporary heap allocations during large summation-heavy
+workloads and intense crypto calculations. 
 
 ### Basic usage
 
 ```kotlin
-val s = BigIntAccumulator()
-val s2 = BigIntAccumulator()
+val s = MutableBigInt()
+val s2 = MutableBigInt()
 for (x in myBigData) {
     s += x 
     s2.addSquareOf(x)
@@ -119,10 +120,10 @@ val sumOfSquares = BigInt.from(s2)
 
 ```factorial
 
-val f = BigIntAccumulator().setOne() // start at 1
+val f = MutableBigInt().setOne() // start at 1
 for (i in 2..n)
     f *= i
-val factorial = BigInt.from(f)
+val factorial = f.toBigInt()
 
 ```
 
