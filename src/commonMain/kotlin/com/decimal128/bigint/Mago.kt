@@ -1997,35 +1997,6 @@ internal object Mago {
     }
 
     /**
-     * Computes `x mod w` for the normalized range `x[0‥xNormLen)` and returns the
-     * remainder as a new normalized single-limb array. Uses a fast path for values
-     * fitting in one or two limbs, otherwise delegates to `calcRem`. Returns [ZERO]
-     * if the remainder is zero.
-     *
-     * @return normalized [Magia] remainder or [ZERO]
-     */
-    fun newRem(x: Magia, xNormLen: Int, w: UInt): Magia =
-        newFromUInt(calcRem32(x, xNormLen, w))
-
-    /**
-     * Computes `x mod w` for the normalized range `x[0‥xNormLen)` and stores the
-     * remainder into `z[0]` if it is non-zero.
-     *
-     * Returns `1` if a non-zero remainder was written, or `0` if the remainder is
-     * zero. Uses a fast path for 1–2 limb values, otherwise delegates to `calcRem`.
-     */
-    fun setRem32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
-        check (isNormalized(x, xNormLen))
-        if (xNormLen > 0) {
-            val rem = calcRem32(x, xNormLen, w)
-            z[0] = rem.toInt()
-            if (rem > 0u)
-                return 1
-        }
-        return 0
-    }
-
-    /**
      * Computes `x mod dw` for the normalized range `x[0‥xNormLen)` where `dw` is a
      * 64-bit unsigned divisor.
      *
@@ -2042,7 +2013,11 @@ internal object Mago {
     fun setRem64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         check (isNormalized(x, xNormLen))
         return when {
-            (dw shr 32) == 0uL -> setRem32(z, x, xNormLen, dw.toUInt())
+            (dw shr 32) == 0uL -> {
+                val rem = calcRem32(x, xNormLen, dw.toUInt())
+                z[0] = rem.toInt()
+                return -rem.toInt() ushr 31
+               }
             xNormLen == 0 -> 0
             xNormLen <= 2 -> setULong(z, toRawULong(x, xNormLen) % dw)
             else -> setRem(z, x, xNormLen, intArrayOf(dw.toInt(), (dw shr 32).toInt()), 2)
@@ -2062,8 +2037,8 @@ internal object Mago {
         when {
             yNormLen == 0 -> throw ArithmeticException("div by zero")
             xNormLen == 0 -> return ZERO
-            yNormLen == 1 -> return newRem(x, xNormLen, y[0].toUInt())
-            yNormLen == 2 -> return newRem(x, xNormLen, (y[1].toULong() shl 32) or y[0].toUInt().toULong())
+            yNormLen <= 2 -> return newRem(x, xNormLen,
+                y[0].toUInt().toULong() or if (yNormLen == 2) (y[1].toULong() shl 32) else 0uL)
             xNormLen <= yNormLen -> {
                 val xBitLen = bitLen(x, xNormLen)
                 val yBitLen = bitLen(y, yNormLen)
@@ -2130,7 +2105,7 @@ internal object Mago {
             }
             yNormLen == 2 && xNormLen <= 2 ->
                 return setULong(zMagia, toRawULong(xMagia, xNormLen) % toRawULong(yMagia, yNormLen))
-            yNormLen == 1 -> return setRem32(zMagia, xMagia, xNormLen, yMagia[0].toUInt())
+            yNormLen == 1 -> return setRem64(zMagia, xMagia, xNormLen, yMagia[0].toUInt().toULong())
             // note that this will handle aliasing
             // when x === yMeta,yMagia
             xNormLen == yNormLen -> {
