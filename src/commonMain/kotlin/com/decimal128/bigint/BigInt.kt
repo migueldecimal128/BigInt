@@ -1049,23 +1049,23 @@ class BigInt private constructor(
 
     operator fun plus(other: BigInt): BigInt = this.addImpl(false, other)
     operator fun plus(n: Int): BigInt =
-        this.addImpl(signFlipThis = false, signFlipOther = false, n = n)
+        this.addImpl(signFlipThis = false, n < 0, n.absoluteValue.toUInt().toULong())
     operator fun plus(w: UInt): BigInt =
-        this.addImpl(signFlipThis = false, otherSign = false, w = w)
+        this.addImpl(signFlipThis = false, false, w.toULong())
     operator fun plus(l: Long): BigInt =
-        this.addImpl(signFlipThis = false, signFlipOther = false, l = l)
+        this.addImpl(signFlipThis = false, l < 0, l.absoluteValue.toULong())
     operator fun plus(dw: ULong): BigInt =
-        this.addImpl(signFlipThis = false, otherSign = false, dw = dw)
+        this.addImpl(signFlipThis = false, false, dw)
 
     operator fun minus(other: BigInt): BigInt = this.addImpl(true, other)
     operator fun minus(n: Int): BigInt =
-        this.addImpl(signFlipThis = false, signFlipOther = true, n = n)
+        this.addImpl(signFlipThis = false, n >= 0, n.absoluteValue.toUInt().toULong())
     operator fun minus(w: UInt): BigInt =
-        this.addImpl(signFlipThis = false, otherSign = true, w = w)
+        this.addImpl(signFlipThis = false, true, w.toULong())
     operator fun minus(l: Long): BigInt =
-        this.addImpl(signFlipThis = false, signFlipOther = true, l = l)
+        this.addImpl(signFlipThis = false, l >= 0, l.absoluteValue.toULong())
     operator fun minus(dw: ULong): BigInt =
-        this.addImpl(signFlipThis = false, otherSign = true, dw = dw)
+        this.addImpl(signFlipThis = false, true, dw)
 
     operator fun times(other: BigInt): BigInt =
         fromNonNormalizedOrZero(meta.signFlag xor other.meta.signFlag,
@@ -1457,20 +1457,6 @@ class BigInt private constructor(
     }
 
     /**
-     * Internal helper for addition or subtraction with an Int operand.
-     *
-     * @param signFlipThis true to flip the sign of this BigInt before operation
-     * @param signFlipOther true to flip the sign of the Int operand before operation
-     * @param n the Int operand
-     * @return a new BigInt representing the result
-     */
-    fun addImpl(signFlipThis: Boolean, signFlipOther: Boolean, n: Int): BigInt {
-        val otherSign = n < 0
-        val otherMag = n.absoluteValue
-        return addImpl(signFlipThis, otherSign xor signFlipOther, otherMag.toUInt())
-    }
-
-    /**
      * Internal helper for addition or subtraction with a UInt operand.
      *
      * @param signFlipThis true to flip the sign of this BigInt before operation
@@ -1495,20 +1481,6 @@ class BigInt private constructor(
             else -> ZERO
         }
         return ret
-    }
-
-    /**
-     * Internal helper for addition or subtraction with a Long operand.
-     *
-     * @param signFlipThis true to flip the sign of this BigInt before operation
-     * @param signFlipOther true to flip the sign of the Long operand before operation
-     * @param l the Long operand
-     * @return a new BigInt representing the result
-     */
-    fun addImpl(signFlipThis: Boolean, signFlipOther: Boolean, l: Long): BigInt {
-        val otherSign = l < 0L
-        val otherMag = l.absoluteValue
-        return addImpl(signFlipThis, otherSign xor signFlipOther, otherMag.toULong())
     }
 
     /**

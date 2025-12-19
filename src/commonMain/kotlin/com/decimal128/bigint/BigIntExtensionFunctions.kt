@@ -1,5 +1,6 @@
 package com.decimal128.bigint
 
+import kotlin.math.absoluteValue
 import kotlin.random.Random
 
 // <<<< THESE PORT OVER TO BigIntAccumulator WITH BigInt => BigIntAccumulator >>>>
@@ -19,22 +20,22 @@ import kotlin.random.Random
  *   so that they produce correct signed results when a primitive appears on the left-hand side.
  */
 operator fun Int.plus(other: BigInt) =
-    other.addImpl(signFlipThis = false, signFlipOther = false, n = this)
+    other.addImpl(signFlipThis = false, this < 0, this.absoluteValue.toUInt().toULong())
 operator fun UInt.plus(other: BigInt) =
-    other.addImpl(signFlipThis = false, otherSign = false, w = this)
+    other.addImpl(signFlipThis = false, false, this.toULong())
 operator fun Long.plus(other: BigInt) =
-    other.addImpl(signFlipThis = false, signFlipOther = false, l = this)
+    other.addImpl(signFlipThis = false, this < 0, this.absoluteValue.toULong())
 operator fun ULong.plus(other: BigInt) =
-    other.addImpl(signFlipThis = false, otherSign = false, dw = this)
+    other.addImpl(signFlipThis = false, false, this)
 
 operator fun Int.minus(other: BigInt) =
-    other.addImpl(signFlipThis = true, signFlipOther = false, n = this)
+    other.addImpl(signFlipThis = true, this < 0, this.absoluteValue.toUInt().toULong())
 operator fun UInt.minus(other: BigInt) =
-    other.addImpl(signFlipThis = true, otherSign = false, w = this)
+    other.addImpl(signFlipThis = true, false, this.toULong())
 operator fun Long.minus(other: BigInt) =
-    other.addImpl(signFlipThis = true, signFlipOther = false, l = this)
+    other.addImpl(signFlipThis = true, this < 0L, this.absoluteValue.toULong())
 operator fun ULong.minus(other: BigInt) =
-    other.addImpl(signFlipThis = true, otherSign = false, dw = this)
+    other.addImpl(signFlipThis = true, false, this)
 
 operator fun Int.times(other: BigInt) = other.times(this)
 operator fun UInt.times(other: BigInt) = other.times(this)
