@@ -66,7 +66,7 @@ object BigIntPrime {
             SmallPrimeResult.COMPOSITE -> false
             SmallPrimeResult.PRIME -> true
             SmallPrimeResult.INCONCLUSIVE -> {
-                if (! isMillerRabin_2_64(n, tmp)) return false
+                if (! isMillerRabinProbablePrimeBase2(n, tmp)) return false
                 val selfridge = selectSelfridgeParams(n)
                 selfridge.D != 0 && isStrongLucasProbablePrime(n, selfridge)
             }
@@ -180,8 +180,26 @@ object BigIntPrime {
         return true
     }
 
+    private val MILLER_RABIN_BASE_2 = intArrayOf(2)
+
+    /**
+     * Returns `true` if [n] passes a strong Miller–Rabin probable-prime
+     * test to base 2.
+     *
+     * This is the Miller–Rabin stage used in Baillie–PSW,
+     * following trial division by small primes.
+     *
+     * @param n the odd integer to test
+     * @param tmp optional reusable scratch space
+     */
+    fun isMillerRabinProbablePrimeBase2(n: BigInt, tmp: MutableBigInt? = null): Boolean =
+        isMillerRabinProbablePrime(n, MILLER_RABIN_BASE_2, tmp)
+
+
     /**
      * Deterministic Miller–Rabin bases sufficient for testing 64-bit–range values.
+     *
+     * Sinclair & Jaeschke. Feitsma & Galway.
      *
      * When used together, these bases make the Miller–Rabin test
      * deterministic for all `n < 2^64`.
