@@ -12,7 +12,7 @@ class TestBigIntModVsRem {
         val n = 7
 
         for (x in -50..50) {
-            val r = x.toBigInt().mod(n)
+            val r = x.toBigInt() mod n
             assertTrue(r >= BigInt.ZERO, "negative result for x=$x")
             assertTrue(r < n.toBigInt(), "out of range for x=$x")
             assertEquals(
@@ -29,8 +29,8 @@ class TestBigIntModVsRem {
 
         val x = (-3).toBigInt()
 
-        val rem = x % n.toBigInt()
-        val mod = x.mod(n)
+        val rem = x % n
+        val mod = x mod n
 
         assertEquals((-3).toBigInt(), rem)
         assertEquals(2.toBigInt(), mod)
@@ -40,9 +40,9 @@ class TestBigIntModVsRem {
     fun mod_zeroAlwaysZero() {
         val zero = BigInt.ZERO
 
-        assertEquals(BigInt.ZERO, zero.mod(1))
+        assertEquals(BigInt.ZERO, zero mod 1)
         assertEquals(BigInt.ZERO, zero.mod(7))
-        assertEquals(BigInt.ZERO, zero.mod(ULong.MAX_VALUE))
+        assertEquals(BigInt.ZERO, zero mod ULong.MAX_VALUE)
     }
 
     @Test
@@ -66,7 +66,7 @@ class TestBigIntModVsRem {
         val neg = -big
 
         val r1 = big.mod(n)
-        val r2 = neg.mod(n)
+        val r2 = neg mod n
 
         assertTrue(r1 >= BigInt.ZERO && r1 < n)
         assertTrue(r2 >= BigInt.ZERO && r2 < n)
@@ -89,9 +89,9 @@ class TestBigIntModVsRem {
 
         val r = x.mod(nInt)
 
-        assertEquals(r, x.mod(nUInt))
-        assertEquals(r, x.mod(nLong))
-        assertEquals(r, x.mod(nULong))
+        assertEquals(r, x mod nUInt)
+        assertEquals(r, x mod nLong)
+        assertEquals(r, x mod nULong)
     }
 
     @Test
@@ -99,13 +99,13 @@ class TestBigIntModVsRem {
         val x = (-42).toBigInt()
 
         assertEquals(
-            x.mod(7),
-            x.mod(-7)
+            x mod 7,
+            x mod -7
         )
 
         assertEquals(
-            x.mod(7L),
-            x.mod(-7L)
+            x mod 7L,
+            x mod -7L
         )
     }
 
