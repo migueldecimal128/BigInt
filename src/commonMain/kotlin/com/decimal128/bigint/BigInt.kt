@@ -76,58 +76,6 @@ class BigInt private constructor(
 
         val TEN = BigInt(Meta(4), intArrayOf(10))
 
-        internal operator fun invoke(sign: Boolean, magia: Magia): BigInt {
-            if (magia.isEmpty()) {
-                check(magia === Mago.ZERO)
-                return ZERO
-            }
-            val signBit = if (sign) 1 else 0
-            val normLen = Mago.normLen(magia)
-            if (normLen == 0)
-                return ZERO
-            check (injectPoison(magia, normLen))
-            val meta = Meta(signBit, normLen)
-            return BigInt(meta, magia)
-        }
-
-        internal operator fun invoke(magia: Magia): BigInt {
-            if (magia.isNotEmpty()) {
-                val signBit = 0
-                val meta = Meta(signBit, magia)
-                if (meta.normLen > 0) {
-                    check(injectPoison(magia, meta.normLen))
-                    return BigInt(meta, magia)
-                }
-            }
-            return ZERO
-        }
-
-        internal operator fun invoke(magia: Magia, normLen: Int): BigInt {
-            if (magia.isNotEmpty()) {
-                check(Mago.isNormalized(magia, normLen))
-                val meta = Meta(0, normLen)
-                if (meta.normLen > 0) {
-                    check(injectPoison(magia, normLen))
-                    return BigInt(meta, magia)
-                }
-            }
-            return ZERO
-        }
-
-        internal operator fun invoke(sign: Boolean, magia: Magia, normLen: Int): BigInt {
-            if (normLen > 0) {
-                check (Mago.isNormalized(magia, normLen))
-                val signBit = if (sign) 1 else 0
-                val meta = Meta(signBit, normLen)
-                check (injectPoison(magia, normLen))
-                return BigInt(meta, magia)
-            }
-            return ZERO
-        }
-
-        internal operator fun invoke(sign: Boolean, biMagnitude: BigInt): BigInt =
-            fromLittleEndianIntArray(sign, biMagnitude.magia, biMagnitude.meta.normLen)
-
         internal fun fromNormalizedNonZero(magia: Magia): BigInt =
             fromNormalizedNonZero(false, magia)
 
@@ -283,6 +231,10 @@ class BigInt private constructor(
          * Constructs a new [BigInt] from a [BigIntAccumulator] or another [BigInt].
          */
         fun from(other: BigIntBase): BigInt = BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
+
+        internal fun from(sign: Boolean, biMagnitude: BigIntBase): BigInt =
+            BigInt(Meta(sign, biMagnitude.meta.normLen),
+                biMagnitude.magia.copyOf(biMagnitude.meta.normLen))
 
         /**
          * Parses a [String] representation of an integer into a [BigInt].
@@ -1035,6 +987,20 @@ class BigInt private constructor(
      */
     fun negate() = if (isZero()) ZERO else BigInt(meta.negate(), magia)
 
+    /**
+     * Returns a value of this magnitude with the requested [sign].
+     *
+     * @param sign `true` for negative, `false` for non-negative
+     */
+    fun withSign(sign: Boolean) = if (isNegative() == sign) this else negate()
+
+    /**
+     * Returns a value of this magnitude with the same sign as [other].
+     *
+     * @param other source of the sign
+     */
+    fun withSignOf(other: BigIntBase) = if (isNegative() == other.isNegative()) this else negate()
+
     override fun toBigInt() = this
 
     /**
@@ -1434,24 +1400,20 @@ class BigInt private constructor(
         when {
             dw == 0uL && signFlipThis -> return this.negate()
             dw == 0uL -> return this
-            this.isZero() && (dw shr 32) == 0uL->
-                return BigInt(otherSign, intArrayOf(dw.toInt()))
-            this.isZero() ->
-                return BigInt(otherSign, intArrayOf(dw.toInt(), (dw shr 32).toInt()))
+            this.isZero() -> return from(otherSign, dw)
             thisSign == otherSign ->
-                return BigInt(thisSign, Mago.newAdd(this.magia, this.meta.normLen, dw))
+                return fromNonNormalizedNonZero(thisSign, Mago.newAdd(this.magia, this.meta.normLen, dw))
         }
         val cmp = this.magnitudeCompareTo(dw)
-        val ret = when {
-            cmp > 0 -> BigInt(thisSign, Mago.newSub(this.magia, this.meta.normLen, dw))
+        return when {
+            cmp > 0 -> fromNonNormalizedNonZero(thisSign, Mago.newSub(this.magia, this.meta.normLen, dw))
             cmp < 0 -> {
                 val thisMag = this.toULongMagnitude()
                 val diff = dw - thisMag
-                BigInt(otherSign, Mago.newFromULong(diff))
+                from(otherSign, diff)
             }
             else -> BigInt.ZERO
         }
-        return ret
     }
 
     /**

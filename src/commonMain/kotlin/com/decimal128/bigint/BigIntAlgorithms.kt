@@ -153,7 +153,7 @@ object BigIntAlgorithms {
             exp == 1 -> base
             base.isZero() -> ZERO
             baseAbs EQ 1 -> if (resultSign) NEG_ONE else ONE
-            baseAbs EQ 2 -> BigInt(resultSign, BigInt.withSetBit(exp))
+            baseAbs EQ 2 -> BigInt.withSetBit(exp).withSign(resultSign)
             exp == 2 -> baseAbs.sqr()
             else -> {
                 val maxBitLen = base.magnitudeBitLen() * exp
@@ -169,7 +169,7 @@ object BigIntAlgorithms {
                         break
                     b.setSqr(b)
                 }
-                BigInt(resultSign, r.magia, r.normLen)
+                BigInt.from(resultSign, r)
             }
         }
     }
