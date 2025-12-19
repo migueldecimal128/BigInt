@@ -10,112 +10,88 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * [MutableBigInt] provides mutable arithmetic operations for compute-heavy
- * calculations where heap-allocated storage of intermediate values
- * impacts runtime performance.
+ * A mutable arbitrary-precision integer optimized for long-running,
+ * allocation-sensitive numeric workloads.
  *
- * Unlike immutable [BigInt] objects,
- * [MutableBigInt] objects modify their internal state in-place by growing
- * internal arrays as needed. Reuse of internal arrays minimizes heap churn
- * and maintains cache coherency. It is well-suited for long-running numerical
- * calculations such as crypto and collecting statistics on very large
- * datasets.
+ * Unlike immutable [BigInt], a [MutableBigInt] modifies its internal value
+ * in place. It expands internal limb storage when needed and reuses it on
+ * subsequent operations, minimizing heap churn and improving cache locality.
+ * This makes it suitable for high-volume accumulation, cryptographic loops,
+ * or statistical aggregation over very large datasets.
  *
- * Operations accept integer primitives (`Int`, `Long`, `UInt`, `ULong`),
- * [BigInt] instances, or other [MutableBigInt] instances as operands.
+ * ## Supported operands
+ * Operations may accept:
+ * – Integer primitives (`Int`, `Long`, `UInt`, `ULong`)
+ * – Immutable [BigInt] values
+ * – Other [MutableBigInt] instances
  *
- * Use of [MutableBigInt] for accumulation of series values is simple and
- * straightforward through the use of built-in operations for:
- * - Sum
- * - Sum of squares
- * - Sum of absolute values
- * - Product
- *
- * Typical statistical usage example:
+ * ## Typical usage (statistical accumulation)
  * ```
- * val sumAcc = MutableBigInt()
- * val sumSqrAcc = MutableBigInt()
- * val sumAbsAcc = MutableBigInt()
+ * val sum = MutableBigInt()
+ * val sumSqr = MutableBigInt()
+ * val sumAbs = MutableBigInt()
  * for (value in data) {
- *     sumAcc += value
- *     sumSqrAcc.addSquareOf(value)
- *     sumAbsAcc.addAbsValueOf(value)
+ *     sum += value
+ *     sumSqr.addSquareOf(value)
+ *     sumAbs.addAbsValueOf(value)
  * }
- * val total = sumAcc.toBigInt()
+ * val total = sum.toBigInt()
  * ```
  *
- * Beyond the use case for gathering statistics, use of [MutableBigInt] is
- * much more complicated and dangerous. Algorithms should **always** be
- * implemented, tested, and thoroughly understood using regular [BigInt].
- * Deriving a [MutableBigInt] implementation from an existing [BigInt]
- * implementation is a separate task that should be undertaken only if
- * necessary.
+ * ## Usage guidance
+ * Treat [MutableBigInt] as a low-level performance tool, not a general-purpose
+ * replacement for [BigInt]. Algorithms should **first** be implemented,
+ * validated, and understood using immutable arithmetic. A mutable translation
+ * should only be attempted when heap allocation of intermediate [BigInt]
+ * values is a demonstrable bottleneck.
  *
- * If the goal becomes elimination of heap allocation of [BigInt]
- * intermediate values then one must be very conscious of the order
- * and manner that operations are performed.
+ * In allocation-free hot loops, instances must be pre-allocated and reused.
+ * Nested infix expressions are discouraged: mutations should occur **one
+ * operation per statement**, e.g.:
  *
- * In order to avoid heap churn all [MutableBigInt] values and
- * temporaries need to be allocated before starting the core
- * iterations of your computation.
+ * – `+=`, `-=`, `*=`, `/=`, `%=`
+ * – `setAdd(a, b)`, `setSub(c, d)`, `setMul(e, f)`, `setDiv(g, h)`
+ * – `setRem(i, j)`, `setMod(k, l)`
+ * – `setShl(x, n)`, `setShr(y, m)`, `setUshr(z, k)`
+ * – `withBitMask(width, index)`
  *
- * Operations effectively
- * become restricted to one mutation operation per line:
- * - `+=` `-=` `*=` `/=` `%=`
- * - `setAdd(a, b)` `setSub(c, d)` `setMul(e, f)` `setDiv(g, h)`
- *   `setRem(i, j)` `setMod(k, l)`
- * - `setShl(a, n)` `setUshr(b, m)` `setShr(c, k)`
- * - `withBitMask(bitWidth, bitIndex)`
+ * This register-style discipline is intentional: it enforces predictable
+ * mutation and prevents accidental allocation or aliasing.
  *
- * This combination of static `register` allocation and one operation
- * per `instruction` feels very much like assembly-level programming,
- * with each [MutableBigInt] acting like a CPU register.
- * The process of converting an existing algorithm it brings a new
- * appreciation of the power of nested infix expressions.
+ * ## Internal representation
+ * [MutableBigInt] stores a sign–magnitude representation:
  *
- * The good news is that [MutableBigInt] makes sure that you are
- * not churning through heap storage. The bad news is that the
- * process is still surprisingly painful.
+ * – Magnitude limbs live in a little-endian `IntArray` (`magia`)
+ * – Limbs hold unsigned 32-bit chunks
+ * – The current normalized limb count and sign bit live in a compact [Meta]
+ * – Zero is represented by `normLen == 0`
+ * – The most significant limb is always nonzero when `normLen > 0`
  *
- * ### Internal representation
+ * The magnitude array always has a minimum capacity of 4 limbs. Allocation
+ * sizes are rounded up to reduce internal fragmentation (typical JVMs
+ * allocate on 16-byte boundaries). The first resize uses the exact requested
+ * capacity (rounded up to the heap quantum boundary); subsequent resizes
+ * increase requested size by ~50% under the assumption that continued
+ * expansion is likely.
  *
- * The implementation uses a sign–magnitude format with the magnitude held
- * in a little-endian [IntArray] of 32-bit unsigned limbs. The normalized
- * current length `normLen` and the `sign` are held in a [Meta] value
- * class whose representation is a single [Int].
+ * ## Temporary buffers
+ * Each instance maintains two reusable temporary limb buffers, `tmp1` and
+ * `tmp2`. They start as canonical empty arrays and grow when required:
  *
- * - The magnitude array is named `magia` (MAGnitude IntArray).
- * - Its allocated length is always ≥ 4.
- * - The current number of active limbs is stored in `meta.normLen`,
- *   ensuring that the most significant limb at `magia[meta.normLen - 1]`
- *   is nonzero.
- * - Zero is represented as `meta.normLen == 0`.
- * - The current `sign` is stored as `meta.signBit`
+ * – Long multiplication and squaring use only `tmp1`
+ * – Long division uses `tmp1` and `tmp2`
  *
- * Each [MutableBigInt] also has the ability to store two internal
- * temporary buffers `tmp1` and `tmp2`. The tmps are initialized to
- * a canonical empty array and get resized/grown if/when needed.
- * Long multiplication and squaring use only `tmp1`.
- * Long division uses both tmps. Since these operations
- * are happening as part of an iterative loop (otherwise you wouldn't be
- * converting to [MutableBigInt]) the temps will get allocated on the
- * first pass and reused on subsequent iterations.
+ * Because these operations normally occur in iterative loops, temporary
+ * storage is allocated once and reused thereafter.
  *
- * All allocations of [IntArray] limb storage (for the primary `magia`
- * and the tmps) are rounded up to eliminate internal fragmentation
- * and make all allocated space available for use.
- * The current generation of JVMs allocates on 16-byte boundaries, so
- * all [IntArray] allocations are rounded up to a multiple of 4.
+ * ## Performance expectations
+ * Eliminating allocator pressure is the main benefit. The trade-off is that
+ * porting existing algorithms requires care—mutation order matters, and
+ * careless aliasing can corrupt results. Treat each [MutableBigInt] like
+ * a CPU register and avoid hidden intermediate values.
  *
- * For a given [MutableBigInt] instance, the first reallocation
- * gives exactly the size requested (rounded up to the heap quantum).
- * Subsequent reallocations increase the requested size by 50%, on
- * the assumption that if we have reallocated twice then we will
- * keep growing.
- *
- * @constructor Creates a new accumulator initialized to zero.
- * Equivalent to calling `MutableBigInt()`.
- * @see BigInt for the immutable arbitrary-precision integer implementation.
+ * @constructor Creates a new mutable integer initialized to zero.
+ * @see BigInt for the immutable arbitrary-precision implementation.
  */
 class MutableBigInt private constructor (
     meta: Meta,
@@ -130,6 +106,15 @@ class MutableBigInt private constructor (
 
         private inline fun limbLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
 
+        /**
+         * Creates a new zero-valued [MutableBigInt] with limb storage preallocated for at
+         * least [initialBitCapacity] bits. The requested capacity is rounded up to the
+         * next heap-allocation quantum (a multiple of 4 limbs).
+         *
+         * @param initialBitCapacity the desired minimum bit capacity; must be ≥ 0
+         * @return a new zero [MutableBigInt] with preallocated limb space
+         * @throws IllegalArgumentException if [initialBitCapacity] is negative
+         */
         fun withInitialBitCapacity(initialBitCapacity: Int): MutableBigInt {
             if (initialBitCapacity >= 0) {
                 val initialLimbCapacity = max(4, limbLenFromBitLen(initialBitCapacity))
@@ -427,13 +412,10 @@ class MutableBigInt private constructor (
     // <<<<<<<<<<< END STORAGE MANAGEMENT FUNCTIONS >>>>>>>>>>>>
 
     /**
-     * Resets this accumulator to zero.
+     * Sets this value to zero in place by clearing the normalized length and
+     * resetting the sign. The underlying limb storage is retained for reuse.
      *
-     * This method clears the current value by setting the internal length to zero
-     * and resetting the sign to non-negative. The internal buffer remains allocated,
-     * allowing future operations to reuse it without incurring new heap allocations.
-     *
-     * @return this accumulator instance, for call chaining.
+     * @return this [MutableBigInt] for call chaining
      */
     fun setZero(): MutableBigInt {
         validate()
@@ -441,81 +423,88 @@ class MutableBigInt private constructor (
         return this
     }
 
-    fun setOne(signFlag: Boolean = false): MutableBigInt {
+    /**
+     * Sets this value to `1` in place, updating sign and magnitude.
+     *
+     * @return this [MutableBigInt] after mutation.
+     */
+    fun setOne(): MutableBigInt {
         validate()
-        _meta = Meta(signFlag, 1)
+        _meta = Meta(0, 1)
         magia[0] = 1
         validate()
         return this
     }
 
+    /**
+     * Replaces this value with its absolute value in place.
+     *
+     * @return this [MutableBigInt] after mutation.
+     */
     fun mutAbs(): MutableBigInt {
         _meta = _meta.abs()
         return this
     }
 
+    /**
+     * Negates this value in place, flipping its sign.
+     *
+     * @return this [MutableBigInt] after mutation.
+     */
     fun mutNegate(): MutableBigInt {
         _meta = _meta.negate()
         return this
     }
 
     /**
-     * Sets this accumulator’s value from a signed 32-bit integer.
+     * Sets this value from a signed 32-bit integer, updating sign and magnitude.
      *
-     * The accumulator’s sign and magnitude are updated to match the given value.
-     *
-     * @param n the source value.
-     * @return this accumulator instance, for call chaining.
+     * @param n the source integer
+     * @return this [MutableBigInt] for call chaining
      */
     fun set(n: Int) = set(n < 0, n.absoluteValue.toUInt().toULong())
 
     /**
-     * Sets this accumulator’s value from an unsigned 32-bit integer.
+     * Sets this value from an unsigned 32-bit integer.
      *
-     * @param w the source value.
-     * @return this accumulator instance, for call chaining.
+     * @param w the source value
+     * @return this [MutableBigInt] for call chaining
      */
     fun set(w: UInt) = set(false, w.toULong())
 
     /**
-     * Sets this accumulator’s value from a signed 64-bit integer.
+     * Sets this value from a signed 64-bit integer, updating sign and magnitude.
      *
-     * The accumulator’s sign and magnitude are updated to match the given value.
-     *
-     * @param l the source value.
-     * @return this accumulator instance, for call chaining.
+     * @param l the source value
+     * @return this [MutableBigInt] for call chaining
      */
     fun set(l: Long) = set(l < 0, l.absoluteValue.toULong())
 
     /**
-     * Sets this accumulator’s value from an unsigned 64-bit integer.
+     * Sets this value from an unsigned 64-bit integer.
      *
-     * @param dw the source value.
-     * @return this accumulator instance, for call chaining.
+     * @param dw the source value
+     * @return this [MutableBigInt] for call chaining
      */
     fun set(dw: ULong) = set(false, dw)
 
     /**
-     * Sets this accumulator’s value from another [MutableBigInt].
+     * Sets this value from another arbitrary-precision integer, copying its sign
+     * and magnitude. The existing limb storage of this [MutableBigInt] is reused
+     * when possible to avoid allocation.
      *
-     * The accumulator copies the sign, and magnitude of the source accumulator.
-     * Internal storage of the destination is reused when possible.
-     *
-     * @param bi the source [MutableBigInt].
-     * @return this accumulator instance, for call chaining.
+     * @param bi the source value (either a [BigInt] or another [MutableBigInt])
+     * @return this [MutableBigInt] for call chaining
      */
     fun set(bi: BigIntBase): MutableBigInt = set(bi.meta, bi.magia)
 
     /**
-     * Sets this accumulator’s value from a raw sign and 64-bit magnitude.
+     * Sets this value using an explicit sign and a 64-bit unsigned magnitude.
+     * This is the low-level primitive invoked by the other `set(...)` overloads.
      *
-     * This is the fundamental low-level setter used by the other `set()` overloads.
-     * It updates the accumulator’s sign and replaces its magnitude with the
-     * provided value.
-     *
-     * @param sign `true` if the value is negative; `false` otherwise.
-     * @param dw the magnitude as an unsigned 64-bit integer.
-     * @return this accumulator instance, for call chaining.
+     * @param sign `true` for a negative value, `false` otherwise
+     * @param dw the magnitude as an unsigned 64-bit integer
+     * @return this [MutableBigInt] for call chaining
      */
     fun set(sign: Boolean, dw: ULong): MutableBigInt {
         val normLen = (64 - dw.countLeadingZeroBits() + 31) ushr 5
@@ -526,6 +515,16 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Sets this value from a 128-bit unsigned magnitude expressed as two 64-bit words,
+     * assigning the given sign and computing the required normalized limb length.
+     * The lower word is given by [dwLo], and the upper word by [dwHi].
+     *
+     * @param sign `true` for a negative value, `false` for a non-negative value
+     * @param dwHi the upper 64 bits of the magnitude
+     * @param dwLo the lower 64 bits of the magnitude
+     * @return this [MutableBigInt] after mutation
+     */
     fun set(sign: Boolean, dwHi: ULong, dwLo: ULong): MutableBigInt {
         val bitLen = if (dwHi == 0uL)
             64 - dwLo.countLeadingZeroBits()
@@ -541,18 +540,14 @@ class MutableBigInt private constructor (
         return this
     }
     /**
-     * Sets this accumulator’s value from a raw limb array.
+     * Sets this value from raw limb data, assigning the given sign and copying
+     * [yLen] limbs from [y] in little-endian order. Existing storage is reused
+     * or expanded as needed. The source array is not modified.
      *
-     * This internal method copies the sign and magnitude from the provided limb
-     * array into this accumulator. The active limb count is set to [yLen], and the
-     * internal buffer is reused or expanded as needed to accommodate the data.
-     *
-     * The input array [y] is not modified.
-     *
-     * @param ySign `true` if the value is negative; `false` otherwise.
-     * @param y the source limb array containing the magnitude in little-endian limb order.
-     * @param yLen the number of significant limbs in [y] to copy.
-     * @return this accumulator instance, for call chaining.
+     * @param ySign `true` for a negative value, `false` otherwise
+     * @param y the source limb array (little-endian magnitude)
+     * @param yLen the number of significant limbs to copy
+     * @return this [MutableBigInt] for call chaining
      */
     private fun set(yMeta: Meta, y: Magia): MutableBigInt {
         ensureCapacityDiscard(yMeta.normLen)
@@ -562,7 +557,8 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Creates an immutable [BigInt] representing the current value of this accumulator.
+     * Creates an immutable [BigInt] representing the current value of this
+     * [MutableBigInt].
      *
      * The returned [BigInt] is a snapshot of the accumulator’s current sign and
      * magnitude. Subsequent modifications to this [MutableBigInt] do not affect
@@ -575,6 +571,16 @@ class MutableBigInt private constructor (
      */
     override fun toBigInt(): BigInt = BigInt.from(this)
 
+    /**
+     * Replaces this value with the sum of [x] and the given addend, storing the
+     * result in place. Overloads accept primitive integers, unsigned integers,
+     * or arbitrary-precision integers. Existing limb storage is reused or grown
+     * as needed.
+     *
+     * @param x the left-hand operand
+     * @param n the right-hand operand (primitive or [BigInt]/[MutableBigInt], depending on overload)
+     * @return this [MutableBigInt] for call chaining
+     */
     fun setAdd(x: BigIntBase, n: Int) =
         setAddImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
     fun setAdd(x: BigIntBase, w: UInt) =
@@ -586,6 +592,15 @@ class MutableBigInt private constructor (
     fun setAdd(x: BigIntBase, y: BigIntBase) =
         setAddImpl(x, y.meta, y.magia)
 
+    /**
+     * Replaces this value with the difference `x - y`, storing the result in place.
+     * Overloads accept primitive integers, unsigned integers, or arbitrary-precision
+     * integers. Existing limb storage is reused or expanded as required.
+     *
+     * @param x the left-hand operand
+     * @param y the right-hand operand (primitive or [BigInt]/[MutableBigInt], depending on overload)
+     * @return this [MutableBigInt] for call chaining
+     */
     fun setSub(x: BigIntBase, n: Int) =
         setAddImpl(x, n >= 0, n.absoluteValue.toUInt().toULong())
     fun setSub(x: BigIntBase, w: UInt) =
@@ -597,6 +612,18 @@ class MutableBigInt private constructor (
     fun setSub(x: BigIntBase, y: BigIntBase) =
         setAddImpl(x, y.meta.negate(), y.magia)
 
+    /**
+     * Internal helper for implementing addition and subtraction against a 64-bit
+     * unsigned operand. Computes `x ± yDw` depending on [ySign], updates this
+     * instance in place, and reuses or expands limb storage as needed. Zero,
+     * sign-match, and magnitude-comparison cases are optimized. The caller must
+     * supply a normalized [x].
+     *
+     * @param x the normalized source value
+     * @param ySign `true` if the addend should be treated as negative
+     * @param yDw the unsigned 64-bit magnitude of the addend
+     * @return this [MutableBigInt] after mutation
+     */
     private fun setAddImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
         check (x.isNormalized())
         val xMagia = x.magia // use only xMagia in here because of aliasing
@@ -628,6 +655,18 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Internal helper for implementing addition and subtraction between two
+     * arbitrary-precision operands. Computes `x ± y` based on sign rules encoded
+     * in [yMeta], updates this instance in place, and reuses or expands limb
+     * storage as needed. Optimizes zero, equal-magnitude, and sign-match cases.
+     * Both inputs must be normalized.
+     *
+     * @param x the left operand (normalized)
+     * @param yMeta the sign and normalized limb count of the right operand
+     * @param yMagia the right operand’s limb array (little-endian magnitude)
+     * @return this [MutableBigInt] after mutation
+     */
     private fun setAddImpl(x: BigIntBase, yMeta: Meta, yMagia: Magia): MutableBigInt {
         check (x.isNormalized())
         check (Mago.isNormalized(yMagia, yMeta.normLen))
@@ -667,6 +706,16 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Replaces this value with the product of [x] and the given multiplier,
+     * storing the result in place. Overloads accept primitive integers,
+     * unsigned integers, or arbitrary-precision integers. Limb storage is reused
+     * or expanded as needed.
+     *
+     * @param x the left-hand operand
+     * @param y the right-hand operand (primitive or [BigInt]/[MutableBigInt], depending on overload)
+     * @return this [MutableBigInt] for call chaining
+     */
     fun setMul(x: BigIntBase, n: Int) =
         setMulImpl(x, n < 0, n.absoluteValue.toUInt())
     fun setMul(x: BigIntBase, w: UInt) =
@@ -678,6 +727,16 @@ class MutableBigInt private constructor (
     fun setMul(x: BigIntBase, y: BigIntBase) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
 
+    /**
+     * Internal helper for multiplying a normalized operand by a 32-bit unsigned
+     * factor. Computes `x * w`, applies [wSign] to adjust the result sign, writes
+     * the result in place, and expands limb storage if needed.
+     *
+     * @param x the normalized multiplicand
+     * @param wSign `true` if the result should be negative
+     * @param w the unsigned 32-bit multiplier
+     * @return this [MutableBigInt] after mutation
+     */
     private fun setMulImpl(x: BigIntBase, wSign: Boolean, w: UInt): MutableBigInt {
         val xMagia = x.magia
         ensureCapacityDiscard(x.meta.normLen + 1)
@@ -688,6 +747,16 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Internal helper for multiplying a normalized operand by a 64-bit unsigned
+     * factor. Computes `x * dw`, applies [dwSign] to adjust the result sign,
+     * writes the result in place, and expands limb storage if needed.
+     *
+     * @param x the normalized multiplicand
+     * @param dwSign `true` if the result should be negative
+     * @param dw the unsigned 64-bit multiplier
+     * @return this [MutableBigInt] after mutation
+     */
     private fun setMulImpl(x: BigIntBase, dwSign: Boolean, dw: ULong): MutableBigInt {
         val xMagia = x.magia
         ensureCapacityDiscard(x.meta.normLen + 2)
@@ -698,6 +767,18 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Internal helper for full arbitrary-precision multiplication. Computes
+     * `x * y` using the limbs supplied by [x] and [y], writes the result into
+     * a temporary buffer, then swaps it into place. Result sign is derived
+     * from the XOR of the operand signs. Temporary storage is expanded if needed.
+     *
+     * @param xMeta sign and length metadata for the left operand
+     * @param x the left operand’s limb array
+     * @param yMeta sign and length metadata for the right operand
+     * @param y the right operand’s limb array
+     * @return this [MutableBigInt] after mutation
+     */
     private fun setMulImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): MutableBigInt {
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
@@ -710,24 +791,66 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Sets this value to the square of a signed 32-bit integer.
+     *
+     * @param n the value to square
+     * @return this [MutableBigInt] for call chaining
+     */
     fun setSqr(n: Int): MutableBigInt = setSqr(n.absoluteValue.toUInt())
 
+    /**
+     * Sets this value to the square of an unsigned 32-bit integer.
+     *
+     * @param w the value to square
+     * @return this [MutableBigInt] for call chaining
+     */
     fun setSqr(w: UInt): MutableBigInt {
         val abs = w.toULong()
         return set(abs * abs)
     }
 
+    /**
+     * Sets this value to the square of a signed 64-bit integer.
+     *
+     * @param l the value to square
+     * @return this [MutableBigInt] for call chaining
+     */
     fun setSqr(l: Long): MutableBigInt = setSqr(l.absoluteValue.toULong())
 
+    /**
+     * Sets this value to the square of an unsigned 64-bit integer. The full
+     * 128-bit product is computed using a high/low multiply and stored with
+     * a non-negative sign.
+     *
+     * @param dw the value to square
+     * @return this [MutableBigInt] for call chaining
+     */
     fun setSqr(dw: ULong): MutableBigInt {
         val lo = dw * dw
         val hi = unsignedMulHi(dw, dw)
         return set(false, hi, lo)
     }
 
+    /**
+     * Sets this value to the square of an arbitrary-precision integer.
+     *
+     * @param x the value to square
+     * @return this [MutableBigInt] for call chaining
+     */
     fun setSqr(x: BigIntBase): MutableBigInt =
         setSqrImpl(x.meta, x.magia)
 
+    /**
+     * Internal helper for arbitrary-precision squaring. Computes `x²` using
+     * the supplied metadata and limb array, writes the result into a zeroed
+     * temporary buffer, and updates this instance in place. Operand must be
+     * normalized.
+     *
+     * @param xMeta sign and length metadata for the operand
+     * @param x the operand’s limb array
+     * @return this [MutableBigInt] after mutation
+     */
     private fun setSqrImpl(xMeta: Meta, x: Magia): MutableBigInt {
         check(Mago.isNormalized(x, xMeta.normLen))
         val xNormLen = xMeta.normLen
@@ -740,6 +863,22 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Replaces this value with the quotient of `x / y`, storing the result
+     * in place. Overloads support division by primitive integers, unsigned
+     * integers, or another arbitrary-precision integer. Limb storage and
+     * temporary buffers are reused or expanded as needed. Signed operands
+     * are normalized into a non-negative magnitude and an explicit sign bit.
+     *
+     * The full arbitrary-precision overload allocates space for the quotient,
+     * attempts low-cost fast paths, and otherwise performs long division using
+     * internal temporary buffers.
+     *
+     * @param x the dividend
+     * @param y the divisor (primitive or [BigInt]/[MutableBigInt], depending on overload)
+     * @return this [MutableBigInt] for call chaining
+     * @throws ArithmeticException if division by zero occurs
+     */
     fun setDiv(x: MutableBigInt, n: Int): MutableBigInt =
         setDivImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
     fun setDiv(x: MutableBigInt, w: UInt): MutableBigInt =
@@ -759,6 +898,18 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Internal helper for division by a 64-bit unsigned divisor. Attempts a fast
+     * path when possible; otherwise performs long division with temporary storage.
+     * Computes `x / yDw`, applies [ySign] to determine the result sign, and writes
+     * the quotient in place, expanding storage if required.
+     *
+     * @param x the normalized dividend
+     * @param ySign `true` if the divisor is treated as negative
+     * @param yDw the unsigned 64-bit divisor magnitude
+     * @return this [MutableBigInt] after mutation
+     * @throws ArithmeticException if division by zero is detected
+     */
     private fun setDivImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
         ensureCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
         if (trySetDivFastPath64(x, ySign, yDw))
@@ -769,7 +920,15 @@ class MutableBigInt private constructor (
         return this
     }
 
-
+    /**
+     * Attempts to compute `x / y` using a fast-path shortcut that handles
+     * small normalized divisors without performing full long division.
+     * When successful, the quotient magnitude and sign are written in place.
+     *
+     * @param x the dividend (normalized)
+     * @param y the divisor (normalized)
+     * @return `true` if the fast path was taken, `false` otherwise
+     */
     private fun trySetDivFastPath(x: BigIntBase, y: BigIntBase): Boolean {
         val qSignFlag = x.meta.signFlag xor y.meta.signFlag
         val qNormLen = Mago.trySetDivFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
@@ -779,6 +938,16 @@ class MutableBigInt private constructor (
         return true
     }
 
+    /**
+     * Attempts to divide `x` by a 64-bit unsigned divisor using a fast path.
+     * If successful, writes the quotient magnitude and sign in place without
+     * invoking full long division.
+     *
+     * @param x the dividend (normalized)
+     * @param ySign `true` if the divisor is treated as negative
+     * @param yDw the unsigned 64-bit divisor magnitude
+     * @return `true` if the fast path handled the division, `false` otherwise
+     */
     private fun trySetDivFastPath64(x: BigIntBase, ySign: Boolean, yDw: ULong): Boolean {
         val qSignFlag = x.meta.signFlag xor ySign
         val qNormLen = Mago.trySetDivFastPath64(this.magia, x.magia, x.meta.normLen, yDw)
