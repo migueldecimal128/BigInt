@@ -781,7 +781,7 @@ class BigIntAccumulator private constructor (
         setModImpl(x, false, dw)
     fun setMod(x: BigIntBase, y: BigIntBase): BigIntAccumulator {
         if (y.meta.isNegative)
-            throw ArithmeticException("modulus of a negative number is undefined")
+            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         setRem(x, y)
         if (isNegative())
             setAdd(this, y)
@@ -790,7 +790,7 @@ class BigIntAccumulator private constructor (
 
     private fun setModImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
         if (ySign)
-            throw ArithmeticException("modulus with a negative divisor is undefined")
+            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         setRem(x, yDw)
         if (isNegative())
             setAdd(this, yDw)
@@ -1126,7 +1126,7 @@ class BigIntAccumulator private constructor (
      * resulting bit length. Throws if [bitCount] is negative.
      */
     fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator = when {
-        bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
+        bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         bitCount == 0 || x.isZero() -> set(x)
         else -> {
             val xMagia = x.magia
@@ -1158,7 +1158,7 @@ class BigIntAccumulator private constructor (
     fun setUshr(x: BigIntBase, bitCount: Int): BigIntAccumulator {
         val zBitLen = x.magnitudeBitLen() - bitCount
         return when {
-            bitCount < 0 -> throw IllegalArgumentException("negative bitCount")
+            bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
             bitCount == 0 -> set(x)
             zBitLen <= 0 -> setZero()
             else -> {
@@ -1195,7 +1195,7 @@ class BigIntAccumulator private constructor (
     fun setShr(x: BigIntBase, bitCount: Int): BigIntAccumulator {
         val zBitLen = x.magnitudeBitLen() - bitCount
         when {
-            bitCount < 0 -> throw IllegalArgumentException("bitCount < 0")
+            bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
             bitCount == 0 -> set(x)
             zBitLen <= 0 && x.meta.isNegative -> set(-1)
             zBitLen <= 0 -> setZero()

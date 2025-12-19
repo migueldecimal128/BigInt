@@ -13,11 +13,13 @@ import kotlin.math.max
 
 typealias Magia = IntArray
 
-private const val ERROR_ADD_OVERFLOW = "add overflow ... destination too small"
-private const val ERROR_SUB_UNDERFLOW = "sub underflow ... minuend too small for subtrahend"
-private const val ERROR_MUL_OVERFLOW = "mul overflow ... destination too small"
-private const val ERROR_SHL_OVERFLOW = "shl overflow ... destination too small"
-
+private const val ERR_MSG_ADD_OVERFLOW = "add overflow ... destination too small"
+private const val ERR_MSG_SUB_UNDERFLOW = "sub underflow ... minuend too small for subtrahend"
+private const val ERR_MSG_MUL_OVERFLOW = "mul overflow ... destination too small"
+private const val ERR_MSG_SHL_OVERFLOW = "shl overflow ... destination too small"
+private const val ERR_MSG_DIV_BY_ZERO = "div by zero"
+private const val ERR_MSG_INVALID_ALLOCATION_LENGTH = "invalid allocation length"
+private const val ERR_MSG_NEGATIVE_INDEX = "negative index"
 
 /**
  * Provides low-level support for arbitrary-precision **unsigned** integer arithmetic.
@@ -242,7 +244,7 @@ internal object Mago {
                 Magia(normLenFromBitLen(bitLen))
             bitLen == 0 -> ZERO
             else ->
-                throw IllegalArgumentException("invalid allocation bitLen:$bitLen")
+                throw IllegalArgumentException(ERR_MSG_INVALID_ALLOCATION_LENGTH)
         }
     }
 
@@ -268,7 +270,7 @@ internal object Mago {
             if (allocSize <= MAX_ALLOC_SIZE)
                 return Magia(allocSize)
         }
-        throw IllegalArgumentException("invalid allocation length:$floorLen")
+        throw IllegalArgumentException(ERR_MSG_INVALID_ALLOCATION_LENGTH)
     }
 
      /**
@@ -343,7 +345,7 @@ internal object Mago {
         }
         if (exactLimbLen == 0)
             return ZERO
-        throw IllegalArgumentException("invalid allocation length:$exactLimbLen")
+        throw IllegalArgumentException(ERR_MSG_INVALID_ALLOCATION_LENGTH)
     }
 
     /**
@@ -440,7 +442,7 @@ internal object Mago {
                 if (carry == 0uL)
                     return i
             }
-            throw ArithmeticException(ERROR_ADD_OVERFLOW)
+            throw ArithmeticException(ERR_MSG_ADD_OVERFLOW)
         }
         throw IllegalArgumentException()
     }
@@ -479,7 +481,7 @@ internal object Mago {
                 }
                 if (carry != 0uL) {
                     if (i == z.size)
-                        throw ArithmeticException(ERROR_ADD_OVERFLOW)
+                        throw ArithmeticException(ERR_MSG_ADD_OVERFLOW)
                     z[i] = 1
                     ++i
                 }
@@ -551,7 +553,7 @@ internal object Mago {
             val xNormLen = normLen(x, xLen)
             if (z.size >= xNormLen) {
                 if (xNormLen <= 2 && toRawULong(x, xNormLen) < dw)
-                    throw ArithmeticException(ERROR_SUB_UNDERFLOW)
+                    throw ArithmeticException(ERR_MSG_SUB_UNDERFLOW)
                 var lastNonZeroIndex = -1
                 var borrow = dw
                 var i = 0
@@ -639,7 +641,7 @@ internal object Mago {
                         return zNormLen
                     }
                 }
-                throw ArithmeticException(ERROR_SUB_UNDERFLOW)
+                throw ArithmeticException(ERR_MSG_SUB_UNDERFLOW)
             }
         }
         throw IllegalArgumentException()
@@ -697,7 +699,7 @@ internal object Mago {
             }
             if (carry != 0uL) {
                 if (i == z.size)
-                    throw ArithmeticException(ERROR_MUL_OVERFLOW)
+                    throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
                 z[i] = carry.toInt()
                 ++i
             }
@@ -781,7 +783,7 @@ internal object Mago {
                 check (isNormalized(z, i))
                 return i
             }
-            throw ArithmeticException(ERROR_MUL_OVERFLOW)
+            throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
         }
         throw IllegalArgumentException()
     }
@@ -850,7 +852,7 @@ internal object Mago {
                 if (i + largoLen < z.size)
                     z[i + largoLen] = carry.toInt()
                 else if (carry != 0uL)
-                    throw ArithmeticException(ERROR_MUL_OVERFLOW)
+                    throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
             }
             var lastIndex = cortoLen + largoLen - 1
             // >= instead of == to help bounds check elimination
@@ -1001,7 +1003,7 @@ internal object Mago {
                         var k = 2 * i + 2
                         while (carry != 0uL) {
                             if (k >= z.size)
-                                throw IllegalArgumentException(ERROR_MUL_OVERFLOW)
+                                throw IllegalArgumentException(ERR_MSG_MUL_OVERFLOW)
                             t = dw32(z[k]) + carry
                             z[k] = t.toInt()
                             carry = t shr 32
@@ -1164,7 +1166,7 @@ internal object Mago {
         val zNormLen = normLenFromBitLen(zBitLen)
 
         if (zNormLen > z.size)
-            throw ArithmeticException(ERROR_SHL_OVERFLOW)
+            throw ArithmeticException(ERR_MSG_SHL_OVERFLOW)
 
         // ------------------------------------------------------------
         // 2. Fast path: whole-limb shift only
@@ -1584,7 +1586,7 @@ internal object Mago {
             val hi = x[loLimb + 2].toUInt().toULong()
             return (hi shl (64 - innerShift)) or (mid shl (32 - innerShift)) or (lo shr innerShift)
         }
-        throw IllegalArgumentException("negative bitIndex:$bitIndex")
+        throw IllegalArgumentException(ERR_MSG_NEGATIVE_INDEX)
 
     }
 
@@ -1706,7 +1708,7 @@ internal object Mago {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
             check (isNormalized(x, xNormLen))
             when {
-                w == 0u -> throw ArithmeticException("div by zero")
+                w == 0u -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
                 xNormLen == 0 -> return 0
                 w.countOneBits() == 1 ->
                     return setShiftRight(z, x, xNormLen, w.countTrailingZeroBits())
@@ -1764,7 +1766,7 @@ internal object Mago {
      */
     fun trySetDivFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
         when {
-            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
             xNormLen == 0 -> return 0
             xNormLen < yNormLen -> return 0
             xNormLen <= 2 ->
@@ -1796,7 +1798,7 @@ internal object Mago {
 
     fun trySetDivFastPath64(zMagia: Magia, xMagia: Magia, xNormLen: Int, yDw: ULong): Int {
         when {
-            yDw == 0uL -> throw ArithmeticException("div by zero")
+            yDw == 0uL -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
             xNormLen == 0 -> return 0
             xNormLen == 1 -> return setUInt(zMagia, (xMagia[0].toUInt().toULong() / yDw).toUInt())
             xNormLen == 2 ->
@@ -1817,7 +1819,7 @@ internal object Mago {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
             when {
-                w == 0u -> throw ArithmeticException("div by zero")
+                w == 0u -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
                 xNormLen <= 2 -> return when {
                     xNormLen == 2 -> {
                         val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
@@ -1931,7 +1933,7 @@ internal object Mago {
         check (isNormalized(x, xNormLen))
         check (isNormalized(y, yNormLen))
         when {
-            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
             yNormLen == 1 -> return newDiv(x, xNormLen, y[0].toUInt())
             xNormLen <= yNormLen -> {
                 val xBitLen = bitLen(x, xNormLen)
@@ -2057,7 +2059,7 @@ internal object Mago {
         check(isNormalized(x, xNormLen))
         check(isNormalized(y, yNormLen))
         when {
-            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
             xNormLen == 0 -> return ZERO
             yNormLen <= 2 -> return newRemOrMod64(x, xNormLen,
                 applyModRingNormalization,
@@ -2134,7 +2136,7 @@ internal object Mago {
 
     fun trySetRemFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
         when {
-            yNormLen == 0 -> throw ArithmeticException("div by zero")
+            yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
             xNormLen < yNormLen -> {
                 xMagia.copyInto(zMagia, 0, 0, xNormLen)
                 return xNormLen

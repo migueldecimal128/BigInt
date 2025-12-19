@@ -611,7 +611,7 @@ class BigInt private constructor(
                     if (zeroTest == 0) ZERO else fromNonNormalizedNonZero(sign, magia)
                 }
                 maxBitLen == 0 -> ZERO
-                else -> throw IllegalArgumentException("bitLen must be > 0")
+                else -> throw IllegalArgumentException(ERR_MSG_BITLEN_LE_0)
             }
 
         }
@@ -667,7 +667,7 @@ class BigInt private constructor(
                 fromNormalizedNonZero(sign, magia)
             }
             bitLen == 0 -> ZERO
-            else -> throw IllegalArgumentException("bitLen must be >= 0")
+            else -> throw IllegalArgumentException(ERR_MSG_BITLEN_LE_0)
         }
 
         /**
@@ -783,7 +783,7 @@ class BigInt private constructor(
         ): BigInt {
             val range = bitLenMax - bitLenMin
             if (bitLenMin < 0 || range < 0)
-                throw IllegalArgumentException("invalid bitLen range: 0 <= bitLenMin <= bitLenMax")
+                throw IllegalArgumentException(ERR_MSG_INVALID_BITLEN_RANGE)
             val bitLen = bitLenMin + rng.nextInt(range + 1)
             return randomWithMaxBitLen(bitLen, rng, withRandomSign)
         }
@@ -868,7 +868,7 @@ class BigInt private constructor(
          */
         fun withSetBit(bitIndex: Int): BigInt {
             if (bitIndex < 0)
-                throw IllegalArgumentException("negative bitIndex:$bitIndex")
+                throw IllegalArgumentException(ERR_MSG_NEG_BITINDEX)
             if (bitIndex == 0)
                 return ONE
             val magia = Mago.newWithBitLen(bitIndex + 1)
@@ -1048,7 +1048,7 @@ class BigInt private constructor(
     operator fun unaryMinus() = negate()
     operator fun unaryPlus() = this
 
-    operator fun plus(other: BigInt): BigInt = this.addImpl(false, other)
+    operator fun plus(other: BigIntBase): BigInt = this.addImpl(false, other)
     operator fun plus(n: Int): BigInt =
         this.addImpl(signFlipThis = false, n < 0, n.absoluteValue.toUInt().toULong())
     operator fun plus(w: UInt): BigInt =
@@ -1058,7 +1058,7 @@ class BigInt private constructor(
     operator fun plus(dw: ULong): BigInt =
         this.addImpl(signFlipThis = false, false, dw)
 
-    operator fun minus(other: BigInt): BigInt = this.addImpl(true, other)
+    operator fun minus(other: BigIntBase): BigInt = this.addImpl(true, other)
     operator fun minus(n: Int): BigInt =
         this.addImpl(signFlipThis = false, n >= 0, n.absoluteValue.toUInt().toULong())
     operator fun minus(w: UInt): BigInt =
@@ -1068,7 +1068,7 @@ class BigInt private constructor(
     operator fun minus(dw: ULong): BigInt =
         this.addImpl(signFlipThis = false, true, dw)
 
-    operator fun times(other: BigInt): BigInt = mulImpl(other)
+    operator fun times(other: BigIntBase): BigInt = mulImpl(other)
 
     operator fun times(n: Int): BigInt = mulImpl(n < 0, n.absoluteValue.toUInt().toULong())
 
@@ -1088,7 +1088,7 @@ class BigInt private constructor(
 
     operator fun div(dw: ULong): BigInt = divImpl(false, dw)
 
-    operator fun rem(other: BigInt): BigInt = remImpl(other)
+    operator fun rem(other: BigIntBase): BigInt = remImpl(other)
 
     // note that in java/kotlin, the sign of remainder only depends upon
     // the dividend, so we just take the abs value of the divisor
@@ -1102,7 +1102,7 @@ class BigInt private constructor(
 
     infix fun mod(n: Int): BigInt {
         if (n < 0)
-            throw ArithmeticException("modulus with a negative divisor is undefined")
+            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         return modImpl(n.absoluteValue.toUInt().toULong())
     }
 
@@ -1110,13 +1110,13 @@ class BigInt private constructor(
 
     infix fun mod(l: Long): BigInt {
         if (l < 0)
-            throw ArithmeticException("modulus with a negative divisor is undefined")
+            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         return modImpl(l.absoluteValue.toULong())
     }
 
     infix fun mod(dw: ULong): BigInt = modImpl(dw)
 
-    infix fun mod(other: BigInt): BigInt = modImpl(other)
+    infix fun mod(other: BigIntBase): BigInt = modImpl(other)
 
     /**
      * Divides the given [numerator] (primitive type) by this BigInt and returns the quotient.
@@ -1129,12 +1129,12 @@ class BigInt private constructor(
      * @throws ArithmeticException if this BigInt is zero
      * @return the quotient as a BigInt, zero if |numerator| < |this|
      */
-    fun divInverse(numerator: Int) = divInverse(numerator.toLong())
+    fun divInverse(numerator: Int) = divInverse(numerator < 0, numerator.absoluteValue.toUInt().toULong())
     fun divInverse(numerator: UInt) = divInverse(false, numerator.toULong())
     fun divInverse(numerator: Long) = divInverse(numerator < 0, numerator.absoluteValue.toULong())
     fun divInverse(signNumerator: Boolean, numerator: ULong): BigInt {
         if (this.isZero())
-            throw ArithmeticException("div by zero")
+            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
         val cmp = this.magnitudeCompareTo(numerator)
         val qSign = this.meta.signFlag xor signNumerator
         return when {
@@ -1159,12 +1159,42 @@ class BigInt private constructor(
      * @throws ArithmeticException if this BigInt is zero
      * @return the remainder as a BigInt, zero if numerator is a multiple of this BigInt
      */
-    fun remInverse(numerator: Int) = remInverse(numerator.toLong())
+    fun remInverse(numerator: Int) = remInverse(numerator < 0, numerator.absoluteValue.toUInt().toULong())
     fun remInverse(numerator: UInt) = remInverse(false, numerator.toULong())
     fun remInverse(numerator: Long) = remInverse(numerator < 0, numerator.absoluteValue.toULong())
     fun remInverse(signNumerator: Boolean, numerator: ULong): BigInt {
         if (this.isZero())
-            throw ArithmeticException("div by zero")
+            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+        val cmp = this.magnitudeCompareTo(numerator)
+        return when {
+            cmp > 0 -> from(signNumerator, numerator)
+            cmp == 0 -> ZERO
+            else -> {
+                val remainder = numerator % this.toULongMagnitude()
+                from(signNumerator, remainder)
+            }
+        }
+    }
+
+    /**
+     * Computes the remainder of dividing the given [numerator] (primitive type) by this BigInt.
+     *
+     * This is used for expressions like `5 % hugeInt`, where the primitive is the numerator
+     * and the BigInt is the divisor.
+     *
+     * @param numerator the value to divide (absolute value used; see `signNumerator`)
+     * @param signNumerator the sign of the numerator (ignored in primitive overloads)
+     * @throws ArithmeticException if this BigInt is zero
+     * @return the remainder as a BigInt, zero if numerator is a multiple of this BigInt
+     */
+    fun modInverse(numerator: Int) = modInverse(numerator < 0, numerator.absoluteValue.toUInt().toULong())
+    fun modInverse(numerator: UInt) = modInverse(false, numerator.toULong())
+    fun modInverse(numerator: Long) = modInverse(numerator < 0, numerator.absoluteValue.toULong())
+    fun modInverse(signNumerator: Boolean, numerator: ULong): BigInt {
+        if (this.isZero())
+            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+        if (this.isNegative())
+            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         val cmp = this.magnitudeCompareTo(numerator)
         return when {
             cmp > 0 -> from(signNumerator, numerator)
@@ -1264,7 +1294,7 @@ class BigInt private constructor(
             bitCount > 0 ->
                 fromNormalizedOrZero(Mago.newShiftRight(this.magia, this.meta.normLen, bitCount))
             bitCount == 0 -> abs()
-            else -> throw IllegalArgumentException("bitCount < 0")
+            else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         }
     }
 
@@ -1291,7 +1321,7 @@ class BigInt private constructor(
             }
 
             bitCount == 0 -> this
-            else -> throw IllegalArgumentException("bitCount < 0")
+            else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         }
     }
 
@@ -1307,7 +1337,7 @@ class BigInt private constructor(
             bitCount > 0 ->
                 fromNormalizedNonZero(this.meta.signFlag,
                     Mago.newShiftLeft(magia, meta.normLen, bitCount))
-            else -> throw IllegalArgumentException("bitCount < 0")
+            else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         }
     }
 
@@ -1425,28 +1455,29 @@ class BigInt private constructor(
     }
 
     /**
-     * Internal helper for addition or subtraction between two BigInts.
+     * Internal helper for addition or subtraction between a [BigInt]
+     * and another [BigInt] or [BigIntAccumulator]
      *
      * @param isSub true to subtract [other] from this, false to add
      * @param other the BigInt operand
      * @return a new BigInt representing the result
      */
-    fun addImpl(isSub: Boolean, other: BigInt): BigInt {
+    fun addImpl(isSub: Boolean, other: BigIntBase): BigInt {
         val otherSign = isSub xor other.meta.isNegative
         when {
             other.isZero() -> return this
-            this.isZero() && isSub -> return other.negate()
-            this.isZero() -> other
+            this.isZero() && isSub -> return other.toBigInt().negate()
+            this.isZero() -> other.toBigInt()
             this.meta.signFlag == otherSign ->
-                return BigInt(this.meta.signFlag,
+                return BigInt.fromNonNormalizedNonZero(this.meta.signFlag,
                     Mago.newAdd(this.magia, this.meta.normLen,
                         other.magia, other.meta.normLen))
         }
         val cmp = this.magnitudeCompareTo(other)
         val ret = when {
-            cmp > 0 -> BigInt(this.meta.signFlag,
+            cmp > 0 -> BigInt.fromNonNormalizedNonZero(this.meta.signFlag,
                 Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
-            cmp < 0 -> BigInt(otherSign,
+            cmp < 0 -> BigInt.fromNonNormalizedNonZero(otherSign,
                 Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
             else -> BigInt.ZERO
         }
