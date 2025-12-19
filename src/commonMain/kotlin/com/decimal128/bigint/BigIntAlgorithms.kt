@@ -236,7 +236,7 @@ object BigIntAlgorithms {
      * @return the non-negative integer square root of this value.
      * @throws ArithmeticException if this value is negative.
      */
-    fun isqrt(radicand: BigInt): BigInt {
+    fun isqrt(radicand: BigIntBase): BigInt {
         if (radicand.isNegative())
             throw ArithmeticException("Square root of a negative BigInt")
         val bitLen = radicand.magnitudeBitLen()
@@ -310,6 +310,19 @@ object BigIntAlgorithms {
             x.mutShr(1)
         } while (x < xPrev)
         return xPrev.toBigInt()
+    }
+
+    /**
+     * Returns `true` if [radicand] is a perfect square.
+     *
+     * This computes `r = isqrt(radicand)` and checks whether `r*r == radicand`.
+     *
+     * @param radicand the non-negative value to test
+     */
+    fun isPerfectSquare(radicand: BigIntBase): Boolean {
+        val isqrt = isqrt(radicand)
+        val squared = isqrt.sqr()
+        return squared EQ radicand
     }
 
 }

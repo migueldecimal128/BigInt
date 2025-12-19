@@ -256,21 +256,30 @@ object BigIntPrime {
      */
     data class LucasParams(val D: Int, val P: Int, val Q: Int)
 
+    private val LUCAS_COMPOSITE = LucasParams(0, 0, 0)
+
     /**
-     * Selects Lucas sequence parameters using the Selfridge method.
+     * Selects Lucas sequence parameters `(D, P, Q)` using the Selfridge method
+     * for the strong Lucas probable-prime test.
      *
-     * Iteratively chooses signed values of `D = 5, -7, 9, -11, ...` until
-     * `jacobi(D, n) = -1`, then returns the corresponding `(D, P, Q)` values
-     * used for the strong Lucas probable-prime test.
+     * A perfect-square check is performed first to avoid pathological runtimes.
      *
-     * If `jacobi(D, n) = 0`, the number is composite unless `n == |D|`,
-     * in which case valid parameters are returned.
+     * The algorithm searches signed values of `D = 5, -7, 9, -11, ...` until
+     * `jacobi(D, n) = -1`, at which point it returns parameters:
      *
-     * @param n positive odd integer to test
-     * @return selected Lucas parameters, or `(0, 0, 0)` if `n` is composite
+     *     P = 1
+     *     Q = (1 − D) / 4      // exact because D ≡ 1 mod 4
+     *
+     * If `jacobi(D, n) = 0`, then `gcd(D, n) > 1` and `n` is composite unless
+     * `n == |D|`, in which case valid Lucas parameters are still returned.
+     *
+     * @param n a positive odd integer
+     * @return the selected Lucas parameters, or a zero-valued sentinel if `n` is composite
      */
     fun selectSelfridgeParams(n: BigInt): LucasParams {
         require(n.isPositive() && n.isOdd())
+        if (n.isPerfectSquare())
+            return LUCAS_COMPOSITE
         var D = 5
         var sign = 1
         while (true) {
@@ -288,7 +297,7 @@ object BigIntPrime {
                     val Q = (1 - dSigned) shr 2
                     return LucasParams(dSigned, 1, Q)
                 }
-                return LucasParams(0, 0, 0)
+                return LUCAS_COMPOSITE
             }
             // next D in 5, -7, 9, -11, 13, ...
             D += 2

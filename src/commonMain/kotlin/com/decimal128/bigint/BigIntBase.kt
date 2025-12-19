@@ -787,6 +787,20 @@ sealed class BigIntBase(
         BigIntSerde.magnitudeToLittleEndianLongArray(this)
 
     /**
+     * Returns the integer square root of this value.
+     *
+     * The result `r` satisfies `r*r ≤ this < (r+1)*(r+1)`.
+     */
+    fun isqrt(): BigInt = BigIntAlgorithms.isqrt(this)
+
+    /**
+     * Returns `true` if this value is a perfect square.
+     *
+     * This is equivalent to checking whether `isqrt().square() == this`.
+     */
+    fun isPerfectSquare(): Boolean = BigIntAlgorithms.isPerfectSquare(this)
+
+    /**
      * Computes a hash code for the magnitude [x], ignoring any leading
      * zero limbs. The effective length is determined by [normLen],
      * ensuring that numerically equal magnitudes with different limb
