@@ -1121,7 +1121,7 @@ class BigInt private constructor(
     }
 
     infix fun mod(other: BigInt): BigInt {
-        val rem = Mago.newRem(magia, meta.normLen, other.magia, other.meta.normLen)
+        val rem = Mago.newRemOrMod(magia, meta.normLen, false, other.magia, other.meta.normLen)
         if (rem === Mago.ZERO)
             return ZERO
         val mod =
@@ -1485,11 +1485,11 @@ class BigInt private constructor(
 
     fun remImpl(dw: ULong): BigInt =
         BigInt.fromNormalizedOrZero(this.meta.signFlag,
-            Mago.newRem(magia, meta.normLen, dw))
+            Mago.newRemOrMod64(magia, meta.normLen, false, dw))
 
     fun remImpl(other: BigIntBase): BigInt =
         BigInt.fromNonNormalizedOrZero(meta.signFlag,
-            Mago.newRem(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+            Mago.newRemOrMod(this.magia, this.meta.normLen, false, other.magia, other.meta.normLen))
 
 }
 
