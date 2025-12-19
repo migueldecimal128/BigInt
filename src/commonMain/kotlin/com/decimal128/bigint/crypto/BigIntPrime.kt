@@ -66,7 +66,7 @@ object BigIntPrime {
             SmallPrimeResult.COMPOSITE -> false
             SmallPrimeResult.PRIME -> true
             SmallPrimeResult.INCONCLUSIVE -> {
-                if (! isMillerRabin64(n, tmp)) return false
+                if (! isMillerRabin_2_64(n, tmp)) return false
                 val selfridge = selectSelfridgeParams(n)
                 selfridge.D != 0 && isStrongLucasProbablePrime(n, selfridge)
             }
@@ -116,6 +116,71 @@ object BigIntPrime {
     }
 
     /**
+     * Performs a *strong* Miller–Rabin probable-prime test on an odd integer [n].
+     *
+     * For each supplied base `a` in [bases], the function checks whether `a`
+     * is a strong witness against the primality of [n]. It factors:
+     *
+     *     n − 1 = d · 2^s    with d odd
+     *
+     * then computes:
+     *
+     *     x = a^d mod n
+     *
+     * The base is accepted if `x == 1` or `x == n − 1`, or if repeated squaring
+     * of `x` (up to `s − 1` times) produces `n − 1`. If a base never reaches `n − 1`,
+     * it is a strong witness and [n] is declared composite.
+     *
+     * **Requirements**
+     * - [n] must be ≥ 3 and odd.
+     * - Callers are responsible for handling `n ∈ {2}` and small primes.
+     *
+     * **Return value**
+     * - `true`  → [n] passes all supplied bases and is therefore a strong probable prime.
+     * - `false` → at least one base is a strong compositeness witness.
+     *
+     * **Notes**
+     * - Probabilistic guarantees depend on the choice of bases; with deterministic
+     *   base sets this can be a fully deterministic test over a bounded domain.
+     * - Bases ≥ [n] are skipped.
+     *
+     * @param n the odd integer to test for primality
+     * @param bases the bases to use for the strong Miller–Rabin test
+     */
+
+    fun isMillerRabinProbablePrime(n: BigInt, bases: IntArray,
+                                   tmpP: MutableBigInt? = null): Boolean {
+        require (n >= 3 && n.isOdd())
+        val nMinusOne = n - 1
+        val s = nMinusOne.countTrailingZeroBits()
+        val d = nMinusOne ushr s
+
+        val ctx = ModContext(n)
+        val tmp = if (tmpP is MutableBigInt) tmpP else MutableBigInt()
+
+        for (a in bases) {
+            if (n <= a) continue   // important for small n
+
+            ctx.modPow(a.toBigInt(), d, tmp)
+
+            if (tmp.isOne() || tmp EQ nMinusOne)
+                continue
+
+            var witness = true
+            repeat(s - 1) {
+                ctx.modSqr(tmp, tmp)
+                if (tmp EQ nMinusOne) {
+                    witness = false
+                    return@repeat
+                }
+            }
+
+            if (witness) return false
+        }
+        return true
+    }
+
+    /**
      * Deterministic Miller–Rabin bases sufficient for testing 64-bit–range values.
      *
      * When used together, these bases make the Miller–Rabin test
@@ -145,39 +210,8 @@ object BigIntPrime {
      * @return `true` if [n] passes all Miller–Rabin bases, `false` if composite
      * @throws IllegalArgumentException if [n] is negative
      */
-    fun isMillerRabin64(n: BigInt, tmp: MutableBigInt): Boolean {
-        require (! n.isNegative())
-        val nMinusOne = n - 1
-        var d = nMinusOne
-        var s = 0
-        while (d.isEven()) {
-            d = d shr 1
-            s++
-        }
-
-        val ctx = ModContext(n)
-
-        for (a in MILLER_RABIN_2_64_BASES) {
-            if (n <= a) continue   // important for small n
-
-            ctx.modPow(a.toBigInt(), d, tmp)
-
-            if (tmp.isOne() || tmp EQ nMinusOne)
-                continue
-
-            var witness = true
-            repeat(s - 1) {
-                ctx.modSqr(tmp, tmp)
-                if (tmp EQ nMinusOne) {
-                    witness = false
-                    return@repeat
-                }
-            }
-
-            if (witness) return false
-        }
-        return true
-    }
+    fun isMillerRabin_2_64(n: BigInt, tmp: MutableBigInt?): Boolean =
+        isMillerRabinProbablePrime(n, MILLER_RABIN_2_64_BASES, tmp)
 
     /**
      * Computes the Jacobi symbol (a | n).
