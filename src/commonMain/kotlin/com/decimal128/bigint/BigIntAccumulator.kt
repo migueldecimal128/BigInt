@@ -790,7 +790,7 @@ class BigIntAccumulator private constructor (
 
     private fun setModImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
         if (ySign)
-            throw ArithmeticException("modulus of a negative number is undefined")
+            throw ArithmeticException("modulus with a negative divisor is undefined")
         setRem(x, yDw)
         if (isNegative())
             setAdd(this, yDw)

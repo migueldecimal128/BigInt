@@ -3,6 +3,7 @@ package com.decimal128.bigint
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class TestBigIntModVsRem {
@@ -95,18 +96,16 @@ class TestBigIntModVsRem {
     }
 
     @Test
-    fun mod_negativeDivisorUsesAbsoluteValue() {
+    fun mod_negativeDivisorFails() {
         val x = (-42).toBigInt()
 
-        assertEquals(
-            x mod 7,
+        assertFailsWith<ArithmeticException> {
             x mod -7
-        )
+        }
 
-        assertEquals(
-            x mod 7L,
+        assertFailsWith<ArithmeticException> {
             x mod -7L
-        )
+        }
     }
 
     @Test

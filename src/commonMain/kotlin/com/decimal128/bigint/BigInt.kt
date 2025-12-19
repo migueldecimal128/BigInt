@@ -1100,11 +1100,19 @@ class BigInt private constructor(
 
     operator fun rem(dw: ULong): BigInt = remImpl(dw)
 
-    infix fun mod(n: Int): BigInt = modImpl(n.absoluteValue.toUInt().toULong())
+    infix fun mod(n: Int): BigInt {
+        if (n < 0)
+            throw ArithmeticException("modulus with a negative divisor is undefined")
+        return modImpl(n.absoluteValue.toUInt().toULong())
+    }
 
     infix fun mod(w: UInt): BigInt = modImpl(w.toULong())
 
-    infix fun mod(l: Long): BigInt = modImpl(l.absoluteValue.toULong())
+    infix fun mod(l: Long): BigInt {
+        if (l < 0)
+            throw ArithmeticException("modulus with a negative divisor is undefined")
+        return modImpl(l.absoluteValue.toULong())
+    }
 
     infix fun mod(dw: ULong): BigInt = modImpl(dw)
 
