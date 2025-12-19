@@ -9,7 +9,7 @@ class TestBigIntAccSetRem {
 
     @Test
     fun setRem_basic() {
-        val x = "16943852051772892430707956759219".toBigIntAccumulator()
+        val x = "16943852051772892430707956759219".toMutableBigInt()
         val y = 16883797134507450982uL.toBigInt()
 
         val out = MutableBigInt()
@@ -23,7 +23,7 @@ class TestBigIntAccSetRem {
         val biX = "16943852051772892430707956759219".toBigInt()
         val x = MutableBigInt()
         val biY = 16883797134507450982uL.toBigInt()
-        val y = biY.toBigIntAccumulator()
+        val y = biY.toMutableBigInt()
 
         x.set(biX)
         x.setRem(x, biY)
@@ -45,9 +45,9 @@ class TestBigIntAccSetRem {
     @Test
     fun setRem_alias_out_is_y() {
         val xBi = "123456789012345678901234567890".toBigInt()
-        val x = xBi.toBigIntAccumulator()
+        val x = xBi.toMutableBigInt()
         val yBi = "9876543210987654321".toBigInt()
-        val y = "9876543210987654321".toBigIntAccumulator()
+        val y = "9876543210987654321".toMutableBigInt()
 
         y.setRem(x, y)
 
@@ -58,7 +58,7 @@ class TestBigIntAccSetRem {
 
     @Test
     fun setRem_alias_x_mod_x_is_zero() {
-        val x = "123456789012345678901234567890".toBigIntAccumulator()
+        val x = "123456789012345678901234567890".toMutableBigInt()
 
         x.setRem(x, x.toBigInt())
 
@@ -67,7 +67,7 @@ class TestBigIntAccSetRem {
 
     @Test
     fun setRem_alias_small_divisor() {
-        val x = "987654321098765432109876543210".toBigIntAccumulator()
+        val x = "987654321098765432109876543210".toMutableBigInt()
         val y = 97.toBigInt()
 
         x.setRem(x, y)
@@ -77,7 +77,7 @@ class TestBigIntAccSetRem {
 
     @Test
     fun setRem_invariants() {
-        val x = "16943852051772892430707956759219".toBigIntAccumulator()
+        val x = "16943852051772892430707956759219".toMutableBigInt()
         val y = "16883797134507450982".toBigInt()
 
         val out = MutableBigInt()
@@ -102,7 +102,7 @@ class TestBigIntAccSetRem {
                 .toBigInt()
                 .abs()
 
-            val x = a.toBigIntAccumulator()
+            val x = a.toMutableBigInt()
             val ref = a % b
 
             // out === x

@@ -78,8 +78,8 @@ object BigIntAlgorithms {
         if (b.isZero())
             return a.abs()
 
-        var x = a.toBigIntAccumulator().mutAbs()
-        var y = b.toBigIntAccumulator().mutAbs()
+        var x = a.toMutableBigInt().mutAbs()
+        var y = b.toMutableBigInt().mutAbs()
 
         val ctzX = x.countTrailingZeroBits()
         val ctzY = y.countTrailingZeroBits()

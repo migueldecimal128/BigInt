@@ -9,7 +9,7 @@ class TestBigIntAccSetDiv {
     @Test
     fun setDiv_basic() {
         val xBi = "16943852051772892430707956759219".toBigInt()
-        val x = xBi.toBigIntAccumulator()
+        val x = xBi.toMutableBigInt()
         val y = 16883797134507450982uL.toBigInt()
 
         val out = MutableBigInt()
@@ -23,7 +23,7 @@ class TestBigIntAccSetDiv {
         val biX = "16943852051772892430707956759219".toBigInt()
         val x = MutableBigInt()
         val biY = 16883797134507450982uL.toBigInt()
-        val y = biY.toBigIntAccumulator()
+        val y = biY.toMutableBigInt()
 
         x.set(biX)
         x.setDiv(x, biY)
@@ -45,10 +45,10 @@ class TestBigIntAccSetDiv {
     @Test
     fun setDiv_alias_out_is_divisor() {
         val xBi = "123456789012345678901234567890".toBigInt()
-        val x = xBi.toBigIntAccumulator()
+        val x = xBi.toMutableBigInt()
 
         val yBi = "9876543210987654321".toBigInt()
-        val y = yBi.toBigIntAccumulator()
+        val y = yBi.toMutableBigInt()
 
         y.setDiv(x, y)
 
@@ -59,7 +59,7 @@ class TestBigIntAccSetDiv {
     @Test
     fun setDiv_alias_small_divisor() {
         val xBi = "987654321098765432109876543210".toBigInt()
-        val x = xBi.toBigIntAccumulator()
+        val x = xBi.toMutableBigInt()
         val y = 97.toBigInt()
 
         x.setDiv(x, y)
@@ -70,7 +70,7 @@ class TestBigIntAccSetDiv {
     @Test
     fun setDiv_invariant_reconstruction() {
         val xBi = "16943852051772892430707956759219".toBigInt()
-        val x = xBi.toBigIntAccumulator()
+        val x = xBi.toMutableBigInt()
         val y = "16883797134507450982".toBigInt()
 
         val q = MutableBigInt()
@@ -96,7 +96,7 @@ class TestBigIntAccSetDiv {
                 .toBigInt()
                 .abs()
 
-            val x = a.toBigIntAccumulator()
+            val x = a.toMutableBigInt()
             val ref = a / b
 
             // out === x

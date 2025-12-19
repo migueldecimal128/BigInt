@@ -3,7 +3,7 @@ package com.decimal128.bigint.crypto
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.MutableBigInt
 import com.decimal128.bigint.toBigInt
-import com.decimal128.bigint.toBigIntAccumulator
+import com.decimal128.bigint.toMutableBigInt
 
 /**
  * Primality-testing utilities for [BigInt].
@@ -227,8 +227,8 @@ object BigIntPrime {
      */
     fun jacobi(a: Int, n: BigInt): Int {
         require (n > 0 && n.isOdd())
-        var v = n.toBigIntAccumulator()
-        var u = a.toBigIntAccumulator()
+        var v = n.toMutableBigInt()
+        var u = a.toMutableBigInt()
         u %= v
         if (u < 0)
             u += n
@@ -236,6 +236,7 @@ object BigIntPrime {
         while (u.isNotZero()) {
             while (u.isEven()) {
                 u.mutShr(1)
+                check (! v.isNegative())
                 val v8 = v.toInt() and 0x07
                 if (v8 == 3 || v8 == 5)
                     j = -j
@@ -411,8 +412,8 @@ object BigIntPrime {
         Q: Int
     ): Triple<BigInt, BigInt, BigInt> {
 
-        var U = 1.toBigIntAccumulator()
-        var V = 1.toBigIntAccumulator()
+        var U = 1.toMutableBigInt()
+        var V = 1.toMutableBigInt()
         var Qk = MutableBigInt()
         modCtx.modSet(Q, Qk)
 
