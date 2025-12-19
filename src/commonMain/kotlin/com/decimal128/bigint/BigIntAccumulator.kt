@@ -519,7 +519,7 @@ class BigIntAccumulator private constructor (
      *
      * @return a new [BigInt] containing the current value of this accumulator.
      */
-    fun toBigInt(): BigInt = BigInt.from(this)
+    override fun toBigInt(): BigInt = BigInt.from(this)
 
     fun setAdd(x: BigIntBase, n: Int) =
         setAddImpl(x, n < 0, n.absoluteValue.toUInt().toULong())

@@ -164,7 +164,6 @@ class BigInt private constructor(
 
         internal fun fromNonNormalizedOrZero(sign: Boolean, magia: Magia): BigInt {
             val normLen = Mago.normLen(magia)
-            // FIXME - inject poison here
             if (normLen > 0)
                 return BigInt(Meta(sign, normLen), magia)
             return ZERO
@@ -283,7 +282,7 @@ class BigInt private constructor(
         /**
          * Constructs a new [BigInt] from a [BigIntAccumulator] or another [BigInt].
          */
-        fun from(other: BigIntBase): BigInt = BigInt(other.meta, other.magia)
+        fun from(other: BigIntBase): BigInt = BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
 
         /**
          * Parses a [String] representation of an integer into a [BigInt].
@@ -1036,6 +1035,8 @@ class BigInt private constructor(
      */
     fun negate() = if (isZero()) ZERO else BigInt(meta.negate(), magia)
 
+    override fun toBigInt() = this
+
     /**
      * Standard plus/minus/times/div/rem operators for BigInt.
      *
@@ -1067,61 +1068,37 @@ class BigInt private constructor(
     operator fun minus(dw: ULong): BigInt =
         this.addImpl(signFlipThis = false, true, dw)
 
-    operator fun times(other: BigInt): BigInt =
-        fromNonNormalizedOrZero(meta.signFlag xor other.meta.signFlag,
-            Mago.newMul(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+    operator fun times(other: BigInt): BigInt = mulImpl(other)
 
-    operator fun times(n: Int): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag xor (n < 0),
-            Mago.newMul(this.magia, this.meta.normLen, n.absoluteValue.toUInt()))
+    operator fun times(n: Int): BigInt = mulImpl(n < 0, n.absoluteValue.toUInt().toULong())
 
-    operator fun times(w: UInt): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag, Mago.newMul(this.magia, this.meta.normLen, w))
+    operator fun times(w: UInt): BigInt = mulImpl(false, w.toULong())
 
-    operator fun times(l: Long): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag xor (l < 0),
-            Mago.newMul(this.magia, this.meta.normLen, l.absoluteValue.toULong()))
+    operator fun times(l: Long): BigInt = mulImpl(l < 0, l.absoluteValue.toULong())
 
-    operator fun times(dw: ULong): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag,
-            Mago.newMul(this.magia, this.meta.normLen, dw))
+    operator fun times(dw: ULong): BigInt = mulImpl(false, dw)
 
-    operator fun div(other: BigInt): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag xor other.meta.signFlag,
-            Mago.newDiv(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+    operator fun div(other: BigInt): BigInt = divImpl(other)
 
-    operator fun div(n: Int): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag xor (n < 0),
-            Mago.newDiv(magia, meta.normLen, n.absoluteValue.toUInt()))
+    operator fun div(n: Int): BigInt = divImpl(n < 0, n.absoluteValue.toUInt().toULong())
 
-    operator fun div(w: UInt): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag,
-            Mago.newDiv(magia, meta.normLen, w))
+    operator fun div(w: UInt): BigInt = divImpl(false, w.toULong())
 
-    operator fun div(l: Long): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag xor (l < 0),
-            Mago.newDiv(magia, meta.normLen, l.absoluteValue.toULong()))
+    operator fun div(l: Long): BigInt = divImpl(l < 0, l.absoluteValue.toULong())
 
-    operator fun div(dw: ULong): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag,
-            Mago.newDiv(magia, meta.normLen, dw))
+    operator fun div(dw: ULong): BigInt = divImpl(false, dw)
 
-    operator fun rem(other: BigInt): BigInt =
-        fromNonNormalizedOrZero(meta.signFlag,
-            Mago.newRem(magia, meta.normLen, other.magia, other.meta.normLen))
+    operator fun rem(other: BigInt): BigInt = remImpl(other)
 
     // note that in java/kotlin, the sign of remainder only depends upon
     // the dividend, so we just take the abs value of the divisor
-    operator fun rem(n: Int): BigInt = rem(n.absoluteValue.toUInt())
+    operator fun rem(n: Int): BigInt = remImpl(n.absoluteValue.toUInt().toULong())
 
-    operator fun rem(w: UInt): BigInt =
-        fromNormalizedOrZero(meta.signFlag, Mago.newRem(magia, meta.normLen, w))
+    operator fun rem(w: UInt): BigInt = remImpl(w.toULong())
 
-    operator fun rem(l: Long): BigInt = rem(l.absoluteValue.toULong())
+    operator fun rem(l: Long): BigInt = remImpl(l.absoluteValue.toULong())
 
-    operator fun rem(dw: ULong): BigInt =
-        fromNonNormalizedOrZero(this.meta.signFlag,
-            Mago.newRem(this.magia, this.meta.normLen, dw))
+    operator fun rem(dw: ULong): BigInt = remImpl(dw)
 
     infix fun mod(n: Int): BigInt = mod(n.absoluteValue.toUInt())
 
@@ -1427,34 +1404,6 @@ class BigInt private constructor(
 
     override fun compareTo(other: BigInt): Int = super.compareTo(other)
 
-    /**
-     * Internal helper for addition or subtraction between two BigInts.
-     *
-     * @param isSub true to subtract [other] from this, false to add
-     * @param other the BigInt operand
-     * @return a new BigInt representing the result
-     */
-    private fun addImpl(isSub: Boolean, other: BigInt): BigInt {
-        val otherSign = isSub xor other.meta.isNegative
-        when {
-            other.isZero() -> return this
-            this.isZero() && isSub -> return other.negate()
-            this.isZero() -> other
-            this.meta.signFlag == otherSign ->
-                return BigInt(this.meta.signFlag,
-                    Mago.newAdd(this.magia, this.meta.normLen,
-                        other.magia, other.meta.normLen))
-        }
-        val cmp = this.magnitudeCompareTo(other)
-        val ret = when {
-            cmp > 0 -> BigInt(this.meta.signFlag,
-                Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
-            cmp < 0 -> BigInt(otherSign,
-                Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
-            else -> ZERO
-        }
-        return ret
-    }
 
     /**
      * Internal helper for addition or subtraction with a ULong operand.
@@ -1484,12 +1433,63 @@ class BigInt private constructor(
                 val diff = dw - thisMag
                 BigInt(otherSign, Mago.newFromULong(diff))
             }
-            else -> ZERO
+            else -> BigInt.ZERO
         }
         return ret
     }
 
+    /**
+     * Internal helper for addition or subtraction between two BigInts.
+     *
+     * @param isSub true to subtract [other] from this, false to add
+     * @param other the BigInt operand
+     * @return a new BigInt representing the result
+     */
+    fun addImpl(isSub: Boolean, other: BigInt): BigInt {
+        val otherSign = isSub xor other.meta.isNegative
+        when {
+            other.isZero() -> return this
+            this.isZero() && isSub -> return other.negate()
+            this.isZero() -> other
+            this.meta.signFlag == otherSign ->
+                return BigInt(this.meta.signFlag,
+                    Mago.newAdd(this.magia, this.meta.normLen,
+                        other.magia, other.meta.normLen))
+        }
+        val cmp = this.magnitudeCompareTo(other)
+        val ret = when {
+            cmp > 0 -> BigInt(this.meta.signFlag,
+                Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+            cmp < 0 -> BigInt(otherSign,
+                Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
+            else -> BigInt.ZERO
+        }
+        return ret
+    }
 
+    fun mulImpl(dwSign: Boolean, dw: ULong): BigInt =
+        BigInt.fromNonNormalizedOrZero(this.meta.signFlag xor dwSign,
+            Mago.newMul(this.magia, this.meta.normLen, dw))
+
+    fun mulImpl(other: BigIntBase): BigInt =
+        BigInt.fromNonNormalizedOrZero(meta.signFlag xor other.meta.signFlag,
+            Mago.newMul(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+
+    fun divImpl(dwSign: Boolean, dw: ULong): BigInt =
+        BigInt.fromNonNormalizedOrZero(this.meta.signFlag xor dwSign,
+            Mago.newDiv(magia, meta.normLen, dw))
+
+    fun divImpl(other: BigIntBase): BigInt =
+        BigInt.fromNonNormalizedOrZero(meta.signFlag xor other.meta.signFlag,
+            Mago.newDiv(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+
+    fun remImpl(dw: ULong): BigInt =
+        BigInt.fromNormalizedOrZero(this.meta.signFlag,
+            Mago.newRem(magia, meta.normLen, dw))
+
+    fun remImpl(other: BigIntBase): BigInt =
+        BigInt.fromNonNormalizedOrZero(meta.signFlag,
+            Mago.newRem(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
 
 }
 

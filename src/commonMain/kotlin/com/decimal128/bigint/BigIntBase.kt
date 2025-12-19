@@ -1,5 +1,6 @@
 package com.decimal128.bigint
 
+import com.decimal128.bigint.BigInt.Companion.fromNonNormalizedOrZero
 import com.decimal128.bigint.Mago.normLen
 import kotlin.math.absoluteValue
 
@@ -826,5 +827,7 @@ sealed class BigIntBase(
 
     override fun hashCode(): Int =
         throw UnsupportedOperationException()
+
+    abstract fun toBigInt(): BigInt
 
 }
