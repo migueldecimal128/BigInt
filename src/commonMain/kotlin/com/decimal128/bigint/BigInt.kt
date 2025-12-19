@@ -12,7 +12,7 @@ import kotlin.random.Random
 
 /**
  * Arbitrary-precision signed integers for Kotlin Multiplatform, serving as a
- * high-performance lightweight replacement for [java.math.BigInteger].
+ * high-performance replacement for [java.math.BigInteger].
  *
  * BigInt supports the standard infix arithmetic operators (`+`, `-`, `*`, `/`, `%`)
  * and comparison operators (`<`, `<=`, `==`, `!=`, `>=`, `>`), implemented via
@@ -26,15 +26,17 @@ import kotlin.random.Random
  *
  * ### Comparison with java.math.BigInteger
  *
- * BigInt is intentionally smaller and simpler than `BigInteger`, and is
+ * [BigInt] is intentionally smaller and simpler than `BigInteger`, and is
  * optimized for values on the order of hundreds of digits rather than
  * tens of thousands. Multiplication uses the schoolbook algorithm, and
- * division uses Knuth’s Algorithm D.
+ * long division uses Knuth’s Algorithm D.
  *
- * BigInt also differs from `BigInteger` in its handling of bit-level and
- * boolean operations. These operations act only on the magnitude, ignore the
- * sign, and generally return non-negative results. This contrasts with
- * BigInteger’s specification:
+ * [BigInt] also differs from `BigInteger` in its handling of bit-level and
+ * boolean operations. [BigInt] provides an extended set of test, select,
+ * and mask operations that can simplify base 2 operations while avoiding
+ * intermediate temporaries. These operations act only on the magnitude,
+ * ignore the sign, and generally return non-negative results. This
+ * contrasts with BigInteger’s specification:
  *
  *    _“All operations behave as if BigIntegers were represented in two’s-complement
  *    notation (like Java’s primitive integer types).”_
@@ -50,7 +52,7 @@ import kotlin.random.Random
  * heap allocation and eliminates the need for caches of small integer values,
  * while enabling idiomatic, readable infix arithmetic expressions.
  *
- * The companion type [BigIntAccumulator] provides mutable arbitrary-precision
+ * The companion type [MutableBigInt] provides mutable arbitrary-precision
  * integer support. Reuse of mutable arrays significantly reduces heap churn
  * and increases cache coherency for statistical summations on large data sets
  * and for compute-heavy crypto calculations.
@@ -228,7 +230,7 @@ class BigInt private constructor(
         }
 
         /**
-         * Constructs a new [BigInt] from a [BigIntAccumulator] or another [BigInt].
+         * Constructs a new [BigInt] from a [MutableBigInt] or another [BigInt].
          */
         fun from(other: BigIntBase): BigInt = BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
 
@@ -1352,20 +1354,20 @@ class BigInt private constructor(
      * unrelated types that will compile quietly but will always evaluate to
      * `false` at runtime.
      *
-     * Note that for convenience `BigInt.equals(BigIntAccumulator)` is accepted
+     * Note that for convenience `BigInt.equals(MutableBigInt)` is accepted
      * and will compare the values for numeric equality. However, this behavior
-     * cannot break collections since [BigIntAccumulator] cannot be stored
-     * in a collection. To enforce this, [BigIntAccumulator.hashCode()] throws
+     * cannot break collections since [MutableBigInt] cannot be stored
+     * in a collection. To enforce this, [MutableBigInt.hashCode()] throws
      * an Exception.
      *
      * @param other the object to compare against
-     * @return `true` if [other] is a [BigInt] or [BigIntAccumulator] with the
+     * @return `true` if [other] is a [BigInt] or [MutableBigInt] with the
      *         same numeric value; `false` otherwise
      */
     override fun equals(other: Any?): Boolean {
         return when (other) {
             is BigInt -> this EQ other
-            is BigIntAccumulator -> this EQ other
+            is MutableBigInt -> this EQ other
             else -> false
         }
     }
@@ -1418,7 +1420,7 @@ class BigInt private constructor(
 
     /**
      * Internal helper for addition or subtraction between a [BigInt]
-     * and another [BigInt] or [BigIntAccumulator]
+     * and another [BigInt] or [MutableBigInt]
      *
      * @param isSub true to subtract [other] from this, false to add
      * @param other the BigInt operand

@@ -9,7 +9,7 @@ class TestBigIntMulDivRem {
     val verbose = true
 
     private fun bi(v: Long) = BigInt.from(v)
-    private fun acc(v: BigInt) = BigIntAccumulator().set(v)
+    private fun mbi(v: BigInt) = MutableBigInt().set(v)
 
     // ------------------------------------------------------------
     // 1. Small deterministic tests (signs + identities)
@@ -28,9 +28,9 @@ class TestBigIntMulDivRem {
         for ((a, b) in cases) {
             val A = bi(a)
             val B = bi(b)
-            val acc = BigIntAccumulator().set(A)
-            acc.setMul(A, B)
-            assertEquals(bi(a * b), acc.toBigInt(), "mul failed: $a * $b")
+            val mbi = MutableBigInt().set(A)
+            mbi.setMul(A, B)
+            assertEquals(bi(a * b), mbi.toBigInt(), "mul failed: $a * $b")
         }
     }
 
@@ -50,10 +50,10 @@ class TestBigIntMulDivRem {
             val A = bi(a)
             val B = bi(b)
 
-            val qAcc = acc(A)
+            val qAcc = mbi(A)
             qAcc.setDiv(A, B)
 
-            val rAcc = acc(A)
+            val rAcc = mbi(A)
             rAcc.setRem(A, B)
 
             val q = bi(a / b)
@@ -79,12 +79,12 @@ class TestBigIntMulDivRem {
         val x = BigInt.from(17)
         val y = BigInt.from(5)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
 
         assertEquals(
             BigInt.from(2),
-            acc.toBigInt(),
+            mbi.toBigInt(),
             "Accumulator remainder failed: 17 % 5"
         )
     }
@@ -94,12 +94,12 @@ class TestBigIntMulDivRem {
         val x = BigInt.from(17)
         val y = BigInt.from(5)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
 
-        println("acc.magia = ${acc.magia.joinToString()}")
-        println("meta.normLen = ${acc.meta.normLen}")
-        println("normLen(magia) = ${Mago.normLen(acc.magia)}")
+        println("mbi.magia = ${mbi.magia.joinToString()}")
+        println("meta.normLen = ${mbi.meta.normLen}")
+        println("normLen(magia) = ${Mago.normLen(mbi.magia)}")
     }
 
     // ------------------------------------------------------------
@@ -112,10 +112,10 @@ class TestBigIntMulDivRem {
                 val A = bi(a)
                 val B = bi(b)
 
-                val divAcc = acc(A)
+                val divAcc = mbi(A)
                 divAcc.setDiv(A, B)
 
-                val remAcc = acc(A)
+                val remAcc = mbi(A)
                 remAcc.setRem(A, B)
 
                 val q = divAcc.toBigInt()
@@ -141,44 +141,44 @@ class TestBigIntMulDivRem {
     fun testMulAliasing_this_is_x() {
         val x = bi(12)
         val y = bi(7)
-        val acc = acc(x)
-        acc.setMul(acc.toBigInt(), y)
-        assertEquals(bi(84), acc.toBigInt())
+        val mbi = mbi(x)
+        mbi.setMul(mbi.toBigInt(), y)
+        assertEquals(bi(84), mbi.toBigInt())
     }
 
     @Test
     fun testMulAliasing_this_is_y() {
         val x = bi(12)
         val y = bi(7)
-        val acc = acc(y)
-        acc.setMul(x, acc.toBigInt())
-        assertEquals(bi(84), acc.toBigInt())
+        val mbi = mbi(y)
+        mbi.setMul(x, mbi.toBigInt())
+        assertEquals(bi(84), mbi.toBigInt())
     }
 
     @Test
     fun testMulAliasing_double() {
         val x = bi(15)
-        val acc = acc(x)
-        acc.setMul(acc.toBigInt(), acc.toBigInt())  // x * x
-        assertEquals(bi(225), acc.toBigInt())
+        val mbi = mbi(x)
+        mbi.setMul(mbi.toBigInt(), mbi.toBigInt())  // x * x
+        assertEquals(bi(225), mbi.toBigInt())
     }
 
     @Test
     fun testDivAliasing_this_is_x() {
         val x = bi(35)
         val y = bi(7)
-        val acc = acc(x)
-        acc.setDiv(acc.toBigInt(), y)
-        assertEquals(bi(5), acc.toBigInt())
+        val mbi = mbi(x)
+        mbi.setDiv(mbi.toBigInt(), y)
+        assertEquals(bi(5), mbi.toBigInt())
     }
 
     @Test
     fun testRemAliasing_this_is_x() {
         val x = bi(35)
         val y = bi(7)
-        val acc = acc(x)
-        acc.setRem(acc.toBigInt(), y)
-        assertEquals(bi(0), acc.toBigInt())
+        val mbi = mbi(x)
+        mbi.setRem(mbi.toBigInt(), y)
+        assertEquals(bi(0), mbi.toBigInt())
     }
 
     // ------------------------------------------------------------
@@ -190,10 +190,10 @@ class TestBigIntMulDivRem {
         val A = BigInt.randomWithBitLen(500)
         val B = BigInt.randomWithBitLen(500)
 
-        val acc = BigIntAccumulator().set(A)
-        acc.setMul(A, B)
+        val mbi = MutableBigInt().set(A)
+        mbi.setMul(A, B)
 
-        assertEquals(A * B, acc.toBigInt())
+        assertEquals(A * B, mbi.toBigInt())
     }
 
     @Test
@@ -201,10 +201,10 @@ class TestBigIntMulDivRem {
         val A = BigInt.randomWithBitLen(500)
         val B = BigInt.randomWithBitLen(300).abs() + bi(1)  // avoid zero
 
-        val qAcc = acc(A)
+        val qAcc = mbi(A)
         qAcc.setDiv(A, B)
 
-        val rAcc = acc(A)
+        val rAcc = mbi(A)
         rAcc.setRem(A, B)
 
         val q = qAcc.toBigInt()
@@ -219,45 +219,45 @@ class TestBigIntMulDivRem {
     fun testRem_twoLimb_by_oneLimb() {
         val x = BigInt.from(0x1_0000_0000L + 123) // 2 limbs
         val y = BigInt.from(97)
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
-        assertEquals(x % y, acc.toBigInt())
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
+        assertEquals(x % y, mbi.toBigInt())
     }
 
     @Test
     fun testRem_multiLimb_by_oneLimb_calcRem() {
         val x = BigInt.randomWithBitLen(300) // ~10 limbs
         val y = BigInt.from(97)
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
-        assertEquals(x % y, acc.toBigInt())
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
+        assertEquals(x % y, mbi.toBigInt())
     }
 
     @Test
     fun testRem_xLessThanY() {
         val x = BigInt.from(17)
         val y = BigInt.from(500)
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
-        assertEquals(x, acc.toBigInt())
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
+        assertEquals(x, mbi.toBigInt())
     }
 
     @Test
     fun testRem_twoLimb_by_twoLimb() {
         val x = BigInt.from(0x1_0000_0000L + 123)
         val y = BigInt.from(0x2_0000_0000L + 7)
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
-        assertEquals(x % y, acc.toBigInt())
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
+        assertEquals(x % y, mbi.toBigInt())
     }
 
     @Test
     fun testRem_multiLimb_by_twoLimb_knuth() {
         val x = BigInt.randomWithBitLen(300)
         val y = BigInt.randomWithBitLen(64)  // 2 limbs
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
-        assertEquals(x % y, acc.toBigInt())
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
+        assertEquals(x % y, mbi.toBigInt())
     }
 
     @Test
@@ -266,9 +266,9 @@ class TestBigIntMulDivRem {
         val y = BigInt.randomWithBitLen(300)
         if (verbose)
             println("x:$x y:$y")
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
-        assertEquals(x % y, acc.toBigInt())
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
+        assertEquals(x % y, mbi.toBigInt())
     }
 
     @Test
@@ -277,13 +277,13 @@ class TestBigIntMulDivRem {
         val y = "874066428351266532052357330140".toBigInt()
         if (verbose)
             println("x:$x y:$y")
-        val acc = BigIntAccumulator().set(x)
-        acc.setRem(x, y)
+        val mbi = MutableBigInt().set(x)
+        mbi.setRem(x, y)
         val biRem = x % y
-        val accRem = acc.toBigInt()
+        val accRem = mbi.toBigInt()
         if (verbose)
             println("biRem:$biRem accRem:$accRem")
-        assertEquals(x % y, acc.toBigInt())
+        assertEquals(x % y, mbi.toBigInt())
     }
 
 

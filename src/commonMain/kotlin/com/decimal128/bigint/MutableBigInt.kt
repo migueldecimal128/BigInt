@@ -10,30 +10,32 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * A mutable arbitrary-precision integer accumulator for efficient series operations.
+ * [MutableBigInt] provides mutable arithmetic operations for compute-heavy
+ * calculations where heap-allocated storage of intermediate values
+ * impacts runtime performance.
  *
- * [BigIntAccumulator] provides mutable arithmetic operations optimized for
- * accumulation tasks commonly encountered when processing numerical series.
- * Supported operations include:
+ * Unlike immutable [BigInt] objects,
+ * [MutableBigInt] objects modify their internal state in-place by growing
+ * internal arrays as needed. Reuse of internal arrays minimizes heap churn
+ * and maintains cache coherency. It is well-suited for long-running numerical
+ * calculations such as crypto and collecting statistics on very large
+ * datasets.
  *
+ * Operations accept integer primitives (`Int`, `Long`, `UInt`, `ULong`),
+ * [BigInt] instances, or other [MutableBigInt] instances as operands.
+ *
+ * Use of [MutableBigInt] for accumulation of series values is simple and
+ * straightforward through the use of built-in operations for:
  * - Sum
  * - Sum of squares
  * - Sum of absolute values
  * - Product
  *
- * Unlike [BigInt], which is immutable, `BigIntAccumulator` modifies its internal
- * state in place. By reusing internal arrays, it minimizes heap allocation and
- * garbage collection once a steady state is reached, making it well-suited for
- * iterative or streaming computations.
- *
- * Operations accept integer primitives (`Int`, `Long`, `UInt`, `ULong`),
- * [BigInt] instances, or other [BigIntAccumulator] instances as operands.
- *
- * Typical usage example:
+ * Typical statistical usage example:
  * ```
- * val sumAcc = BigIntAccumulator()
- * val sumSqrAcc = BigIntAccumulator()
- * val sumAbsAcc = BigIntAccumulator()
+ * val sumAcc = MutableBigInt()
+ * val sumSqrAcc = MutableBigInt()
+ * val sumAbsAcc = MutableBigInt()
  * for (value in data) {
  *     sumAcc += value
  *     sumSqrAcc.addSquareOf(value)
@@ -42,28 +44,80 @@ import kotlin.math.min
  * val total = sumAcc.toBigInt()
  * ```
  *
+ * Beyond the use case for gathering statistics, use of [MutableBigInt] is
+ * much more complicated and dangerous. Algorithms should **always** be
+ * implemented, tested, and thoroughly understood using regular [BigInt].
+ * Deriving a [MutableBigInt] implementation from an existing [BigInt]
+ * implementation is a separate task that should be undertaken only if
+ * necessary.
+ *
+ * If the goal becomes elimination of heap allocation of [BigInt]
+ * intermediate values then one must be very conscious of the order
+ * and manner that operations are performed.
+ *
+ * In order to avoid heap churn all [MutableBigInt] values and
+ * temporaries need to be allocated before starting the core
+ * iterations of your computation.
+ *
+ * Operations effectively
+ * become restricted to one mutation operation per line:
+ * - `+=` `-=` `*=` `/=` `%=`
+ * - `setAdd(a, b)` `setSub(c, d)` `setMul(e, f)` `setDiv(g, h)`
+ *   `setRem(i, j)` `setMod(k, l)`
+ * - `setShl(a, n)` `setUshr(b, m)` `setShr(c, k)`
+ * - `withBitMask(bitWidth, bitIndex)`
+ *
+ * This combination of static `register` allocation and one operation
+ * per `instruction` feels very much like assembly-level programming,
+ * with each [MutableBigInt] acting like a CPU register.
+ * The process of converting an existing algorithm it brings a new
+ * appreciation of the power of nested infix expressions.
+ *
+ * The good news is that [MutableBigInt] makes sure that you are
+ * not churning through heap storage. The bad news is that the
+ * process is still surprisingly painful.
+ *
  * ### Internal representation
  *
- * The implementation uses a sign–magnitude format, with a [Boolean] sign flag
- * and a little-endian [IntArray] of 32-bit unsigned limbs.
+ * The implementation uses a sign–magnitude format with the magnitude held
+ * in a little-endian [IntArray] of 32-bit unsigned limbs. The normalized
+ * current length `normLen` and the `sign` are held in a [Meta] value
+ * class whose representation is a single [Int].
  *
  * - The magnitude array is named `magia` (MAGnitude IntArray).
  * - Its allocated length is always ≥ 4.
- * - The current number of active limbs is stored in `limbLen`.
- * - Zero is represented as `limbLen == 0`.
- * - When nonzero, `limbLen` is normalized so that the most significant limb
- *   (`magia[limbLen − 1]`) is nonzero.
+ * - The current number of active limbs is stored in `meta.normLen`,
+ *   ensuring that the most significant limb at `magia[meta.normLen - 1]`
+ *   is nonzero.
+ * - Zero is represented as `meta.normLen == 0`.
+ * - The current `sign` is stored as `meta.signBit`
  *
- * [BigIntAccumulator] also maintains an internal temporary buffer `tmp`,
- * used for intermediate operations (for example, squaring a value before
- * summation). In some cases, `tmp` may be swapped with the main `magia` array
- * to minimize additional allocation or data copying.
+ * Each [MutableBigInt] also has the ability to store two internal
+ * temporary buffers `tmp1` and `tmp2`. The tmps are initialized to
+ * a canonical empty array and get resized/grown if/when needed.
+ * Long multiplication and squaring use only `tmp1`.
+ * Long division uses both tmps. Since these operations
+ * are happening as part of an iterative loop (otherwise you wouldn't be
+ * converting to [MutableBigInt]) the temps will get allocated on the
+ * first pass and reused on subsequent iterations.
+ *
+ * All allocations of [IntArray] limb storage (for the primary `magia`
+ * and the tmps) are rounded up to eliminate internal fragmentation
+ * and make all allocated space available for use.
+ * The current generation of JVMs allocates on 16-byte boundaries, so
+ * all [IntArray] allocations are rounded up to a multiple of 4.
+ *
+ * For a given [MutableBigInt] instance, the first reallocation
+ * gives exactly the size requested (rounded up to the heap quantum).
+ * Subsequent reallocations increase the requested size by 50%, on
+ * the assumption that if we have reallocated twice then we will
+ * keep growing.
  *
  * @constructor Creates a new accumulator initialized to zero.
- * Equivalent to calling `BigIntAccumulator()`.
+ * Equivalent to calling `MutableBigInt()`.
  * @see BigInt for the immutable arbitrary-precision integer implementation.
  */
-class BigIntAccumulator private constructor (
+class MutableBigInt private constructor (
     meta: Meta,
     magia: Magia,
 ) : BigIntBase(meta, magia) {
@@ -76,10 +130,10 @@ class BigIntAccumulator private constructor (
 
         private inline fun limbLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
 
-        fun withInitialBitCapacity(initialBitCapacity: Int): BigIntAccumulator {
+        fun withInitialBitCapacity(initialBitCapacity: Int): MutableBigInt {
             if (initialBitCapacity >= 0) {
                 val initialLimbCapacity = max(4, limbLenFromBitLen(initialBitCapacity))
-                return BigIntAccumulator(
+                return MutableBigInt(
                     Meta(0),
                     Mago.newWithFloorLen(initialLimbCapacity)
                 )
@@ -87,8 +141,8 @@ class BigIntAccumulator private constructor (
             throw IllegalArgumentException()
         }
 
-        private fun from(meta: Meta, magia: Magia): BigIntAccumulator {
-            return BigIntAccumulator(
+        private fun from(meta: Meta, magia: Magia): MutableBigInt {
+            return MutableBigInt(
                 Meta(0),
                 Mago.newWithFloorLen(meta.normLen)
             ).set(meta, magia)
@@ -381,13 +435,13 @@ class BigIntAccumulator private constructor (
      *
      * @return this accumulator instance, for call chaining.
      */
-    fun setZero(): BigIntAccumulator {
+    fun setZero(): MutableBigInt {
         validate()
         _meta = Meta(0)
         return this
     }
 
-    fun setOne(signFlag: Boolean = false): BigIntAccumulator {
+    fun setOne(signFlag: Boolean = false): MutableBigInt {
         validate()
         _meta = Meta(signFlag, 1)
         magia[0] = 1
@@ -395,12 +449,12 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    fun mutAbs(): BigIntAccumulator {
+    fun mutAbs(): MutableBigInt {
         _meta = _meta.abs()
         return this
     }
 
-    fun mutNegate(): BigIntAccumulator {
+    fun mutNegate(): MutableBigInt {
         _meta = _meta.negate()
         return this
     }
@@ -442,15 +496,15 @@ class BigIntAccumulator private constructor (
     fun set(dw: ULong) = set(false, dw)
 
     /**
-     * Sets this accumulator’s value from another [BigIntAccumulator].
+     * Sets this accumulator’s value from another [MutableBigInt].
      *
      * The accumulator copies the sign, and magnitude of the source accumulator.
      * Internal storage of the destination is reused when possible.
      *
-     * @param bi the source [BigIntAccumulator].
+     * @param bi the source [MutableBigInt].
      * @return this accumulator instance, for call chaining.
      */
-    fun set(bi: BigIntBase): BigIntAccumulator = set(bi.meta, bi.magia)
+    fun set(bi: BigIntBase): MutableBigInt = set(bi.meta, bi.magia)
 
     /**
      * Sets this accumulator’s value from a raw sign and 64-bit magnitude.
@@ -463,7 +517,7 @@ class BigIntAccumulator private constructor (
      * @param dw the magnitude as an unsigned 64-bit integer.
      * @return this accumulator instance, for call chaining.
      */
-    fun set(sign: Boolean, dw: ULong): BigIntAccumulator {
+    fun set(sign: Boolean, dw: ULong): MutableBigInt {
         val normLen = (64 - dw.countLeadingZeroBits() + 31) ushr 5
         _meta = Meta(sign, normLen)
         // limbLen = if (dw == 0uL) 0 else if ((dw shr 32) == 0uL) 1 else 2
@@ -472,7 +526,7 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    fun set(sign: Boolean, dwHi: ULong, dwLo: ULong): BigIntAccumulator {
+    fun set(sign: Boolean, dwHi: ULong, dwLo: ULong): MutableBigInt {
         val bitLen = if (dwHi == 0uL)
             64 - dwLo.countLeadingZeroBits()
         else
@@ -500,7 +554,7 @@ class BigIntAccumulator private constructor (
      * @param yLen the number of significant limbs in [y] to copy.
      * @return this accumulator instance, for call chaining.
      */
-    private fun set(yMeta: Meta, y: Magia): BigIntAccumulator {
+    private fun set(yMeta: Meta, y: Magia): MutableBigInt {
         ensureCapacityDiscard(yMeta.normLen)
         _meta = yMeta
         y.copyInto(magia, 0, 0, yMeta.normLen)
@@ -511,7 +565,7 @@ class BigIntAccumulator private constructor (
      * Creates an immutable [BigInt] representing the current value of this accumulator.
      *
      * The returned [BigInt] is a snapshot of the accumulator’s current sign and
-     * magnitude. Subsequent modifications to this [BigIntAccumulator] do not affect
+     * magnitude. Subsequent modifications to this [MutableBigInt] do not affect
      * the returned [BigInt], and vice versa.
      *
      * This conversion performs a copy of the active limbs (`magia[0 until limbLen]`)
@@ -543,7 +597,7 @@ class BigIntAccumulator private constructor (
     fun setSub(x: BigIntBase, y: BigIntBase) =
         setAddImpl(x, y.meta.negate(), y.magia)
 
-    private fun setAddImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+    private fun setAddImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
         check (x.isNormalized())
         val xMagia = x.magia // use only xMagia in here because of aliasing
         when {
@@ -574,7 +628,7 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun setAddImpl(x: BigIntBase, yMeta: Meta, yMagia: Magia): BigIntAccumulator {
+    private fun setAddImpl(x: BigIntBase, yMeta: Meta, yMagia: Magia): MutableBigInt {
         check (x.isNormalized())
         check (Mago.isNormalized(yMagia, yMeta.normLen))
         val xMagia = x.magia // save for aliasing
@@ -624,7 +678,7 @@ class BigIntAccumulator private constructor (
     fun setMul(x: BigIntBase, y: BigIntBase) =
         setMulImpl(x.meta, x.magia, y.meta, y.magia)
 
-    private fun setMulImpl(x: BigIntBase, wSign: Boolean, w: UInt): BigIntAccumulator {
+    private fun setMulImpl(x: BigIntBase, wSign: Boolean, w: UInt): MutableBigInt {
         val xMagia = x.magia
         ensureCapacityDiscard(x.meta.normLen + 1)
         _meta = Meta(
@@ -634,7 +688,7 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun setMulImpl(x: BigIntBase, dwSign: Boolean, dw: ULong): BigIntAccumulator {
+    private fun setMulImpl(x: BigIntBase, dwSign: Boolean, dw: ULong): MutableBigInt {
         val xMagia = x.magia
         ensureCapacityDiscard(x.meta.normLen + 2)
         _meta = Meta(
@@ -644,7 +698,7 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun setMulImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): BigIntAccumulator {
+    private fun setMulImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): MutableBigInt {
         val xNormLen = xMeta.normLen
         val yNormLen = yMeta.normLen
         ensureTmp1Capacity(xNormLen + yNormLen)
@@ -656,25 +710,25 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    fun setSqr(n: Int): BigIntAccumulator = setSqr(n.absoluteValue.toUInt())
+    fun setSqr(n: Int): MutableBigInt = setSqr(n.absoluteValue.toUInt())
 
-    fun setSqr(w: UInt): BigIntAccumulator {
+    fun setSqr(w: UInt): MutableBigInt {
         val abs = w.toULong()
         return set(abs * abs)
     }
 
-    fun setSqr(l: Long): BigIntAccumulator = setSqr(l.absoluteValue.toULong())
+    fun setSqr(l: Long): MutableBigInt = setSqr(l.absoluteValue.toULong())
 
-    fun setSqr(dw: ULong): BigIntAccumulator {
+    fun setSqr(dw: ULong): MutableBigInt {
         val lo = dw * dw
         val hi = unsignedMulHi(dw, dw)
         return set(false, hi, lo)
     }
 
-    fun setSqr(x: BigIntBase): BigIntAccumulator =
+    fun setSqr(x: BigIntBase): MutableBigInt =
         setSqrImpl(x.meta, x.magia)
 
-    private fun setSqrImpl(xMeta: Meta, x: Magia): BigIntAccumulator {
+    private fun setSqrImpl(xMeta: Meta, x: Magia): MutableBigInt {
         check(Mago.isNormalized(x, xMeta.normLen))
         val xNormLen = xMeta.normLen
         ensureTmp1CapacityZeroed(xNormLen + xNormLen)
@@ -686,15 +740,15 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    fun setDiv(x: BigIntAccumulator, n: Int): BigIntAccumulator =
+    fun setDiv(x: MutableBigInt, n: Int): MutableBigInt =
         setDivImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
-    fun setDiv(x: BigIntAccumulator, w: UInt): BigIntAccumulator =
+    fun setDiv(x: MutableBigInt, w: UInt): MutableBigInt =
         setDivImpl(x, false, w.toULong())
-    fun setDiv(x: BigIntAccumulator, l: Long): BigIntAccumulator =
+    fun setDiv(x: MutableBigInt, l: Long): MutableBigInt =
         setDivImpl(x, l < 0L, l.absoluteValue.toULong())
-    fun setDiv(x: BigIntAccumulator, dw: ULong): BigIntAccumulator =
+    fun setDiv(x: MutableBigInt, dw: ULong): MutableBigInt =
         setDivImpl(x, false, dw)
-    fun setDiv(x: BigIntBase, y: BigIntBase): BigIntAccumulator {
+    fun setDiv(x: BigIntBase, y: BigIntBase): MutableBigInt {
         ensureCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
         if (trySetDivFastPath(x, y))
             return this
@@ -705,7 +759,7 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun setDivImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+    private fun setDivImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
         ensureCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
         if (trySetDivFastPath64(x, ySign, yDw))
             return this
@@ -743,15 +797,15 @@ class BigIntAccumulator private constructor (
         return true
     }
 
-    fun setRem(x: BigIntBase, n: Int): BigIntAccumulator =
+    fun setRem(x: BigIntBase, n: Int): MutableBigInt =
         setRemImpl(x, n.absoluteValue.toUInt().toULong())
-    fun setRem(x: BigIntBase, w: UInt): BigIntAccumulator =
+    fun setRem(x: BigIntBase, w: UInt): MutableBigInt =
         setRemImpl(x, w.toULong())
-    fun setRem(x: BigIntBase, l: Long): BigIntAccumulator =
+    fun setRem(x: BigIntBase, l: Long): MutableBigInt =
         setRemImpl(x, l.absoluteValue.toULong())
-    fun setRem(x: BigIntBase, dw: ULong): BigIntAccumulator =
+    fun setRem(x: BigIntBase, dw: ULong): MutableBigInt =
         setRemImpl(x, dw)
-    fun setRem(x: BigIntBase, y: BigIntBase): BigIntAccumulator {
+    fun setRem(x: BigIntBase, y: BigIntBase): MutableBigInt {
         ensureCapacityCopy(min(x.meta.normLen, y.meta.normLen))
         if (trySetRemFastPath(x.meta, x.magia, y.meta, y.magia))
             return this
@@ -765,21 +819,21 @@ class BigIntAccumulator private constructor (
     }
 
 
-    private fun setRemImpl(x: BigIntBase, yDw: ULong): BigIntAccumulator {
+    private fun setRemImpl(x: BigIntBase, yDw: ULong): MutableBigInt {
         ensureTmp1Capacity(x.meta.normLen + 1)
         val rem = Mago.calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
         return set(x.meta.signFlag, rem)
     }
 
-    fun setMod(x: BigIntBase, n: Int): BigIntAccumulator =
+    fun setMod(x: BigIntBase, n: Int): MutableBigInt =
         setModImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
-    fun setMod(x: BigIntBase, w: UInt): BigIntAccumulator =
+    fun setMod(x: BigIntBase, w: UInt): MutableBigInt =
         setModImpl(x, false, w.toULong())
-    fun setMod(x: BigIntBase, l: Long): BigIntAccumulator =
+    fun setMod(x: BigIntBase, l: Long): MutableBigInt =
         setModImpl(x, l < 0, l.absoluteValue.toULong())
-    fun setMod(x: BigIntBase, dw: ULong): BigIntAccumulator =
+    fun setMod(x: BigIntBase, dw: ULong): MutableBigInt =
         setModImpl(x, false, dw)
-    fun setMod(x: BigIntBase, y: BigIntBase): BigIntAccumulator {
+    fun setMod(x: BigIntBase, y: BigIntBase): MutableBigInt {
         if (y.meta.isNegative)
             throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         setRem(x, y)
@@ -788,7 +842,7 @@ class BigIntAccumulator private constructor (
         return this
     }
 
-    private fun setModImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): BigIntAccumulator {
+    private fun setModImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
         if (ySign)
             throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         setRem(x, yDw)
@@ -824,8 +878,8 @@ class BigIntAccumulator private constructor (
      *
      * Example usage:
      * ```
-     * val acc = BigIntAccumulator()
-     * acc += 42L
+     * val mbi = MutableBigInt()
+     * mbi += 42L
      * ```
      *
      * @param l the value to add.
@@ -873,8 +927,8 @@ class BigIntAccumulator private constructor (
      *
      * Example usage:
      * ```
-     * val acc = BigIntAccumulator()
-     * acc -= 42L
+     * val mbi = MutableBigInt()
+     * mbi -= 42L
      * ```
      *
      * @param l the value to subtract.
@@ -904,19 +958,19 @@ class BigIntAccumulator private constructor (
      * it with the operand. Supported operand types include:
      * - [Int], [Long], [UInt], [ULong]
      * - [BigInt]
-     * - [BigIntAccumulator]
+     * - [MutableBigInt]
      *
      * Sign handling is automatically applied.
      *
-     * When multiplying by another `BigIntAccumulator` that is the same instance
+     * When multiplying by another `MutableBigInt` that is the same instance
      * (`this === other`), a specialized squaring routine is used to prevent aliasing
      * issues and improve performance.
      *
      * Example usage:
      * ```
-     * val acc = BigIntAccumulator().setOne() // must start at 1 for multiplication
-     * acc *= 10
-     * acc *= anotherBigInt
+     * val mbi = MutableBigInt().setOne() // must start at 1 for multiplication
+     * mbi *= 10
+     * mbi *= anotherBigInt
      * ```
      *
      * @param n the value to multiply by.
@@ -944,8 +998,8 @@ class BigIntAccumulator private constructor (
      *
      * Example usage:
      * ```
-     * val acc = BigIntAccumulator().setOne() // must start at 1 for multiplication
-     * acc *= 10L
+     * val mbi = MutableBigInt().setOne() // must start at 1 for multiplication
+     * mbi *= 10L
      * ```
      *
      * @param l the value to multiply by.
@@ -962,7 +1016,7 @@ class BigIntAccumulator private constructor (
 
     /**
      * Multiplies this accumulator by the given [BigInt]
-     * or [BigIntAccumulator] value.
+     * or [MutableBigInt] value.
      *
      * @param bi the value to multiply by.
      * @see timesAssign(Long)
@@ -996,7 +1050,7 @@ class BigIntAccumulator private constructor (
      * and add it to this accumulator. Supported operand types include:
      * - [Int], [Long], [UInt], [ULong]
      * - [BigInt]
-     * - [BigIntAccumulator]
+     * - [MutableBigInt]
      *
      * The magnitude is squared before addition. The internal tmp buffer
      * is reused to minimize heap allocation during the operation.
@@ -1007,7 +1061,7 @@ class BigIntAccumulator private constructor (
      *
      * Example usage:
      * ```
-     * val sumSqr = BigIntAccumulator()
+     * val sumSqr = MutableBigInt()
      * for (v in data) {
      *     sumSqr.addSquareOf(v)
      * }
@@ -1084,14 +1138,14 @@ class BigIntAccumulator private constructor (
      * Adds the absolute value of the given operand to this accumulator in place.
      *
      * Supported operand types include integer primitives ([Int], [Long]) and
-     * arbitrary-precision values ([BigInt], [BigIntAccumulator]).
+     * arbitrary-precision values ([BigInt], [MutableBigInt]).
      *
      * This operation does not support unsigned types since they are always
      * non-negative ... use `+=`
      *
      * Example usage:
      * ```
-     * val sumAbs = BigIntAccumulator()
+     * val sumAbs = MutableBigInt()
      * for (v in data) {
      *     sumAbs.addAbsValueOf(v)
      * }
@@ -1106,7 +1160,7 @@ class BigIntAccumulator private constructor (
 
     /**
      * Adds the absolute value of the given [BigInt] or
-     * [BigIntAccumulator] to this accumulator.
+     * [MutableBigInt] to this accumulator.
      *
      * @param hi the value to add.
      * @see addAbsValueOf(Long)
@@ -1119,13 +1173,13 @@ class BigIntAccumulator private constructor (
      * Sign remains the same.
      * Throws if [bitCount] is negative.
      */
-    fun mutShl(bitCount: Int): BigIntAccumulator = setShl(this, bitCount)
+    fun mutShl(bitCount: Int): MutableBigInt = setShl(this, bitCount)
 
     /**
      * Sets this accumulator to `x << bitCount`. Allocates space for the
      * resulting bit length. Throws if [bitCount] is negative.
      */
-    fun setShl(x: BigIntAccumulator, bitCount: Int): BigIntAccumulator = when {
+    fun setShl(x: MutableBigInt, bitCount: Int): MutableBigInt = when {
         bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         bitCount == 0 || x.isZero() -> set(x)
         else -> {
@@ -1145,7 +1199,7 @@ class BigIntAccumulator private constructor (
      *
      * Throws if [bitCount] is negative.
      */
-    fun mutUshr(bitCount: Int): BigIntAccumulator = setUshr(this, bitCount)
+    fun mutUshr(bitCount: Int): MutableBigInt = setUshr(this, bitCount)
 
     /**
      * Sets this accumulator to `x >>> bitCount`.
@@ -1155,7 +1209,7 @@ class BigIntAccumulator private constructor (
      *
      * Throws if [bitCount] is negative.
      */
-    fun setUshr(x: BigIntBase, bitCount: Int): BigIntAccumulator {
+    fun setUshr(x: BigIntBase, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
         return when {
             bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
@@ -1181,7 +1235,7 @@ class BigIntAccumulator private constructor (
      *
      * Throws if [bitCount] is negative.
      */
-    fun mutShr(bitCount: Int): BigIntAccumulator = setShr(this, bitCount)
+    fun mutShr(bitCount: Int): MutableBigInt = setShr(this, bitCount)
 
     /**
      * Sets this accumulator to `x >> bitCount`.
@@ -1192,7 +1246,7 @@ class BigIntAccumulator private constructor (
      *
      * Throws if [bitCount] is negative.
      */
-    fun setShr(x: BigIntBase, bitCount: Int): BigIntAccumulator {
+    fun setShr(x: BigIntBase, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
         when {
             bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
@@ -1223,7 +1277,7 @@ class BigIntAccumulator private constructor (
      *
      * @throws IllegalArgumentException if [bitIndex] is negative
      */
-    fun setBit(bitIndex: Int): BigIntAccumulator {
+    fun setBit(bitIndex: Int): MutableBigInt {
         if (bitIndex >= 0) {
             val wordIndex = bitIndex ushr 5
             val isolatedBit = (1 shl (bitIndex and 0x1F))
@@ -1245,7 +1299,7 @@ class BigIntAccumulator private constructor (
      *
      * @throws IllegalArgumentException if [bitIndex] is negative
      */
-    fun clearBit(bitIndex: Int): BigIntAccumulator {
+    fun clearBit(bitIndex: Int): MutableBigInt {
         if (bitIndex >= 0) {
             val wordIndex = bitIndex ushr 5
             if (wordIndex < meta.normLen) {
@@ -1269,7 +1323,7 @@ class BigIntAccumulator private constructor (
      *
      * @throws IllegalArgumentException if `bitWidth` or `bitIndex` is negative.
      */
-    fun applyBitMask(bitWidth: Int, bitIndex: Int = 0): BigIntAccumulator {
+    fun applyBitMask(bitWidth: Int, bitIndex: Int = 0): MutableBigInt {
         check (isNormalized())
         val myBitLen = magnitudeBitLen()
         when {
@@ -1328,7 +1382,7 @@ class BigIntAccumulator private constructor (
      * Value comparison for computational use.
      *
      * Equality is intentionally **asymmetric**:
-     * - Compares by numeric value against [BigIntAccumulator], [BigInt], and
+     * - Compares by numeric value against [MutableBigInt], [BigInt], and
      *   selected integer primitives.
      * - `other.equals(this)` is **not** guaranteed to return the same result.
      *
@@ -1352,12 +1406,12 @@ class BigIntAccumulator private constructor (
     /**
      * Always throws.
      *
-     * `BigIntAccumulator` is mutable and must never be used as a key in hash-based
+     * `MutableBigInt` is mutable and must never be used as a key in hash-based
      * collections (`HashMap`, `HashSet`, etc.). Calling `hashCode()` is therefore
      * unsupported and results in an exception.
      */
     override fun hashCode(): Int =
         throw UnsupportedOperationException(
-            "mutable BigIntAccumulator is an invalid key in collections")
+            "mutable MutableBigInt is an invalid key in collections")
 
 }

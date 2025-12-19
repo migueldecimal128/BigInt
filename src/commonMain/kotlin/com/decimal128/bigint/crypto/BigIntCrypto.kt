@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.BigIntAccumulator
+import com.decimal128.bigint.MutableBigInt
 
 object BigIntCrypto {
 
@@ -9,19 +9,19 @@ object BigIntCrypto {
         val mBitLen = m.magnitudeBitLen()
         if (mBitLen <= 1)
             throw IllegalArgumentException()
-        var t = BigIntAccumulator.Companion
+        var t = MutableBigInt.Companion
             .withInitialBitCapacity(2 * mBitLen)
-        var newT = BigIntAccumulator.Companion
+        var newT = MutableBigInt.Companion
             .withInitialBitCapacity(2 * mBitLen)
             .set(1)
-        var tmpT = BigIntAccumulator()
-        var r = BigIntAccumulator().set(m)
-        var newR = BigIntAccumulator().setRem(a, m)
-        var tmpR = BigIntAccumulator()
+        var tmpT = MutableBigInt()
+        var r = MutableBigInt().set(m)
+        var newR = MutableBigInt().setRem(a, m)
+        var tmpR = MutableBigInt()
 
-        val q = BigIntAccumulator()
-        val qNewT = BigIntAccumulator()
-        val qNewR = BigIntAccumulator()
+        val q = MutableBigInt()
+        val qNewT = MutableBigInt()
+        val qNewR = MutableBigInt()
 
         while (newR.isNotZero()) {
             q.setDiv(r, newR)

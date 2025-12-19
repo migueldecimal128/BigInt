@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.BigIntAccumulator
+import com.decimal128.bigint.MutableBigInt
 import com.decimal128.bigint.toBigInt
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -14,7 +14,7 @@ class TestIsProbablePrime {
 
     @Test
     fun testSmallValues() {
-        val tmp = BigIntAccumulator()
+        val tmp = MutableBigInt()
 
         assertFalse(BigIntPrime.isProbablePrime(bi(0), tmp))
         assertFalse(BigIntPrime.isProbablePrime(bi(1), tmp))
@@ -27,7 +27,7 @@ class TestIsProbablePrime {
 
     @Test
     fun testSmallPrimesInTable() {
-        val tmp = BigIntAccumulator()
+        val tmp = MutableBigInt()
 
         val primes = intArrayOf(
             3, 5, 7, 11, 13, 17, 19, 23,
@@ -54,7 +54,7 @@ class TestIsProbablePrime {
 
     @Test
     fun testSmallCompositeFactors() {
-        val tmp = BigIntAccumulator()
+        val tmp = MutableBigInt()
 
         val composites = intArrayOf(
             9, 15, 21, 25, 27, 33, 35, 39,
@@ -72,7 +72,7 @@ class TestIsProbablePrime {
 
     @Test
     fun testLargePrimeAndComposite() {
-        val tmp = BigIntAccumulator()
+        val tmp = MutableBigInt()
 
         // 61-bit prime
         val prime = BigInt.from("2305843009213693951") // 2^61 − 1
@@ -85,7 +85,7 @@ class TestIsProbablePrime {
 
     @Test
     fun testNegativeRejected() {
-        val tmp = BigIntAccumulator()
+        val tmp = MutableBigInt()
         assertFailsWith<IllegalArgumentException> {
             BigIntPrime.isProbablePrime((-7).toBigInt(), tmp)
         }

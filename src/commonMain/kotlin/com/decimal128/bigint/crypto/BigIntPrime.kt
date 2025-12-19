@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.BigIntAccumulator
+import com.decimal128.bigint.MutableBigInt
 import com.decimal128.bigint.toBigInt
 import com.decimal128.bigint.toBigIntAccumulator
 
@@ -19,7 +19,7 @@ import com.decimal128.bigint.toBigIntAccumulator
  *
  * ## Notes
  * - All algorithms are allocation-conscious and reuse
- *   [BigIntAccumulator] scratch storage where possible.
+ *   [MutableBigInt] scratch storage where possible.
  * - Results are *probabilistic* but extremely reliable in practice.
  * - Negative values are rejected; `0` and `1` are composite.
  */
@@ -28,7 +28,7 @@ object BigIntPrime {
     /**
      * Returns `true` if [n] is a probable prime (Baillie–PSW test).
      */
-    fun isProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()) =
+    fun isProbablePrime(n: BigInt, tmp: MutableBigInt = MutableBigInt()) =
         isBailliePSWProbablePrime(n, tmp)
 
     /**
@@ -50,7 +50,7 @@ object BigIntPrime {
      * ## Behavior
      * - Returns `false` for negative values, `0`, and `1`
      * - Returns `true` for all small primes
-     * - Uses [BigIntAccumulator] scratch storage to minimize heap allocation
+     * - Uses [MutableBigInt] scratch storage to minimize heap allocation
      *
      * ## Constraints
      * - [n] must be non-negative
@@ -60,7 +60,7 @@ object BigIntPrime {
      * @return `true` if [n] is a probable prime, `false` if composite
      * @throws IllegalArgumentException if [n] is negative
      */
-    fun isBailliePSWProbablePrime(n: BigInt, tmp: BigIntAccumulator = BigIntAccumulator()): Boolean {
+    fun isBailliePSWProbablePrime(n: BigInt, tmp: MutableBigInt = MutableBigInt()): Boolean {
         require(!n.isNegative())
         return when (classifyBySmallPrimes(n, tmp)) {
             SmallPrimeResult.COMPOSITE -> false
@@ -91,7 +91,7 @@ object BigIntPrime {
 
     private fun classifyBySmallPrimes(
         n: BigInt,
-        tmp: BigIntAccumulator
+        tmp: MutableBigInt
     ): SmallPrimeResult {
         return when {
             n <= 1 -> SmallPrimeResult.COMPOSITE
@@ -145,7 +145,7 @@ object BigIntPrime {
      * @return `true` if [n] passes all Miller–Rabin bases, `false` if composite
      * @throws IllegalArgumentException if [n] is negative
      */
-    fun isMillerRabin64(n: BigInt, tmp: BigIntAccumulator): Boolean {
+    fun isMillerRabin64(n: BigInt, tmp: MutableBigInt): Boolean {
         require (! n.isNegative())
         val nMinusOne = n - 1
         var d = nMinusOne
@@ -379,19 +379,19 @@ object BigIntPrime {
 
         var U = 1.toBigIntAccumulator()
         var V = 1.toBigIntAccumulator()
-        var Qk = BigIntAccumulator()
+        var Qk = MutableBigInt()
         modCtx.modSet(Q, Qk)
 
-        var U2m = BigIntAccumulator()
-        var V2m = BigIntAccumulator()
-        var V2 = BigIntAccumulator()
-        var QkDoubled = BigIntAccumulator()
-        var Q2m = BigIntAccumulator()
-        var U2m1 = BigIntAccumulator()
-        var V2m1 = BigIntAccumulator()
-        var Q2m1 = BigIntAccumulator()
-        val tmp1 = BigIntAccumulator()
-        val tmp2 = BigIntAccumulator()
+        var U2m = MutableBigInt()
+        var V2m = MutableBigInt()
+        var V2 = MutableBigInt()
+        var QkDoubled = MutableBigInt()
+        var Q2m = MutableBigInt()
+        var U2m1 = MutableBigInt()
+        var V2m1 = MutableBigInt()
+        var Q2m1 = MutableBigInt()
+        val tmp1 = MutableBigInt()
+        val tmp2 = MutableBigInt()
 
         for (i in d.magnitudeBitLen() - 2 downTo 0) {
 

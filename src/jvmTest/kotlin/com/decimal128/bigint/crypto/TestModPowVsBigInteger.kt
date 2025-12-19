@@ -1,6 +1,6 @@
 package com.decimal128.bigint.crypto
 
-import com.decimal128.bigint.BigIntAccumulator
+import com.decimal128.bigint.MutableBigInt
 import com.decimal128.bigint.toBigInt
 import java.math.BigInteger
 import java.util.Random
@@ -16,7 +16,7 @@ class TestModPowVsBigInteger {
         val mJava = BigInteger.probablePrime(128, rnd)
         val m = mJava.toString().toBigInt()
         val ctx = ModContext(m)
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
 
         repeat(500) {
             val aJava = BigInteger(mJava.bitLength() - 1, rnd).mod(mJava)

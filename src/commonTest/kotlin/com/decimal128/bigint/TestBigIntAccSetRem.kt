@@ -12,7 +12,7 @@ class TestBigIntAccSetRem {
         val x = "16943852051772892430707956759219".toBigIntAccumulator()
         val y = 16883797134507450982uL.toBigInt()
 
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
         out.setRem(x, y)
 
         assertEquals(x.toBigInt() % y, out.toBigInt())
@@ -21,7 +21,7 @@ class TestBigIntAccSetRem {
     @Test
     fun setRem_alias_out_is_x() {
         val biX = "16943852051772892430707956759219".toBigInt()
-        val x = BigIntAccumulator()
+        val x = MutableBigInt()
         val biY = 16883797134507450982uL.toBigInt()
         val y = biY.toBigIntAccumulator()
 
@@ -80,7 +80,7 @@ class TestBigIntAccSetRem {
         val x = "16943852051772892430707956759219".toBigIntAccumulator()
         val y = "16883797134507450982".toBigInt()
 
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
         out.setRem(x, y)
 
         val r = out.toBigInt()

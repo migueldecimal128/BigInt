@@ -3,7 +3,7 @@ package com.decimal128.bigint
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 
-// <<<< THESE PORT OVER TO BigIntAccumulator WITH BigInt => BigIntAccumulator >>>>
+// <<<< THESE PORT OVER TO MutableBigInt WITH BigInt => MutableBigInt >>>>
 /**
  * Extension operators to enable arithmetic and comparison between primitive integer types
  * (`Int`, `UInt`, `Long`, `ULong`) and `BigInt`.
@@ -215,12 +215,12 @@ fun BigInt.pow(exp: Int): BigInt = BigIntAlgorithms.pow(this, exp)
 fun BigInt.isqrt(): BigInt = BigIntAlgorithms.isqrt(this)
 
 
-fun BigInt.toBigIntAccumulator() = BigIntAccumulator.from(this)
+fun BigInt.toBigIntAccumulator() = MutableBigInt.from(this)
 
-fun Int.toBigIntAccumulator() = BigIntAccumulator().set(this)
-fun UInt.toBigIntAccumulator() = BigIntAccumulator().set(this)
-fun Long.toBigIntAccumulator() = BigIntAccumulator().set(this)
-fun ULong.toBigIntAccumulator() = BigIntAccumulator().set(this)
+fun Int.toBigIntAccumulator() = MutableBigInt().set(this)
+fun UInt.toBigIntAccumulator() = MutableBigInt().set(this)
+fun Long.toBigIntAccumulator() = MutableBigInt().set(this)
+fun ULong.toBigIntAccumulator() = MutableBigInt().set(this)
 
 fun String.toBigIntAccumulator() = this.toBigInt().toBigIntAccumulator()
 

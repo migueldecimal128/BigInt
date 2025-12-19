@@ -11,8 +11,8 @@ class TestBigIntAccAddSub {
     }
 
     private fun bi(v: Int): BigInt = BigInt.from(v)    // adjust to your constructor
-    private fun acc(v: Int): BigIntAccumulator =
-        BigIntAccumulator().set(bi(v))
+    private fun mbi(v: Int): MutableBigInt =
+        MutableBigInt().set(bi(v))
 
     @Test
     fun testAddAndSubAllCombinations() {
@@ -21,7 +21,7 @@ class TestBigIntAccAddSub {
         for (x in values) {
             for (y in values) {
                 // --- Test Addition ---
-                val accAdd = acc(x).setAdd(bi(x), bi(y))
+                val accAdd = mbi(x).setAdd(bi(x), bi(y))
                 val expectedAdd = x + y
                 assertEquals(
                     bi(expectedAdd),
@@ -30,7 +30,7 @@ class TestBigIntAccAddSub {
                 )
 
                 // --- Test Subtraction ---
-                val accSub = acc(x).setSub(bi(x), bi(y))
+                val accSub = mbi(x).setSub(bi(x), bi(y))
                 val expectedSub = x - y
                 assertEquals(
                     bi(expectedSub),
@@ -43,16 +43,16 @@ class TestBigIntAccAddSub {
 
     @Test
     fun testAlias_this_is_x_add() {
-        val acc = BigIntAccumulator().set(bi(10))     // acc = 10
-        acc.setAdd(acc.toBigInt(), bi(7))             // acc = acc + 7
-        assertEquals(bi(17), acc.toBigInt(), "alias: this === x (addition) failed")
+        val mbi = MutableBigInt().set(bi(10))     // mbi = 10
+        mbi.setAdd(mbi.toBigInt(), bi(7))             // mbi = mbi + 7
+        assertEquals(bi(17), mbi.toBigInt(), "alias: this === x (addition) failed")
     }
 
     @Test
     fun testAlias_this_is_y_add() {
-        val acc = BigIntAccumulator().set(bi(7))      // acc = 7
-        acc.setAdd(bi(10), acc.toBigInt())            // acc = 10 + acc
-        assertEquals(bi(17), acc.toBigInt(), "alias: this === y (addition) failed")
+        val mbi = MutableBigInt().set(bi(7))      // mbi = 7
+        mbi.setAdd(bi(10), mbi.toBigInt())            // mbi = 10 + mbi
+        assertEquals(bi(17), mbi.toBigInt(), "alias: this === y (addition) failed")
     }
 
     // ------------------------------------------------------------
@@ -64,11 +64,11 @@ class TestBigIntAccAddSub {
         val x = BigInt.withBitMask(1024) - bi(1)   // all 1 bits
         val y = bi(1)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setAdd(x, y)
+        val mbi = MutableBigInt().set(x)
+        mbi.setAdd(x, y)
 
         val expected = BigInt.withBitMask(1024)
-        assertEquals(expected, acc.toBigInt(), "large carry propagation failed")
+        assertEquals(expected, mbi.toBigInt(), "large carry propagation failed")
     }
 
     // ------------------------------------------------------------
@@ -80,11 +80,11 @@ class TestBigIntAccAddSub {
         val x = BigInt.withBitMask(1024)
         val y = bi(1)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setSub(x, y)
+        val mbi = MutableBigInt().set(x)
+        mbi.setSub(x, y)
 
         val expected = BigInt.withBitMask(1024) - bi(1)
-        assertEquals(expected, acc.toBigInt(), "large borrow propagation failed")
+        assertEquals(expected, mbi.toBigInt(), "large borrow propagation failed")
     }
 
     // ------------------------------------------------------------
@@ -95,11 +95,11 @@ class TestBigIntAccAddSub {
         val x = BigInt.randomWithBitLen(2000)
         val y = BigInt.randomWithBitLen(2000)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setAdd(x, y)
+        val mbi = MutableBigInt().set(x)
+        mbi.setAdd(x, y)
 
         val expected = x + y
-        assertEquals(expected, acc.toBigInt(), "random 2000-bit addition failed")
+        assertEquals(expected, mbi.toBigInt(), "random 2000-bit addition failed")
     }
 
     // ------------------------------------------------------------
@@ -110,11 +110,11 @@ class TestBigIntAccAddSub {
         val x = BigInt.randomWithBitLen(2000)
         val y = BigInt.randomWithBitLen(2000)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setSub(x, y)
+        val mbi = MutableBigInt().set(x)
+        mbi.setSub(x, y)
 
         val expected = x - y
-        assertEquals(expected, acc.toBigInt(), "random 2000-bit subtraction failed")
+        assertEquals(expected, mbi.toBigInt(), "random 2000-bit subtraction failed")
     }
 
     // ------------------------------------------------------------
@@ -125,11 +125,11 @@ class TestBigIntAccAddSub {
         val x = BigInt.randomWithBitLen(1500)
         val y = BigInt.randomWithBitLen(1500)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setAdd(acc.toBigInt(), y)
+        val mbi = MutableBigInt().set(x)
+        mbi.setAdd(mbi.toBigInt(), y)
 
         val expected = x + y
-        assertEquals(expected, acc.toBigInt(), "alias (this === x) add failed")
+        assertEquals(expected, mbi.toBigInt(), "alias (this === x) add failed")
     }
 
     // ------------------------------------------------------------
@@ -140,11 +140,11 @@ class TestBigIntAccAddSub {
         val x = BigInt.randomWithBitLen(1500)
         val y = BigInt.randomWithBitLen(1500)
 
-        val acc = BigIntAccumulator().set(y)
-        acc.setAdd(x, acc.toBigInt())
+        val mbi = MutableBigInt().set(y)
+        mbi.setAdd(x, mbi.toBigInt())
 
         val expected = x + y
-        assertEquals(expected, acc.toBigInt(), "alias (this === y) add failed")
+        assertEquals(expected, mbi.toBigInt(), "alias (this === y) add failed")
     }
 
     // ------------------------------------------------------------
@@ -154,11 +154,11 @@ class TestBigIntAccAddSub {
     fun testLargeAlias_double() {
         val x = BigInt.randomWithBitLen(1800)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setAdd(acc.toBigInt(), acc.toBigInt())  // acc = x + x
+        val mbi = MutableBigInt().set(x)
+        mbi.setAdd(mbi.toBigInt(), mbi.toBigInt())  // mbi = x + x
 
         val expected = x + x
-        assertEquals(expected, acc.toBigInt(), "alias (x == y == this) doubling failed")
+        assertEquals(expected, mbi.toBigInt(), "alias (x == y == this) doubling failed")
     }
 
     // ------------------------------------------------------------
@@ -168,11 +168,11 @@ class TestBigIntAccAddSub {
     fun testLargeAlias_cancelToZero() {
         val x = BigInt.randomWithBitLen(1600)
 
-        val acc = BigIntAccumulator().set(x)
-        acc.setSub(acc.toBigInt(), x)  // acc = x - x
+        val mbi = MutableBigInt().set(x)
+        mbi.setSub(mbi.toBigInt(), x)  // mbi = x - x
 
         val expected = BigInt.ZERO
-        assertEquals(expected, acc.toBigInt(), "alias subtract to zero failed")
+        assertEquals(expected, mbi.toBigInt(), "alias subtract to zero failed")
     }
 
 

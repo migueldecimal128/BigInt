@@ -31,7 +31,7 @@ sealed class BigIntBase(
     fun isNotZero() = meta.normLen > 0
 
     /**
-     * Returns `true` if this BigIntAccumulator currently is One
+     * Returns `true` if this MutableBigInt currently is One
      */
     fun isOne() = meta._meta == 1 && magia[0] == 1
 
@@ -495,9 +495,9 @@ sealed class BigIntBase(
 
     /**
      * Comparison predicate for numerical equality with another [BigInt] or
-     * [BigIntAccumulator].
+     * [MutableBigInt].
      *
-     * @param other the [BigInt] or [BigIntAccumulator] to compare with
+     * @param other the [BigInt] or [MutableBigInt] to compare with
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
     infix fun EQ(other: BigIntBase): Boolean =
@@ -544,12 +544,12 @@ sealed class BigIntBase(
     infix fun NE(other: BigInt): Boolean = !EQ(other)
 
     /**
-     * Comparison predicate for numerical inequality with a [BigIntAccumulator].
+     * Comparison predicate for numerical inequality with a [MutableBigInt].
      *
-     * @param acc the [BigIntAccumulator] to compare with
+     * @param mbi the [MutableBigInt] to compare with
      * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
      */
-    infix fun NE(acc: BigIntAccumulator): Boolean = !EQ(acc)
+    infix fun NE(mbi: MutableBigInt): Boolean = !EQ(mbi)
 
     /**
      * Comparison predicate for numerical inequality with a signed 32-bit integer.
@@ -586,9 +586,9 @@ sealed class BigIntBase(
 
     /**
      * Comparison predicate for numerical equality with another [BigInt] or
-     * [BigIntAccumulator]
+     * [MutableBigInt]
      *
-     * @param other the [BigInt] or [BigIntAccumulator] to compare with
+     * @param other the [BigInt] or [MutableBigInt] to compare with
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
     infix fun magEQ(other: BigIntBase): Boolean = magnitudeCompareTo(other) == 0
@@ -634,12 +634,12 @@ sealed class BigIntBase(
     infix fun magNE(other: BigInt): Boolean = !magEQ(other)
 
     /**
-     * Comparison predicate for numerical inequality with a [BigIntAccumulator].
+     * Comparison predicate for numerical inequality with a [MutableBigInt].
      *
-     * @param acc the [BigIntAccumulator] to compare with
+     * @param mbi the [MutableBigInt] to compare with
      * @return `true` if signs differ or magnitudes are unequal, `false` otherwise
      */
-    infix fun magNE(acc: BigIntAccumulator): Boolean = !magEQ(acc)
+    infix fun magNE(mbi: MutableBigInt): Boolean = !magEQ(mbi)
 
     /**
      * Comparison predicate for numerical inequality with a signed 32-bit integer.

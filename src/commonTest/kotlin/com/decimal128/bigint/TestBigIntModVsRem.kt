@@ -96,7 +96,7 @@ class TestBigIntModVsRem {
     }
 
     @Test
-    fun mod_negativeDivisorFails() {
+    fun mod_negativeDivisorUsesAbsoluteValue() {
         val x = (-42).toBigInt()
 
         assertFailsWith<ArithmeticException> {

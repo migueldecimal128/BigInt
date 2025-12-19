@@ -14,7 +14,7 @@ class TestFactorialMacosX64 {
     @Test
     fun testSmall() {
         assertEquals(BigInt.ONE, BigInt.factorial(0))
-        val accum = BigIntAccumulator().setOne()
+        val accum = MutableBigInt().setOne()
         var f = 1uL
         for (i in 1..20) {
             f *= i.toULong()
@@ -30,7 +30,7 @@ class TestFactorialMacosX64 {
     @Test
     fun testMedium() {
         var f = BigInt.factorial(20)
-        val accum = BigIntAccumulator().set(f)
+        val accum = MutableBigInt().set(f)
         for (i in 21..100) {
             f *= i
             accum *= i
@@ -50,7 +50,7 @@ class TestFactorialMacosX64 {
                 mul *= i
         }
 
-        val accum = BigIntAccumulator().setOne()
+        val accum = MutableBigInt().setOne()
         val accumTime = measureTime {
             for (i in 2..bigNum)
                 accum *= i

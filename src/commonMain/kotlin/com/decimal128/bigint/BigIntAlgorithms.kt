@@ -5,7 +5,6 @@ import com.decimal128.bigint.BigInt.Companion.ONE
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigInt.Companion.from
 import kotlin.math.ceil
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
@@ -29,7 +28,7 @@ object BigIntAlgorithms {
             return from(f)
         }
         val bitCapacityRequired = estimateFactorialBitLen(n)
-        val f = BigIntAccumulator.withInitialBitCapacity(bitCapacityRequired)
+        val f = MutableBigInt.withInitialBitCapacity(bitCapacityRequired)
         val twentyBang = 2_432_902_008_176_640_000L
         f.set(twentyBang)
         for (i in 21..n)
@@ -157,8 +156,8 @@ object BigIntAlgorithms {
             exp == 2 -> baseAbs.sqr()
             else -> {
                 val maxBitLen = base.magnitudeBitLen() * exp
-                val b = BigIntAccumulator.withInitialBitCapacity(maxBitLen).set(base)
-                val r = BigIntAccumulator.withInitialBitCapacity(maxBitLen).setOne()
+                val b = MutableBigInt.withInitialBitCapacity(maxBitLen).set(base)
+                val r = MutableBigInt.withInitialBitCapacity(maxBitLen).setOne()
 
                 var e = exp
                 while (true) {
@@ -300,10 +299,10 @@ object BigIntAlgorithms {
         //  complicated because this might all be clamped by
         //  topBitsIndex
 
-        var x = BigIntAccumulator().set(topSqrt)
+        var x = MutableBigInt().set(topSqrt)
         x.setShl(x, topBitsIndex shr 1)
 
-        var xPrev = BigIntAccumulator()
+        var xPrev = MutableBigInt()
         do {
             val t = xPrev; xPrev = x; x = t
             x.setDiv(radicand, xPrev)

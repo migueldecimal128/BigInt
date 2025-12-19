@@ -21,15 +21,15 @@ class TestBigIntAccum {
         }
     }
 
-    fun testEQ(bi: BigInt, bia: BigIntAccumulator): Boolean {
-        if (bi EQ bia.toBigInt())
+    fun testEQ(bi: BigInt, mbi: MutableBigInt): Boolean {
+        if (bi EQ mbi.toBigInt())
             return true
         return false
     }
 
     @Test
     fun testAddSub() {
-        val hia = BigIntAccumulator()
+        val hia = MutableBigInt()
         var hi = BigInt.ZERO
 
         repeat(rng.nextInt(1000)) {
@@ -130,7 +130,7 @@ class TestBigIntAccum {
 
     @Test
     fun testMul() {
-        val hia = BigIntAccumulator().setOne()
+        val hia = MutableBigInt().setOne()
         var hi = BigInt.ONE
 
         for (i in 0..<200) {
@@ -198,8 +198,8 @@ class TestBigIntAccum {
 
     @Test
     fun testProblem() {
-        val bia1 = BigIntAccumulator().set(3)
-        val bia2 = BigIntAccumulator().set(2)
+        val bia1 = MutableBigInt().set(3)
+        val bia2 = MutableBigInt().set(2)
         bia1 *= bia2
         if (verbose)
             println("bia1:$bia1")
@@ -211,7 +211,7 @@ class TestBigIntAccum {
 
     @Test
     fun testAddAbsValue() {
-        val hia = BigIntAccumulator()
+        val hia = MutableBigInt()
         var hi = BigInt.ZERO
 
         for (i in 0..<10) {
@@ -266,7 +266,7 @@ class TestBigIntAccum {
 
     @Test
     fun testAddSquareOf() {
-        val hia = BigIntAccumulator()
+        val hia = MutableBigInt()
         var hi = BigInt.ZERO
 
         for (i in 0..<rng.nextInt(10)) {

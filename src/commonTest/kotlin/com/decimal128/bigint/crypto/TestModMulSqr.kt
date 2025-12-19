@@ -1,6 +1,6 @@
 package com.decimal128.bigint.crypto
 
-import com.decimal128.bigint.BigIntAccumulator
+import com.decimal128.bigint.MutableBigInt
 import com.decimal128.bigint.toBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,7 +12,7 @@ class TestModMulSqr {
         val m = 97.toBigInt()
         val ctx = ModContext(m)
 
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
 
         ctx.modMul(3.toBigInt(), 5.toBigInt(), out)
         assertEquals(15.toBigInt(), out.toBigInt())
@@ -25,7 +25,7 @@ class TestModMulSqr {
     fun modMul_withReduction() {
         val m = 11.toBigInt()
         val ctx = ModContext(m)
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
 
         ctx.modMul(7.toBigInt(), 8.toBigInt(), out)
         assertEquals((7 * 8 % 11).toBigInt(), out.toBigInt())
@@ -35,7 +35,7 @@ class TestModMulSqr {
     fun modMul_zeroAndOne() {
         val m = 101.toBigInt()
         val ctx = ModContext(m)
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
 
         ctx.modMul(0.toBigInt(), 42.toBigInt(), out)
         assertEquals(0.toBigInt(), out.toBigInt())
@@ -49,7 +49,7 @@ class TestModMulSqr {
     fun modSqr_basic() {
         val m = 97.toBigInt()
         val ctx = ModContext(m)
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
 
         ctx.modSqr(5.toBigInt(), out)
         assertEquals(25.toBigInt(), out.toBigInt())
@@ -59,7 +59,7 @@ class TestModMulSqr {
     fun modSqr_withReduction() {
         val m = 13.toBigInt()
         val ctx = ModContext(m)
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
 
         ctx.modSqr(7.toBigInt(), out)
         assertEquals((7 * 7 % 13).toBigInt(), out.toBigInt())
@@ -69,7 +69,7 @@ class TestModMulSqr {
     fun modSqr_zeroAndOne() {
         val m = 101.toBigInt()
         val ctx = ModContext(m)
-        val out = BigIntAccumulator()
+        val out = MutableBigInt()
 
         ctx.modSqr(0.toBigInt(), out)
         assertEquals(0.toBigInt(), out.toBigInt())

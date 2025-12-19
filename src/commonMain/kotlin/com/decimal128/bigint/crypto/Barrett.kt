@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.BigIntAccumulator
+import com.decimal128.bigint.MutableBigInt
 
 class Barrett private constructor (val m: BigInt,
                                    val muBits: BigInt,
@@ -15,10 +15,10 @@ class Barrett private constructor (val m: BigInt,
     val bPowKPlus1 = BigInt.withSetBit(shiftKPlus1Bits)
 
     // Initial capacities are sized by bitLen to avoid resizing in modPow hot paths
-    val q = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
-    val r = BigIntAccumulator.Companion.withInitialBitCapacity(kBits + 1)
-    val r1 = BigIntAccumulator.Companion.withInitialBitCapacity(kBits + 32)
-    val r2 = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
+    val q = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
+    val r = MutableBigInt.Companion.withInitialBitCapacity(kBits + 1)
+    val r1 = MutableBigInt.Companion.withInitialBitCapacity(kBits + 32)
+    val r2 = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
 
     companion object {
         operator fun invoke(m: BigInt): Barrett {
@@ -161,7 +161,7 @@ class Barrett private constructor (val m: BigInt,
         return r.toBigInt()
     }
 
-    fun reduceInto(x: BigIntAccumulator, out: BigIntAccumulator) {
+    fun reduceInto(x: MutableBigInt, out: MutableBigInt) {
         require (x >= 0)
         require (x < mSquared)
         if (x < m) {
@@ -201,14 +201,14 @@ class Barrett private constructor (val m: BigInt,
         out.set(r)
     }
 
-    fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) {
-        val tmp: BigIntAccumulator = this.q
+    fun modMul(a: BigInt, b: BigInt, out: MutableBigInt) {
+        val tmp: MutableBigInt = this.q
         tmp.setMul(a, b)
         reduceInto(tmp, out)
     }
 
-    fun modSqr(a: BigInt, out: BigIntAccumulator) {
-        val tmp: BigIntAccumulator = this.q
+    fun modSqr(a: BigInt, out: MutableBigInt) {
+        val tmp: MutableBigInt = this.q
         tmp.setSqr(a)
         reduceInto(tmp, out)
     }

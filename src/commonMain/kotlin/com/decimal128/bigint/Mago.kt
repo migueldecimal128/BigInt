@@ -47,7 +47,7 @@ private const val ERR_MSG_NEGATIVE_INDEX = "negative index"
  *   return the normalized length. The caller must ensure that there is sufficient
  *   space in the destination for operator and operands. Operators are implemented
  *   to allow aliased operands and result ... `x *= x`. The `set*` functions are used
- *   exclusively by [BigIntAccumulator].
+ *   exclusively by [MutableBigInt].
  *
  * ### Available Functionality
  * - Magia acts as a complete arbitrary-length integer **ALU** (Arithmetic Logic Unit).
@@ -68,7 +68,7 @@ private const val ERR_MSG_NEGATIVE_INDEX = "negative index"
  * of implementation.
  *
  * Magia forms the computational core used by higher-level abstractions such as
- * [BigInt] and [BigIntAccumulator].
+ * [BigInt] and [MutableBigInt].
  *
  * Magus ... ancient Latin word for a Persian magician who works with Magia
   */

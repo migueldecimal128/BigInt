@@ -1,8 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.BigIntAccumulator
-import com.decimal128.bigint.toBigInt
+import com.decimal128.bigint.MutableBigInt
 import kotlin.math.absoluteValue
 
 /**
@@ -16,7 +15,7 @@ import kotlin.math.absoluteValue
  *
  * ## Design notes
  * - The modulus [m] must be ≥ 1 and is immutable for the lifetime of the context.
- * - All operations write their result into a caller-supplied [BigIntAccumulator]
+ * - All operations write their result into a caller-supplied [MutableBigInt]
  *   to avoid heap allocation.
  * - Internal scratch accumulators are owned by the context; therefore,
  *   **instances are not thread-safe** and must not be shared across threads
@@ -34,7 +33,7 @@ import kotlin.math.absoluteValue
  * ## Usage
  * ```
  * val ctx = ModContext(m)
- * val out = BigIntAccumulator()
+ * val out = MutableBigInt()
  *
  * ctx.modMul(a, b, out)
  * ctx.modPow(base, exp, out)
@@ -53,9 +52,9 @@ class ModContext(val m: BigInt) {
 
     private val impl = Barrett(m)
 
-    private val tmp = BigIntAccumulator()
+    private val tmp = MutableBigInt()
 
-    fun modSet(a: Int, out: BigIntAccumulator) {
+    fun modSet(a: Int, out: MutableBigInt) {
         if (a >= 0 && m > a)
             out.set(a)
         else {
@@ -73,7 +72,7 @@ class ModContext(val m: BigInt) {
      * @param b second addend
      * @param out destination accumulator for the result
      */
-    fun modAdd(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) {
+    fun modAdd(a: MutableBigInt, b: MutableBigInt, out: MutableBigInt) {
         out.setAdd(a, b)
         if (out >= m) out -= m
     }
@@ -85,7 +84,7 @@ class ModContext(val m: BigInt) {
      * @param b subtrahend
      * @param out destination accumulator for the result
      */
-    fun modSub(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) {
+    fun modSub(a: MutableBigInt, b: MutableBigInt, out: MutableBigInt) {
         out.setSub(a, b)
         if (out.isNegative()) out += m
     }
@@ -97,7 +96,7 @@ class ModContext(val m: BigInt) {
      * @param b second multiplicand
      * @param out destination accumulator for the result
      */
-    fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) =
+    fun modMul(a: BigInt, b: BigInt, out: MutableBigInt) =
         impl.modMul(a, b, out)
 
     /**
@@ -107,7 +106,7 @@ class ModContext(val m: BigInt) {
      * @param b second multiplicand
      * @param out destination accumulator for the result
      */
-    fun modMul(a: BigIntAccumulator, b: Int, out: BigIntAccumulator) =
+    fun modMul(a: MutableBigInt, b: Int, out: MutableBigInt) =
         impl.modMul(a, b, out)
 
     /**
@@ -117,7 +116,7 @@ class ModContext(val m: BigInt) {
      * @param b second multiplicand
      * @param out destination accumulator for the result
      */
-    fun modMul(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) =
+    fun modMul(a: MutableBigInt, b: MutableBigInt, out: MutableBigInt) =
         impl.modMul(a, b, out)
 
     /**
@@ -126,7 +125,7 @@ class ModContext(val m: BigInt) {
      * @param a value to square
      * @param out destination accumulator for the result
      */
-    fun modSqr(a: BigInt, out: BigIntAccumulator) =
+    fun modSqr(a: BigInt, out: MutableBigInt) =
         impl.modSqr(a, out)
 
     /**
@@ -135,7 +134,7 @@ class ModContext(val m: BigInt) {
      * @param a value to square
      * @param out destination accumulator for the result
      */
-    fun modSqr(a: BigIntAccumulator, out: BigIntAccumulator) =
+    fun modSqr(a: MutableBigInt, out: MutableBigInt) =
         impl.modSqr(a, out)
 
     /**
@@ -145,7 +144,7 @@ class ModContext(val m: BigInt) {
      * @param exp exponent (must be ≥ 0)
      * @param out destination accumulator for the result
      */
-    fun modPow(base: BigInt, exp: BigInt, out: BigIntAccumulator) =
+    fun modPow(base: BigInt, exp: BigInt, out: MutableBigInt) =
         impl.modPow(base, exp, out)
 
     /**
@@ -154,21 +153,21 @@ class ModContext(val m: BigInt) {
      * @param a input value
      * @param out destination accumulator for the result
      */
-    fun modHalfLucas(a: BigIntAccumulator, out: BigIntAccumulator) =
+    fun modHalfLucas(a: MutableBigInt, out: MutableBigInt) =
         impl.modHalfLucas(a, out)
 
     // modInv scratch for EEA Extended Euclidean Algorithm
 
-    private var invR    = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-    private var invNewR = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-    private var invTmpR  = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-    private var invT    = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-    private var invNewT = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-    private var invTmpT  = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private var invR    = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private var invNewR = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private var invTmpR  = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private var invT    = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private var invNewT = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private var invTmpT  = MutableBigInt.withInitialBitCapacity(kBits + 1)
 
-    private val invQ     = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-    private val invQNewR = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
-    private val invQNewT = BigIntAccumulator.withInitialBitCapacity(kBits + 1)
+    private val invQ     = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private val invQNewR = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private val invQNewT = MutableBigInt.withInitialBitCapacity(kBits + 1)
 
     /**
      * Computes the modular multiplicative inverse of [a] modulo [m].
@@ -182,7 +181,7 @@ class ModContext(val m: BigInt) {
      * @throws IllegalArgumentException if `a` is out of range
      * @throws ArithmeticException if the inverse does not exist
      */
-    fun modInv(a: BigInt, out: BigIntAccumulator) {
+    fun modInv(a: BigInt, out: MutableBigInt) {
         require(a >= 0 && a < m)
 
         invR.set(m)
@@ -223,7 +222,7 @@ class ModContext(val m: BigInt) {
      * ## Notes
      * - Assumes a fixed, positive modulus `m > 1`.
      * - Uses base `b = 2^32` and limb-based arithmetic.
-     * - All methods write results into caller-supplied [BigIntAccumulator]s.
+     * - All methods write results into caller-supplied [MutableBigInt]s.
      * - Internal scratch state makes this class **not thread-safe**.
      *
      * This class is an internal implementation detail of [ModContext].
@@ -242,12 +241,12 @@ class ModContext(val m: BigInt) {
         val bPowKPlus1 = BigInt.Companion.withSetBit(shiftKPlus1Bits)
 
         // Initial capacities are sized by bitLen to avoid resizing in modPow hot paths
-        val q = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
-        val r1 = BigIntAccumulator.Companion.withInitialBitCapacity(kBits + 32)
-        val r2 = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
+        val q = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
+        val r1 = MutableBigInt.Companion.withInitialBitCapacity(kBits + 32)
+        val r2 = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
 
-        val mulTmp = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
-        val baseTmp = BigIntAccumulator.Companion.withInitialBitCapacity(2*kBits + 32)
+        val mulTmp = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
+        val baseTmp = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
 
         companion object {
 
@@ -278,7 +277,7 @@ class ModContext(val m: BigInt) {
          * @param x non-negative value with `x < m²`
          * @param out destination accumulator for `x mod m`
          */
-        fun reduceInto(x: BigIntAccumulator, out: BigIntAccumulator) {
+        fun reduceInto(x: MutableBigInt, out: MutableBigInt) {
             check(out !== q && out !== r1 && out !== r2 && out !== mulTmp)
 
             if (x < 0)
@@ -325,7 +324,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: BigInt, b: Int, out: BigIntAccumulator) {
+        fun modMul(a: BigInt, b: Int, out: MutableBigInt) {
             check (out !== mulTmp)
             mulTmp.setMul(a, b)
             reduceInto(mulTmp, out)
@@ -334,7 +333,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: BigInt, b: BigInt, out: BigIntAccumulator) {
+        fun modMul(a: BigInt, b: BigInt, out: MutableBigInt) {
             check (out !== mulTmp)
             mulTmp.setMul(a, b)
             reduceInto(mulTmp, out)
@@ -343,7 +342,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: BigIntAccumulator, b: Int, out: BigIntAccumulator) {
+        fun modMul(a: MutableBigInt, b: Int, out: MutableBigInt) {
             check (a !== mulTmp && out !== mulTmp)
             if (b != 0) {
                 mulTmp.setMul(a, b.absoluteValue.toUInt())
@@ -358,7 +357,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: BigIntAccumulator, b: BigIntAccumulator, out: BigIntAccumulator) {
+        fun modMul(a: MutableBigInt, b: MutableBigInt, out: MutableBigInt) {
             check (a !== mulTmp && b !== mulTmp && out !== mulTmp)
             mulTmp.setMul(a, b)
             reduceInto(mulTmp, out)
@@ -367,7 +366,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * a) mod m`.
          */
-        fun modSqr(a: BigInt, out: BigIntAccumulator) {
+        fun modSqr(a: BigInt, out: MutableBigInt) {
             check (out !== mulTmp)
             mulTmp.setSqr(a)
             reduceInto(mulTmp, out)
@@ -376,7 +375,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * a) mod m`.
          */
-        fun modSqr(a: BigIntAccumulator, out: BigIntAccumulator) {
+        fun modSqr(a: MutableBigInt, out: MutableBigInt) {
             check (a !== mulTmp && out !== mulTmp)
             mulTmp.setSqr(a)
             reduceInto(mulTmp, out)
@@ -385,13 +384,13 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(base^exp) mod m` using square-and-multiply.
          *
-         * Uses mutable [BigIntAccumulator] scratch state to minimize heap allocation.
+         * Uses mutable [MutableBigInt] scratch state to minimize heap allocation.
          *
          * @param base base value
          * @param exp exponent (must be ≥ 0)
          * @param out destination accumulator for the result
          */
-        fun modPow(base: BigInt, exp: BigInt, out: BigIntAccumulator) {
+        fun modPow(base: BigInt, exp: BigInt, out: MutableBigInt) {
             if (exp < 0)
                 throw IllegalArgumentException()
             out.setOne()
@@ -421,7 +420,7 @@ class ModContext(val m: BigInt) {
          * @param a input value
          * @param out destination accumulator for the result
          */
-        fun modHalfLucas(a: BigIntAccumulator, out: BigIntAccumulator) {
+        fun modHalfLucas(a: MutableBigInt, out: MutableBigInt) {
             check (m.isOdd())
             if (out !== a)
                 out.set(a)

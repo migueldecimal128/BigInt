@@ -9,7 +9,7 @@ object BigIntExtensions {
 
     fun BigInt.toBigInteger(): BigInteger = BigInteger(this.toTwosComplementBigEndianByteArray())
 
-    fun BigIntAccumulator.toBigInteger(): BigInteger = BigInteger(this.toBigInt().toTwosComplementBigEndianByteArray())
+    fun MutableBigInt.toBigInteger(): BigInteger = BigInteger(this.toBigInt().toTwosComplementBigEndianByteArray())
 
     fun BigInteger.toBigInt(): BigInt = BigInt.from(this.toString())
 

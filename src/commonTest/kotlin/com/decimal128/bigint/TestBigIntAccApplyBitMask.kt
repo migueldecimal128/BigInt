@@ -16,7 +16,7 @@ class TestBigIntAccApplyBitMask {
             val x = BigInt.randomWithBitLen(bitLen, withRandomSign = true)
 
             // Create accumulator version
-            val acc = BigIntAccumulator().set(x)
+            val mbi = MutableBigInt().set(x)
 
             // --- Random mask parameters ---
             val bitWidth = rnd.nextInt(0, 150)      // includes zero-width, 1-bit, wide masks
@@ -26,8 +26,8 @@ class TestBigIntAccApplyBitMask {
             val expected = x.withBitMask(bitWidth, bitIndex)
 
             // --- Actual result (mutable accumulator) ---
-            acc.applyBitMask(bitWidth, bitIndex)
-            val actual = acc.toBigInt()   // or acc.toImmutable(), whatever your API is
+            mbi.applyBitMask(bitWidth, bitIndex)
+            val actual = mbi.toBigInt()   // or mbi.toImmutable(), whatever your API is
 
             assertEquals(
                 expected,

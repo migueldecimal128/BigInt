@@ -8,35 +8,35 @@ class TestBigIntAccTimesDivRemAssign {
     val verbose = true
     /* ---------- helpers ---------- */
 
-    private fun newAcc(value: Long): BigIntAccumulator {
-        val acc = BigIntAccumulator()
-        acc += value
-        return acc
+    private fun newAcc(value: Long): MutableBigInt {
+        val mbi = MutableBigInt()
+        mbi += value
+        return mbi
     }
 
-    private fun assertAccEqualsLong(expected: Long, acc: BigIntAccumulator) {
-        val actual = acc.toBigInt()
+    private fun assertAccEqualsLong(expected: Long, mbi: MutableBigInt) {
+        val actual = mbi.toBigInt()
         val expectedBig = expected.toBigInt()
         assertEquals(expectedBig, actual)
     }
 
-    private fun assertAccEqualsBig(expected: BigInt, acc: BigIntAccumulator) {
-        val actual = acc.toBigInt()
+    private fun assertAccEqualsBig(expected: BigInt, mbi: MutableBigInt) {
+        val actual = mbi.toBigInt()
         assertEquals(expected, actual)
     }
 
-    private fun newLargeAccFromDecimal(s: String): BigIntAccumulator {
-        val acc = BigIntAccumulator()
+    private fun newLargeAccFromDecimal(s: String): MutableBigInt {
+        val mbi = MutableBigInt()
         val bi = BigInt.from(s)
-        acc += bi
-        return acc
+        mbi += bi
+        return mbi
     }
 
-    private fun newLargeAccShift(bits: Int): BigIntAccumulator {
-        val acc = BigIntAccumulator()
-        acc += BigInt.ONE
-        acc.mutShl(bits)   // assume you have in-place shift
-        return acc
+    private fun newLargeAccShift(bits: Int): MutableBigInt {
+        val mbi = MutableBigInt()
+        mbi += BigInt.ONE
+        mbi.mutShl(bits)   // assume you have in-place shift
+        return mbi
     }
 
     /* ====================================================================== */
@@ -45,141 +45,141 @@ class TestBigIntAccTimesDivRemAssign {
 
     @Test
     fun timesAssign_Int() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(3)
-        acc *= 2
-        assertAccEqualsLong(6, acc)
+        mbi = newAcc(3)
+        mbi *= 2
+        assertAccEqualsLong(6, mbi)
 
-        acc = newAcc(3)
-        acc *= -2
-        assertAccEqualsLong(-6, acc)
+        mbi = newAcc(3)
+        mbi *= -2
+        assertAccEqualsLong(-6, mbi)
 
-        acc = newAcc(-3)
-        acc *= 2
-        assertAccEqualsLong(-6, acc)
+        mbi = newAcc(-3)
+        mbi *= 2
+        assertAccEqualsLong(-6, mbi)
 
-        acc = newAcc(-3)
-        acc *= -2
-        assertAccEqualsLong(6, acc)
+        mbi = newAcc(-3)
+        mbi *= -2
+        assertAccEqualsLong(6, mbi)
     }
 
     @Test
     fun timesAssign_UInt() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(3)
-        acc *= 2u
-        assertAccEqualsLong(6, acc)
+        mbi = newAcc(3)
+        mbi *= 2u
+        assertAccEqualsLong(6, mbi)
 
-        acc = newAcc(-3)
-        acc *= 2u
-        assertAccEqualsLong(-6, acc)
+        mbi = newAcc(-3)
+        mbi *= 2u
+        assertAccEqualsLong(-6, mbi)
     }
 
     @Test
     fun timesAssign_Long() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(3)
-        acc *= 2L
-        assertAccEqualsLong(6, acc)
+        mbi = newAcc(3)
+        mbi *= 2L
+        assertAccEqualsLong(6, mbi)
 
-        acc = newAcc(3)
-        acc *= -2L
-        assertAccEqualsLong(-6, acc)
+        mbi = newAcc(3)
+        mbi *= -2L
+        assertAccEqualsLong(-6, mbi)
     }
 
     @Test
     fun timesAssign_ULong() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(3)
-        acc *= 2uL
-        assertAccEqualsLong(6, acc)
+        mbi = newAcc(3)
+        mbi *= 2uL
+        assertAccEqualsLong(6, mbi)
 
-        acc = newAcc(-3)
-        acc *= 2uL
-        assertAccEqualsLong(-6, acc)
+        mbi = newAcc(-3)
+        mbi *= 2uL
+        assertAccEqualsLong(-6, mbi)
     }
 
     @Test
     fun timesAssign_BigInt() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
         val pos = 7.toBigInt()
         val neg = (-7).toBigInt()
 
-        acc = newAcc(3)
-        acc *= pos
-        assertAccEqualsLong(21, acc)
+        mbi = newAcc(3)
+        mbi *= pos
+        assertAccEqualsLong(21, mbi)
 
-        acc = newAcc(3)
-        acc *= neg
-        assertAccEqualsLong(-21, acc)
+        mbi = newAcc(3)
+        mbi *= neg
+        assertAccEqualsLong(-21, mbi)
     }
 
     @Test
     fun timesAssign_BigIntAccumulator() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
         val pos = newAcc(7)
         val neg = newAcc(-7)
 
-        acc = newAcc(3)
-        acc *= pos
-        assertAccEqualsLong(21, acc)
+        mbi = newAcc(3)
+        mbi *= pos
+        assertAccEqualsLong(21, mbi)
 
-        acc = newAcc(3)
-        acc *= neg
-        assertAccEqualsLong(-21, acc)
+        mbi = newAcc(3)
+        mbi *= neg
+        assertAccEqualsLong(-21, mbi)
     }
 
     @Test
     fun timesAssign_Zero() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(3)
-        acc *= 0
-        assertAccEqualsLong(0, acc)
+        mbi = newAcc(3)
+        mbi *= 0
+        assertAccEqualsLong(0, mbi)
 
-        acc = newAcc(-3)
-        acc *= 0L
-        assertAccEqualsLong(0, acc)
+        mbi = newAcc(-3)
+        mbi *= 0L
+        assertAccEqualsLong(0, mbi)
     }
 
     @Test
     fun timesAssign_Long_multiLimb() {
-        val acc = newLargeAccShift(192)   // 192 bits = 6 limbs
+        val mbi = newLargeAccShift(192)   // 192 bits = 6 limbs
         val mul: Long = 0x1_0000_0001L     // >32 bits
 
-        val expected = acc.toBigInt() * mul.toBigInt()
+        val expected = mbi.toBigInt() * mul.toBigInt()
 
-        acc *= mul
+        mbi *= mul
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
     @Test
     fun timesAssign_ULong_multiLimb() {
-        val acc = newLargeAccShift(224)   // 7 limbs
+        val mbi = newLargeAccShift(224)   // 7 limbs
         val mul: ULong = 0x1_0000_0001uL
 
-        val expected = acc.toBigInt() * mul.toBigInt()
+        val expected = mbi.toBigInt() * mul.toBigInt()
 
-        acc *= mul
+        mbi *= mul
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
     @Test
     fun timesAssign_BigInt_multiLimb() {
-        val acc = newLargeAccShift(256)
+        val mbi = newLargeAccShift(256)
         val mul = BigInt.from("18446744073709551617") // 2^64 + 1
 
-        val expected = acc.toBigInt() * mul
+        val expected = mbi.toBigInt() * mul
 
-        acc *= mul
+        mbi *= mul
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
 
@@ -189,133 +189,133 @@ class TestBigIntAccTimesDivRemAssign {
 
     @Test
     fun divAssign_Int() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(6)
-        acc /= 2
-        assertAccEqualsLong(3, acc)
+        mbi = newAcc(6)
+        mbi /= 2
+        assertAccEqualsLong(3, mbi)
 
-        acc = newAcc(6)
-        acc /= -2
-        assertAccEqualsLong(-3, acc)
+        mbi = newAcc(6)
+        mbi /= -2
+        assertAccEqualsLong(-3, mbi)
 
-        acc = newAcc(-6)
-        acc /= 2
-        assertAccEqualsLong(-3, acc)
+        mbi = newAcc(-6)
+        mbi /= 2
+        assertAccEqualsLong(-3, mbi)
 
-        acc = newAcc(-6)
-        acc /= -2
-        assertAccEqualsLong(3, acc)
+        mbi = newAcc(-6)
+        mbi /= -2
+        assertAccEqualsLong(3, mbi)
     }
 
     @Test
     fun divAssign_UInt() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(6)
-        acc /= 2u
-        assertAccEqualsLong(3, acc)
+        mbi = newAcc(6)
+        mbi /= 2u
+        assertAccEqualsLong(3, mbi)
 
-        acc = newAcc(-6)
-        acc /= 2u
-        assertAccEqualsLong(-3, acc)
+        mbi = newAcc(-6)
+        mbi /= 2u
+        assertAccEqualsLong(-3, mbi)
     }
 
     @Test
     fun divAssign_Long() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(6)
-        acc /= 2L
-        assertAccEqualsLong(3, acc)
+        mbi = newAcc(6)
+        mbi /= 2L
+        assertAccEqualsLong(3, mbi)
 
-        acc = newAcc(6)
-        acc /= -2L
-        assertAccEqualsLong(-3, acc)
+        mbi = newAcc(6)
+        mbi /= -2L
+        assertAccEqualsLong(-3, mbi)
     }
 
     @Test
     fun divAssign_ULong() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(6)
-        acc /= 2uL
-        assertAccEqualsLong(3, acc)
+        mbi = newAcc(6)
+        mbi /= 2uL
+        assertAccEqualsLong(3, mbi)
 
-        acc = newAcc(-6)
-        acc /= 2uL
-        assertAccEqualsLong(-3, acc)
+        mbi = newAcc(-6)
+        mbi /= 2uL
+        assertAccEqualsLong(-3, mbi)
     }
 
     @Test
     fun divAssign_BigInt() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
         val pos = 7.toBigInt()
         val neg = (-7).toBigInt()
 
-        acc = newAcc(21)
-        acc /= pos
-        assertAccEqualsLong(3, acc)
+        mbi = newAcc(21)
+        mbi /= pos
+        assertAccEqualsLong(3, mbi)
 
-        acc = newAcc(21)
-        acc /= neg
-        assertAccEqualsLong(-3, acc)
+        mbi = newAcc(21)
+        mbi /= neg
+        assertAccEqualsLong(-3, mbi)
     }
 
     @Test
     fun divAssign_BigIntAccumulator() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
         val pos = newAcc(7)
         val neg = newAcc(-7)
 
-        acc = newAcc(21)
-        acc /= pos
-        assertAccEqualsLong(3, acc)
+        mbi = newAcc(21)
+        mbi /= pos
+        assertAccEqualsLong(3, mbi)
 
-        acc = newAcc(21)
-        acc /= neg
-        assertAccEqualsLong(-3, acc)
+        mbi = newAcc(21)
+        mbi /= neg
+        assertAccEqualsLong(-3, mbi)
     }
 
     @Test
     fun divAssign_Long_multiLimb() {
-        val acc = newLargeAccFromDecimal(
+        val mbi = newLargeAccFromDecimal(
             "12345678901234567890123456789012345678901234567890"
         )
         val div: Long = 0x1_0000_0001L
 
-        val expected = acc.toBigInt() / div.toBigInt()
+        val expected = mbi.toBigInt() / div.toBigInt()
 
-        acc /= div
+        mbi /= div
 
         if (verbose)
-            println("expected:$expected observed:$acc")
+            println("expected:$expected observed:$mbi")
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
     @Test
     fun divAssign_ULong_multiLimb() {
-        val acc = newLargeAccShift(240)
+        val mbi = newLargeAccShift(240)
         val div: ULong = 0x1_0000_0001uL
 
-        val expected = acc.toBigInt() / div.toBigInt()
+        val expected = mbi.toBigInt() / div.toBigInt()
 
-        acc /= div
+        mbi /= div
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
     @Test
     fun divAssign_BigInt_multiLimb() {
-        val acc = newLargeAccShift(320)
+        val mbi = newLargeAccShift(320)
         val div = BigInt.from("340282366920938463463374607431768211457") // 2^128+1
 
-        val expected = acc.toBigInt() / div
+        val expected = mbi.toBigInt() / div
 
-        acc /= div
+        mbi /= div
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
     /* ====================================================================== */
@@ -324,151 +324,151 @@ class TestBigIntAccTimesDivRemAssign {
 
     @Test
     fun remAssign_Int() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(7)
-        acc %= 3
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= 3
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(7)
-        acc %= -3
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= -3
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(-7)
-        acc %= 3
-        assertAccEqualsLong(-1, acc)
+        mbi = newAcc(-7)
+        mbi %= 3
+        assertAccEqualsLong(-1, mbi)
 
-        acc = newAcc(-7)
-        acc %= -3
-        assertAccEqualsLong(-1, acc)
+        mbi = newAcc(-7)
+        mbi %= -3
+        assertAccEqualsLong(-1, mbi)
     }
 
     @Test
     fun remAssign_UInt() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(7)
-        acc %= 3u
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= 3u
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(-7)
-        acc %= 3u
-        assertAccEqualsLong(-1, acc)
+        mbi = newAcc(-7)
+        mbi %= 3u
+        assertAccEqualsLong(-1, mbi)
     }
 
     @Test
     fun remAssign_Long() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(7)
-        acc %= 3L
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= 3L
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(-7)
-        acc %= 3L
-        assertAccEqualsLong(-1, acc)
+        mbi = newAcc(-7)
+        mbi %= 3L
+        assertAccEqualsLong(-1, mbi)
     }
 
     @Test
     fun remAssign_ULong() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(7)
-        acc %= 3uL
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= 3uL
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(-7)
-        acc %= 3uL
-        assertAccEqualsLong(-1, acc)
+        mbi = newAcc(-7)
+        mbi %= 3uL
+        assertAccEqualsLong(-1, mbi)
     }
 
     @Test
     fun remAssign_BigInt() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
         val pos = 3.toBigInt()
         val neg = (-3).toBigInt()
 
-        acc = newAcc(7)
-        acc %= pos
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= pos
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(7)
-        acc %= neg
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= neg
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(-7)
-        acc %= pos
-        assertAccEqualsLong(-1, acc)
+        mbi = newAcc(-7)
+        mbi %= pos
+        assertAccEqualsLong(-1, mbi)
     }
 
     @Test
     fun remAssign_BigIntAccumulator() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
         val pos = newAcc(3)
         val neg = newAcc(-3)
 
-        acc = newAcc(7)
-        acc %= pos
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= pos
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(7)
-        acc %= neg
-        assertAccEqualsLong(1, acc)
+        mbi = newAcc(7)
+        mbi %= neg
+        assertAccEqualsLong(1, mbi)
 
-        acc = newAcc(-7)
-        acc %= pos
-        assertAccEqualsLong(-1, acc)
+        mbi = newAcc(-7)
+        mbi %= pos
+        assertAccEqualsLong(-1, mbi)
     }
 
     @Test
     fun remAssign_ZeroDividend() {
-        var acc: BigIntAccumulator
+        var mbi: MutableBigInt
 
-        acc = newAcc(0)
-        acc %= 3
-        assertAccEqualsLong(0, acc)
+        mbi = newAcc(0)
+        mbi %= 3
+        assertAccEqualsLong(0, mbi)
 
-        acc = newAcc(0)
-        acc %= 3L
-        assertAccEqualsLong(0, acc)
+        mbi = newAcc(0)
+        mbi %= 3L
+        assertAccEqualsLong(0, mbi)
     }
 
     @Test
     fun remAssign_Long_multiLimb() {
-        val acc = newLargeAccFromDecimal(
+        val mbi = newLargeAccFromDecimal(
             "99999999999999999999999999999999999999999999999999"
         )
         val div: Long = 0x1_0000_0001L
 
-        val expected = acc.toBigInt() % div.toBigInt()
+        val expected = mbi.toBigInt() % div.toBigInt()
 
-        acc %= div
+        mbi %= div
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
     @Test
     fun remAssign_ULong_multiLimb() {
-        val acc = newLargeAccShift(288)
+        val mbi = newLargeAccShift(288)
         val div: ULong = 0x1_0000_0001uL
 
-        val expected = acc.toBigInt() % div.toBigInt()
+        val expected = mbi.toBigInt() % div.toBigInt()
 
-        acc %= div
+        mbi %= div
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
     @Test
     fun remAssign_BigInt_multiLimb() {
-        val acc = newLargeAccShift(384)
+        val mbi = newLargeAccShift(384)
         val div = BigInt.from("18446744073709551617") // 2^64+1
 
-        val expected = acc.toBigInt() % div
+        val expected = mbi.toBigInt() % div
 
-        acc %= div
+        mbi %= div
 
-        assertAccEqualsBig(expected, acc)
+        assertAccEqualsBig(expected, mbi)
     }
 
 
