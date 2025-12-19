@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class TestPrintParse {
 
-    val verbose = true
+    val verbose = false
 
     data class ParseCase(val raw: String, val expected: String = raw)
 

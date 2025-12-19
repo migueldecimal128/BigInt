@@ -6,7 +6,7 @@ import kotlin.test.assertTrue
 
 class TestBigIntMulDivRem {
 
-    val verbose = true
+    val verbose = false
 
     private fun bi(v: Long) = BigInt.from(v)
     private fun mbi(v: BigInt) = MutableBigInt().set(v)

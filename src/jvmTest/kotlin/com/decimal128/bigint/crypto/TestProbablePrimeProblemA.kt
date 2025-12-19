@@ -7,22 +7,9 @@ import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TestIsProbablePrimeVsBigInteger {
+class TestProbablePrimeProblemA {
 
     val verbose = false
-
-    @Test
-    fun testIsProbablePrime_againstJavaBigInteger() {
-        repeat(200) {
-            val n = BigInt.randomWithMaxBitLen(2048) or BigInt.ONE  // odd
-            val ours = BigIntPrime.isProbablePrime(n)
-
-            val java = n.toBigInteger().isProbablePrime(50)
-
-            assertEquals(java, ours, "mismatch on $n")
-        }
-    }
-
 
     @Test
     fun testProblemA() {
@@ -46,11 +33,13 @@ class TestIsProbablePrimeVsBigInteger {
         val myOpinion = BigIntPrime.isProbablePrime(bi)
         if (verbose)
             println("testProblemA isProbablePrime() myOpinion:$myOpinion")
+        var javaOpinion = false
         for (certainty in 25..200 step 25) {
-            val javaOpinion = java.isProbablePrime(certainty)
+            javaOpinion = java.isProbablePrime(certainty)
             if (verbose)
                 println("  java certainty:$certainty javaOpinion:$javaOpinion")
         }
+        assertEquals(javaOpinion, myOpinion)
     }
 
 

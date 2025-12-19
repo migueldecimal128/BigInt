@@ -328,17 +328,9 @@ object BigIntPrime {
 
         val modCtx = ModContext(n)
         // U_d, V_d, Q^d (all normalized mod n)
-        //val (Ux, Vx, Qk) = lucasUVQk(n, d, params.D, params.Q)
-        val (U, V, Qk) = lucasUVQk_2(modCtx, d, params.D, params.Q)
-        //if (U NE Ux || V NE Vx || Qk NE Qkx) {
-        //    println("snafu!")
-        //    println(" U:$U  V:$V  Qk:$Qk")
-        //    println("Ux:$U Vx:$Vx Qkx:$Qkx")
-        //    println("--")
-        //    throw IllegalStateException()
-        //}
+        val (U, V, Qk) = lucasUVQk(modCtx, d, params.D, params.Q)
 
-        if (U.isZero()) return true
+        if (U.isZero() || V.isZero()) return true
 
         var Vcur = V
         var Qcur = Qk
@@ -377,7 +369,7 @@ object BigIntPrime {
      * @param Q Lucas parameter `Q`
      * @return a triple `(U_d, V_d, Q^d mod n)`
      */
-    fun lucasUVQk(
+    fun lucasUVQk_BigInt(
         n: BigInt,
         d: BigInt,   // odd
         D: Int,
@@ -414,7 +406,7 @@ object BigIntPrime {
         return Triple(U, V, Qk)
     }
 
-    fun lucasUVQk_2(
+    fun lucasUVQk(
         modCtx: ModContext,
         d: BigInt,   // odd
         D: Int,

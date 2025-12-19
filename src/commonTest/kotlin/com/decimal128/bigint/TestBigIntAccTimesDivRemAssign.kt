@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class TestBigIntAccTimesDivRemAssign {
 
-    val verbose = true
+    val verbose = false
     /* ---------- helpers ---------- */
 
     private fun newAcc(value: Long): MutableBigInt {
