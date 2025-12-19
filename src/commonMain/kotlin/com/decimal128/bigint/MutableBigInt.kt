@@ -957,15 +957,39 @@ class MutableBigInt private constructor (
         return true
     }
 
-    private fun trySetRemFastPath(xMeta: Meta, xMagia: Magia, yMeta: Meta, yMagia: Magia): Boolean {
-        val rSignFlag = xMeta.signFlag
-        val rNormLen = Mago.trySetRemFastPath(this.magia, xMagia, xMeta.normLen, yMagia, yMeta.normLen)
+    /**
+     * Attempts to compute the remainder `x % y` using a fast-path shortcut for
+     * small normalized divisors. If successful, the remainder is written in place
+     * with the correct sign and without performing full long division.
+     *
+     * @param x the dividend (normalized)
+     * @param y the divisor (normalized)
+     * @return `true` if one of the fast path solutions was applied, `false` otherwise
+     */
+    private fun trySetRemFastPath(x: BigIntBase, y: BigIntBase): Boolean {
+        val rSignFlag = x.meta.signFlag
+        val rNormLen = Mago.trySetRemFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
         if (rNormLen < 0)
             return false
         _meta = Meta(rSignFlag, rNormLen)
         return true
     }
 
+    /**
+     * Replaces this value with the remainder of `x % y`, storing the result
+     * in place. Overloads support primitive integers, unsigned integers, and
+     * arbitrary-precision divisors. Storage is reused when possible, and fast
+     * paths are attempted for small divisors before falling back to full
+     * remainder computation.
+     *
+     * For multi-limb divisors, temporary buffers are allocated or reused for
+     * normalization and long-division steps.
+     *
+     * @param x the dividend
+     * @param y the divisor (primitive or [BigInt]/[MutableBigInt], depending on overload)
+     * @return this [MutableBigInt] for call chaining
+     * @throws ArithmeticException if division by zero is detected
+     */
     fun setRem(x: BigIntBase, n: Int): MutableBigInt =
         setRemImpl(x, n.absoluteValue.toUInt().toULong())
     fun setRem(x: BigIntBase, w: UInt): MutableBigInt =
@@ -976,7 +1000,7 @@ class MutableBigInt private constructor (
         setRemImpl(x, dw)
     fun setRem(x: BigIntBase, y: BigIntBase): MutableBigInt {
         ensureCapacityCopy(min(x.meta.normLen, y.meta.normLen))
-        if (trySetRemFastPath(x.meta, x.magia, y.meta, y.magia))
+        if (trySetRemFastPath(x, y))
             return this
         if (y.meta.normLen == 2)
             return setRemImpl(x, (y.magia[1].toULong() shl 32) or (y.magia[0].toUInt().toULong()))
@@ -987,13 +1011,35 @@ class MutableBigInt private constructor (
         return this
     }
 
-
+    /**
+     * Internal helper for computing `x % yDw` with a 64-bit unsigned divisor.
+     * Performs remainder reduction using temporary storage, then writes the
+     * signed remainder in place.
+     *
+     * @param x the normalized dividend
+     * @param yDw the unsigned 64-bit divisor magnitude
+     * @return this [MutableBigInt] after mutation
+     */
     private fun setRemImpl(x: BigIntBase, yDw: ULong): MutableBigInt {
         ensureTmp1Capacity(x.meta.normLen + 1)
         val rem = Mago.calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
         return set(x.meta.signFlag, rem)
     }
 
+    /**
+     * Replaces this value with the modular result `x mod y`, ensuring a
+     * non-negative outcome. Overloads accept primitive integers, unsigned
+     * integers, or another arbitrary-precision modulus. Negative moduli are
+     * rejected. Storage is reused where possible.
+     *
+     * For full-precision moduli, the implementation computes the remainder,
+     * then conditionally adds the modulus if the result is negative.
+     *
+     * @param x the dividend
+     * @param y the modulus (primitive or [BigInt]/[MutableBigInt], depending on overload)
+     * @return this [MutableBigInt] for call chaining
+     * @throws ArithmeticException if the modulus is negative or zero
+     */
     fun setMod(x: BigIntBase, n: Int): MutableBigInt =
         setModImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
     fun setMod(x: BigIntBase, w: UInt): MutableBigInt =
@@ -1011,6 +1057,17 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Internal helper for computing `x mod yDw` with a 64-bit unsigned modulus.
+     * Rejects negative moduli, computes the remainder, and conditionally adds
+     * the modulus to ensure a non-negative result.
+     *
+     * @param x the dividend (normalized)
+     * @param ySign must be `false`; a `true` value triggers an exception
+     * @param yDw the unsigned modulus
+     * @return this [MutableBigInt] after mutation
+     * @throws ArithmeticException if a negative modulus is requested
+     */
     private fun setModImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
         if (ySign)
             throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
@@ -1021,249 +1078,216 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Adds the given Int value to this accumulator.
+     * Adds a signed 32-bit integer to this value in place.
      *
-     * @param n the value to add.
-     * @see plusAssign(Long)
+     * @param n the value to add
      */
     operator fun plusAssign(n: Int) { setAdd(this, n) }
 
     /**
-     * Adds the given UInt value to this accumulator.
+     * Adds an unsigned 32-bit integer to this value in place.
      *
-     * @param w the value to add.
-     * @see plusAssign(Long)
+     * @param w the value to add
      */
     operator fun plusAssign(w: UInt) { setAdd(this, w) }
 
     /**
-     * Adds the given Long value to this accumulator in place.
+     * Adds a signed 64-bit integer to this value in place. This is the canonical
+     * overload backing the `+=` operator for integer operands.
      *
-     * This is the canonical overload for the `+=` operator. The accumulator is
-     * updated by adding the operand, with the sign handled automatically.
-     *
-     * For `BigInt`-style operands, the accumulator adopts the operand’s sign
-     * and magnitude for the addition.
-     *
-     * Example usage:
-     * ```
-     * val mbi = MutableBigInt()
-     * mbi += 42L
-     * ```
-     *
-     * @param l the value to add.
+     * @param l the value to add
      */
     operator fun plusAssign(l: Long) { setAdd(this, l) }
 
     /**
-     * Adds the given ULong value to this accumulator.
+     * Adds an unsigned 64-bit integer to this value in place.
      *
-     * @param dw the value to add.
-     * @see plusAssign(Long)
+     * @param dw the value to add
      */
     operator fun plusAssign(dw: ULong) { setAdd(this, dw) }
 
     /**
-     * Adds the given BigInt value to this accumulator.
+     * Adds an arbitrary-precision integer to this value in place.
      *
-     * @param bi the value to add.
-     * @see plusAssign(Long)
+     * @param bi the value to add
      */
     operator fun plusAssign(bi: BigIntBase) { setAdd(this, bi) }
 
     /**
-     * Subtracts the given Int value from this accumulator.
+     * Subtracts a signed 32-bit integer from this value in place.
      *
-     * @param n the value to subtract.
-     * @see minusAssign(Long)
+     * @param n the value to subtract
      */
     operator fun minusAssign(n: Int) { setSub(this, n) }
 
     /**
-     * Subtracts the given UInt value from this accumulator.
+     * Subtracts an unsigned 32-bit integer from this value in place.
      *
-     * @param w the value to subtract.
-     * @see minusAssign(Long)
+     * @param w the value to subtract
      */
     operator fun minusAssign(w: UInt) { setSub(this, w) }
 
     /**
-     * Subtracts the given Long value from this accumulator in place.
+     * Subtracts a signed 64-bit integer from this value in place. This is the
+     * canonical overload backing the `-=` operator for integer operands.
      *
-     * This is the canonical overload for the `-=` operator. The accumulator is
-     * updated by subtracting the absolute value of the operand, with sign handled
-     * automatically.
-     *
-     * Example usage:
-     * ```
-     * val mbi = MutableBigInt()
-     * mbi -= 42L
-     * ```
-     *
-     * @param l the value to subtract.
+     * @param l the value to subtract
      */
     operator fun minusAssign(l: Long) { setSub(this, l) }
 
     /**
-     * Subtracts the given ULong value from this accumulator.
+     * Subtracts an unsigned 64-bit integer from this value in place.
      *
-     * @param dw the value to subtract.
-     * @see minusAssign(Long)
+     * @param dw the value to subtract
      */
     operator fun minusAssign(dw: ULong) { setSub(this, dw) }
 
     /**
-     * Subtracts the given BigInt value from this accumulator.
+     * Subtracts an arbitrary-precision integer from this value in place.
      *
-     * @param bi the value to subtract.
-     * @see minusAssign(Long)
+     * @param bi the value to subtract
      */
     operator fun minusAssign(bi: BigIntBase) { setSub(this, bi) }
 
     /**
-     * Multiplies this accumulator by the given value in place.
+     * Multiplies this value by a signed 32-bit integer in place. This is the
+     * canonical overload backing the `*=` operator for integer operands.
      *
-     * The `timesAssign` operators (`*=`) mutate this accumulator by multiplying
-     * it with the operand. Supported operand types include:
-     * - [Int], [Long], [UInt], [ULong]
-     * - [BigInt]
-     * - [MutableBigInt]
-     *
-     * Sign handling is automatically applied.
-     *
-     * When multiplying by another `MutableBigInt` that is the same instance
-     * (`this === other`), a specialized squaring routine is used to prevent aliasing
-     * issues and improve performance.
-     *
-     * Example usage:
-     * ```
-     * val mbi = MutableBigInt().setOne() // must start at 1 for multiplication
-     * mbi *= 10
-     * mbi *= anotherBigInt
-     * ```
-     *
-     * @param n the value to multiply by.
-     * @see timesAssign(Long)
-     *
+     * @param n the value to multiply by
      */
     operator fun timesAssign(n: Int) { setMul(this, n) }
 
     /**
-     * Multiplies this accumulator by the given UInt value.
+     * Multiplies this value by an unsigned 32-bit integer in place.
      *
-     * @param w the value to multiply by.
-     * @see timesAssign(Long)
+     * @param w the value to multiply by
      */
     operator fun timesAssign(w: UInt) { setMul(this, w) }
 
     /**
-     * Multiplies this accumulator by the given Long value in place.
+     * Multiplies this value by a signed 64-bit integer in place. This is the
+     * canonical overload backing the `*=` operator for integer operands. Sign
+     * is applied automatically.
      *
-     * This is the canonical overload for the `*=` operator. The accumulator is
-     * updated by multiplying with the operand. Sign is handled automatically.
-     *
-     * When multiplying by the same instance (`this *= this`), a specialized
-     * squaring routine is used to prevent aliasing issues and improve performance.
-     *
-     * Example usage:
-     * ```
-     * val mbi = MutableBigInt().setOne() // must start at 1 for multiplication
-     * mbi *= 10L
-     * ```
-     *
-     * @param l the value to multiply by.
+     * @param l the value to multiply by
      */
     operator fun timesAssign(l: Long) { setMul(this, l) }
 
     /**
-     * Multiplies this accumulator by the given ULong value.
+     * Multiplies this value by an unsigned 64-bit integer in place.
      *
-     * @param dw the value to multiply by.
-     * @see timesAssign(Long)
+     * @param dw the value to multiply by
      */
     operator fun timesAssign(dw: ULong) { setMul(this, dw) }
 
     /**
-     * Multiplies this accumulator by the given [BigInt]
-     * or [MutableBigInt] value.
+     * Multiplies this value by an arbitrary-precision integer in place. If the
+     * operand aliases this instance, a specialized squaring path is used.
      *
-     * @param bi the value to multiply by.
-     * @see timesAssign(Long)
+     * @param bi the value to multiply by
      */
     operator fun timesAssign(bi: BigIntBase) { setMul(this, bi) }
 
-    operator fun divAssign(n: Int) { setDiv(this, n) }
-
-    operator fun divAssign(w: UInt) { setDiv(this, w) }
-
-    operator fun divAssign(l: Long) { setDiv(this, l) }
-
-    operator fun divAssign(dw: ULong) { setDiv(this, dw) }
-
-    operator fun divAssign(bi: BigIntBase) { setDiv(this, bi) }
-
-    operator fun remAssign(n: Int) { setRem(this, n) }
-
-    operator fun remAssign(w: UInt) { setRem(this, w) }
-
-    operator fun remAssign(l: Long) { setRem(this, l) }
-
-    operator fun remAssign(dw: ULong) { setRem(this, dw) }
-
-    operator fun remAssign(bi: BigIntBase) { setRem(this, bi) }
 
     /**
-     * Adds the square of the given value to this accumulator in-place.
+     * Divides this value by a signed 32-bit integer in place.
      *
-     * The `addSquareOf` methods efficiently compute the square of the operand
-     * and add it to this accumulator. Supported operand types include:
-     * - [Int], [Long], [UInt], [ULong]
-     * - [BigInt]
-     * - [MutableBigInt]
+     * @param n the divisor
+     */
+    operator fun divAssign(n: Int) { setDiv(this, n) }
+
+    /**
+     * Divides this value by an unsigned 32-bit integer in place.
      *
-     * The magnitude is squared before addition. The internal tmp buffer
-     * is reused to minimize heap allocation during the operation.
+     * @param w the divisor
+     */
+    operator fun divAssign(w: UInt) { setDiv(this, w) }
+
+    /**
+     * Divides this value by a signed 64-bit integer in place.
      *
-     * These methods mutate the accumulator in place. They are safe to use even
-     * when the source is the same instance as the accumulator (`this`), as
-     * squaring is performed into temporary storage before addition.
+     * @param l the divisor
+     */
+    operator fun divAssign(l: Long) { setDiv(this, l) }
+
+    /**
+     * Divides this value by an unsigned 64-bit integer in place.
      *
-     * Example usage:
-     * ```
-     * val sumSqr = MutableBigInt()
-     * for (v in data) {
-     *     sumSqr.addSquareOf(v)
-     * }
-     * val totalSquares = sumSqr.toBigInt()
-     * ```
+     * @param dw the divisor
+     */
+    operator fun divAssign(dw: ULong) { setDiv(this, dw) }
+
+    /**
+     * Divides this value by an arbitrary-precision integer in place.
      *
-     * @param n the integer value to square and add.
+     * @param bi the divisor
+     */
+    operator fun divAssign(bi: BigIntBase) { setDiv(this, bi) }
+
+
+    /**
+     * Replaces this value with the remainder of division by a signed 32-bit integer.
+     *
+     * @param n the divisor
+     */
+    operator fun remAssign(n: Int) { setRem(this, n) }
+
+    /**
+     * Replaces this value with the remainder of division by an unsigned 32-bit integer.
+     *
+     * @param w the divisor
+     */
+    operator fun remAssign(w: UInt) { setRem(this, w) }
+
+    /**
+     * Replaces this value with the remainder of division by a signed 64-bit integer.
+     *
+     * @param l the divisor
+     */
+    operator fun remAssign(l: Long) { setRem(this, l) }
+
+    /**
+     * Replaces this value with the remainder of division by an unsigned 64-bit integer.
+     *
+     * @param dw the divisor
+     */
+    operator fun remAssign(dw: ULong) { setRem(this, dw) }
+
+    /**
+     * Replaces this value with the remainder of division by an arbitrary-precision integer.
+     *
+     * @param bi the divisor
+     */
+    operator fun remAssign(bi: BigIntBase) { setRem(this, bi) }
+
+
+    /**
+     * Adds the square of a signed 32-bit integer to this value in place.
+     *
+     * @param n the value to square and add
      */
     fun addSquareOf(n: Int) = setAdd(this, n.toLong() * n.toLong())
 
     /**
-     * Adds the square of the given UInt value to this accumulator.
+     * Adds the square of an unsigned 32-bit integer to this value in place.
      *
-     * @param w the value to square and add.
-     * @see addSquareOf(ULong)
+     * @param w the value to square and add
      */
     fun addSquareOf(w: UInt) = setAdd(this, w.toULong() * w.toULong())
 
     /**
-     * Adds the square of the given Long value to this accumulator.
+     * Adds the square of a signed 64-bit integer to this value in place.
      *
-     * @param l the value to square and add.
-     * @see addSquareOf(ULong)
+     * @param l the value to square and add
      */
     fun addSquareOf(l: Long) = addSquareOf(l.absoluteValue.toULong())
 
+
     /**
-     * Adds the square of the given ULong value to this accumulator.
+     * Adds the square of an unsigned 64-bit integer to this value in place,
+     * using a 128-bit product when required.
      *
-     * This method is the canonical implementation for adding squares. It handles
-     * internal limb arithmetic efficiently and updates the accumulator in place.
-     *
-     * @param dw the value to square and add.
+     * @param dw the value to square and add
      */
     fun addSquareOf(dw: ULong) {
         val lo64 = dw * dw
@@ -1283,10 +1307,9 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Adds the square of the given BigInt value to this accumulator.
+     * Adds the square of an arbitrary-precision integer to this value in place.
      *
-     * @param bi the value to square and add.
-     * @see addSquareOf(ULong)
+     * @param bi the value to square and add
      */
     fun addSquareOf(bi: BigIntBase) {
         ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
@@ -1296,57 +1319,48 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Adds the absolute value of the given Int to this accumulator.
+     * Adds the absolute value of a signed 32-bit integer in place.
      *
-     * @param n the value to add.
-     * @see addAbsValueOf(Long)
+     * @param n the value to add
      */
     fun addAbsValueOf(n: Int) = plusAssign(n.absoluteValue.toUInt())
 
     /**
-     * Adds the absolute value of the given operand to this accumulator in place.
+     * Adds the absolute value of a signed 64-bit integer in place. This is the
+     * canonical overload for absolute-value accumulation; unsigned values can be
+     * added directly with `+=`.
      *
-     * Supported operand types include integer primitives ([Int], [Long]) and
-     * arbitrary-precision values ([BigInt], [MutableBigInt]).
-     *
-     * This operation does not support unsigned types since they are always
-     * non-negative ... use `+=`
-     *
-     * Example usage:
-     * ```
-     * val sumAbs = MutableBigInt()
-     * for (v in data) {
-     *     sumAbs.addAbsValueOf(v)
-     * }
-     * val totalAbs = sumAbs.toBigInt()
-     * ```
-     *
-     * This is the canonical overload for absolute values.
-     *
-     * @param l the value to add.
+     * @param l the value to add
      */
     fun addAbsValueOf(l: Long) = plusAssign(l.absoluteValue.toULong())
 
     /**
-     * Adds the absolute value of the given [BigInt] or
-     * [MutableBigInt] to this accumulator.
+     * Adds the absolute value of an arbitrary-precision integer in place.
      *
-     * @param hi the value to add.
-     * @see addAbsValueOf(Long)
+     * @param bi the value to add
      */
     fun addAbsValueOf(bi: BigIntBase) =
-        setAddImpl(this, bi.meta.abs(), bi.magia) // add if it is positive, subtract if it is negative
+        // add if it is positive, subtract if it is negative
+        setAddImpl(this, bi.meta.abs(), bi.magia)
 
     /**
-     * Mutates accumulator `this <<= bitCount`.
-     * Sign remains the same.
-     * Throws if [bitCount] is negative.
+     * Shifts this value left by [bitCount] in place (`this <<= bitCount`).
+     * The sign is preserved.
+     *
+     * @param bitCount the number of bits to shift left; must be non-negative
+     * @return this [MutableBigInt] after mutation
+     * @throws IllegalArgumentException if [bitCount] is negative
      */
     fun mutShl(bitCount: Int): MutableBigInt = setShl(this, bitCount)
 
     /**
-     * Sets this accumulator to `x << bitCount`. Allocates space for the
-     * resulting bit length. Throws if [bitCount] is negative.
+     * Sets this value to `x << bitCount`, allocating space for the result.
+     * The sign of [x] is preserved.
+     *
+     * @param x the source value to shift
+     * @param bitCount the number of bits to shift left; must be non-negative
+     * @return this [MutableBigInt] after mutation
+     * @throws IllegalArgumentException if [bitCount] is negative
      */
     fun setShl(x: MutableBigInt, bitCount: Int): MutableBigInt = when {
         bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
@@ -1354,29 +1368,32 @@ class MutableBigInt private constructor (
         else -> {
             val xMagia = x.magia
             ensureBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
-            _meta = Meta(meta.signBit,
-                Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount))
+            _meta = Meta(
+                meta.signBit,
+                Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount)
+            )
             this
         }
     }
 
     /**
-     * Mutates this accumulator `this >>>= bitCount`.
+     * Performs a logical right shift in place (`this >>>= bitCount`), discarding
+     * sign and yielding a non-negative magnitude.
      *
-     * The sign of this is ignored and the resulting value is the
-     * non-negative magnitude.
-     *
-     * Throws if [bitCount] is negative.
+     * @param bitCount the number of bits to shift right; must be non-negative
+     * @return this [MutableBigInt] after mutation
+     * @throws IllegalArgumentException if [bitCount] is negative
      */
     fun mutUshr(bitCount: Int): MutableBigInt = setUshr(this, bitCount)
 
     /**
-     * Sets this accumulator to `x >>> bitCount`.
-     *
-     * The sign of `x` is ignored and the resulting value is the
+     * Sets this value to `x >>> bitCount`, discarding sign and yielding a
      * non-negative magnitude.
      *
-     * Throws if [bitCount] is negative.
+     * @param x the source value to shift
+     * @param bitCount the number of bits to shift right; must be non-negative
+     * @return this [MutableBigInt] after mutation
+     * @throws IllegalArgumentException if [bitCount] is negative
      */
     fun setUshr(x: BigIntBase, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
@@ -1385,35 +1402,34 @@ class MutableBigInt private constructor (
             bitCount == 0 -> set(x)
             zBitLen <= 0 -> setZero()
             else -> {
-                // if aliasing then we are shrinking
                 ensureBitCapacityDiscard(zBitLen)
                 _meta = Meta(
                     0,
-                    Mago.setShiftRight(magia, x.magia, x.meta.normLen, bitCount))
+                    Mago.setShiftRight(magia, x.magia, x.meta.normLen, bitCount)
+                )
                 this
             }
         }
     }
 
     /**
-     * Mutates this accumulator `x >>= bitCount`.
+     * Performs an arithmetic right shift in place (`this >>= bitCount`), preserving
+     * sign. Negative values replicate the sign bit as if in two’s complement.
      *
-     * Follows arithmetic shift right semantics ...
-     * effectively treating the resulting value as if
-     * `this` were stored in twos-complement.
-     *
-     * Throws if [bitCount] is negative.
+     * @param bitCount the number of bits to shift right; must be non-negative
+     * @return this [MutableBigInt] after mutation
+     * @throws IllegalArgumentException if [bitCount] is negative
      */
     fun mutShr(bitCount: Int): MutableBigInt = setShr(this, bitCount)
 
     /**
-     * Sets this accumulator to `x >> bitCount`.
+     * Sets this value to `x >> bitCount` using arithmetic right-shift semantics.
+     * Negative values propagate sign bits as if in two’s-complement.
      *
-     * Follows arithmetic shift right semantics if `x` is negative,
-     * effectively treating the resulting value as if it were
-     * stored in twos-complement.
-     *
-     * Throws if [bitCount] is negative.
+     * @param x the source value to shift
+     * @param bitCount the number of bits to shift right; must be non-negative
+     * @return this [MutableBigInt] after mutation
+     * @throws IllegalArgumentException if [bitCount] is negative
      */
     fun setShr(x: BigIntBase, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
@@ -1423,11 +1439,15 @@ class MutableBigInt private constructor (
             zBitLen <= 0 && x.meta.isNegative -> set(-1)
             zBitLen <= 0 -> setZero()
             else -> {
-                val needsIncrement = x.meta.isNegative && Mago.testAnyBitInLowerN(x.magia, bitCount)
-                // if aliasing then we are shrinking
+                val needsIncrement = x.meta.isNegative &&
+                        Mago.testAnyBitInLowerN(x.magia, bitCount)
+
                 ensureBitCapacityDiscard(zBitLen)
-                var normLen = Mago.setShiftRight(magia, x.magia, x.meta.normLen, bitCount)
-                check (normLen > 0)
+                var normLen = Mago.setShiftRight(
+                    magia, x.magia, x.meta.normLen, bitCount
+                )
+                check(normLen > 0)
+
                 if (needsIncrement) {
                     ensureBitCapacityCopy(zBitLen + 1)
                     normLen = Mago.setAdd64(magia, magia, normLen, 1u)
@@ -1439,11 +1459,13 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Sets the bit at [bitIndex] in the magnitude, growing the limb array if needed.
+     * Function that sets the bit at [bitIndex] in the magnitude, growing storage
+     * if needed. If the target bit lies within the current normalized limb range,
+     * it is updated in place; otherwise the limb array is extended and the new
+     * highest limb is initialized.
      *
-     * If the bit lies within the current normalized limb range, the limb is updated
-     * in place. Otherwise the array is extended and the new highest limb set.
-     *
+     * @param bitIndex index of the bit to set; must be ≥ 0
+     * @return this [MutableBigInt]
      * @throws IllegalArgumentException if [bitIndex] is negative
      */
     fun setBit(bitIndex: Int): MutableBigInt {
@@ -1462,10 +1484,14 @@ class MutableBigInt private constructor (
         throw IllegalArgumentException()
     }
 
+
     /**
-     * Clears the bit at [bitIndex] in the magnitude. If the cleared bit was in the
-     * most-significant used limb, the normalized length is reduced accordingly.
+     * Function that clears the bit at [bitIndex] in the magnitude. If the cleared
+     * bit lies in the most-significant active limb, the normalized length is
+     * recomputed. Bits above the current magnitude are ignored.
      *
+     * @param bitIndex index of the bit to clear; must be ≥ 0
+     * @return this [MutableBigInt]
      * @throws IllegalArgumentException if [bitIndex] is negative
      */
     fun clearBit(bitIndex: Int): MutableBigInt {
@@ -1482,23 +1508,26 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Applies a bit mask of `bitWidth` consecutive 1-bits starting at `bitIndex`
-     * to this accumulator, clearing all bits outside that range. The sign is
-     * always cleared to non-negative. Operates in place and returns this.
+     * Function that applies a mask of [bitWidth] consecutive 1-bits starting at
+     * [bitIndex], clearing all bits outside that range. The sign is set to
+     * non-negative. Operates in place and returns this value.
      *
      * Equivalent to:
+     * `this = abs(this) & ((2^bitWidth - 1) << bitIndex)`.
      *
-     *     this = abs(this) & ((2^bitWidth - 1) << bitIndex)
-     *
-     * @throws IllegalArgumentException if `bitWidth` or `bitIndex` is negative.
+     * @param bitWidth number of consecutive 1-bits in the mask; must be ≥ 0
+     * @param bitIndex starting bit position of the mask; must be ≥ 0
+     * @return this [MutableBigInt]
+     * @throws IllegalArgumentException if either parameter is negative
      */
     fun applyBitMask(bitWidth: Int, bitIndex: Int = 0): MutableBigInt {
-        check (isNormalized())
+        check(isNormalized())
         val myBitLen = magnitudeBitLen()
         when {
             bitIndex < 0 || bitWidth < 0 ->
                 throw IllegalArgumentException(
-                    "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
+                    "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth"
+                )
             bitWidth == 0 || bitIndex >= myBitLen -> return setZero()
             bitWidth == 1 && !testBit(bitIndex) -> return setZero()
             bitWidth == 1 -> {
@@ -1506,7 +1535,7 @@ class MutableBigInt private constructor (
                 magia.fill(0, 0, limbIndex)
                 magia[limbIndex] = 1 shl (bitIndex and 0x1F)
                 _meta = Meta(limbIndex + 1)
-                check (isNormalized())
+                check(isNormalized())
                 return this
             }
         }
@@ -1521,19 +1550,17 @@ class MutableBigInt private constructor (
         magia[loIndex] = magia[loIndex] and (-1 shl ctz)
         val normLen = Mago.normLen(magia, normLen0)
         _meta = Meta(normLen)
-        check (isNormalized())
+        check(isNormalized())
         return this
     }
 
+
     /**
-     * Returns the current value of this accumulator as a raw unsigned 64-bit value.
+     * Function that returns the current magnitude truncated to a raw unsigned
+     * 64-bit quantity. If the magnitude exceeds 64 bits, only the least-significant
+     * 64 bits are returned. Intended for internal use.
      *
-     * This method is intended for internal use. It converts the accumulator
-     * to a single [ULong], assuming the value fits within 64 bits.
-     * If the magnitude exceeds 64 bits, the result will only include the least
-     * significant 64 bits.
-     *
-     * @return the value of this accumulator as a [ULong], truncated if necessary.
+     * @return the low 64 bits of this value as a [ULong]
      */
     private inline fun toRawULong(): ULong {
         //return when {
@@ -1548,18 +1575,22 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Value comparison for computational use.
+     * Function that performs a numeric value comparison for computational use.
      *
-     * Equality is intentionally **asymmetric**:
-     * - Compares by numeric value against [MutableBigInt], [BigInt], and
-     *   selected integer primitives.
-     * - `other.equals(this)` is **not** guaranteed to return the same result.
+     * Equality is **asymmetric by design**:
+     * - This instance compares equal to [BigInt] / [MutableBigInt] values and
+     *   selected primitive integers by numeric value.
+     * - The reverse comparison (`other.equals(this)`) is **not** guaranteed.
      *
      * This type is mutable and **not a value type**:
-     * - Must not be used in hash-based collections.
-     * - [hashCode] is unsupported and always throws.
+     * - Must not be placed in hash-based collections.
+     * - [hashCode] is deliberately unsupported and always throws.
      *
-     * Intended for internal arithmetic and testing, not for generic equality checks.
+     * Intended for arithmetic utilities and testing, **not** as a general-purpose
+     * equality contract.
+     *
+     * @param other a candidate value for numeric comparison
+     * @return `true` if numerically equal under the above rules, `false` otherwise
      */
     override fun equals(other: Any?): Boolean {
         return when (other) {
@@ -1572,12 +1603,14 @@ class MutableBigInt private constructor (
         }
     }
 
+
     /**
-     * Always throws.
+     * Function that always throws. `MutableBigInt` is mutable and must never be
+     * used as a key in hash-based collections (`HashMap`, `HashSet`, etc.).
+     * Calling [hashCode] is therefore unsupported.
      *
-     * `MutableBigInt` is mutable and must never be used as a key in hash-based
-     * collections (`HashMap`, `HashSet`, etc.). Calling `hashCode()` is therefore
-     * unsupported and results in an exception.
+     * @return never returns
+     * @throws UnsupportedOperationException always thrown to forbid use in hashing
      */
     override fun hashCode(): Int =
         throw UnsupportedOperationException(
