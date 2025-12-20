@@ -1,7 +1,9 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.BigIntBase
 import com.decimal128.bigint.MutableBigInt
+import com.decimal128.bigint.toBigInt
 import kotlin.math.absoluteValue
 
 /**
@@ -72,7 +74,7 @@ class ModContext(val m: BigInt) {
      * @param b second addend
      * @param out destination accumulator for the result
      */
-    fun modAdd(a: MutableBigInt, b: MutableBigInt, out: MutableBigInt) {
+    fun modAdd(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
         out.setAdd(a, b)
         if (out >= m) out -= m
     }
@@ -84,7 +86,7 @@ class ModContext(val m: BigInt) {
      * @param b subtrahend
      * @param out destination accumulator for the result
      */
-    fun modSub(a: MutableBigInt, b: MutableBigInt, out: MutableBigInt) {
+    fun modSub(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
         out.setSub(a, b)
         if (out.isNegative()) out += m
     }
@@ -96,7 +98,7 @@ class ModContext(val m: BigInt) {
      * @param b second multiplicand
      * @param out destination accumulator for the result
      */
-    fun modMul(a: BigInt, b: BigInt, out: MutableBigInt) =
+    fun modMul(a: BigIntBase, b: BigIntBase, out: MutableBigInt) =
         impl.modMul(a, b, out)
 
     /**
@@ -106,17 +108,7 @@ class ModContext(val m: BigInt) {
      * @param b second multiplicand
      * @param out destination accumulator for the result
      */
-    fun modMul(a: MutableBigInt, b: Int, out: MutableBigInt) =
-        impl.modMul(a, b, out)
-
-    /**
-     * Computes `(a * b) mod m`.
-     *
-     * @param a first multiplicand
-     * @param b second multiplicand
-     * @param out destination accumulator for the result
-     */
-    fun modMul(a: MutableBigInt, b: MutableBigInt, out: MutableBigInt) =
+    fun modMul(a: BigIntBase, b: Int, out: MutableBigInt) =
         impl.modMul(a, b, out)
 
     /**
@@ -125,16 +117,7 @@ class ModContext(val m: BigInt) {
      * @param a value to square
      * @param out destination accumulator for the result
      */
-    fun modSqr(a: BigInt, out: MutableBigInt) =
-        impl.modSqr(a, out)
-
-    /**
-     * Computes `(a * a) mod m`.
-     *
-     * @param a value to square
-     * @param out destination accumulator for the result
-     */
-    fun modSqr(a: MutableBigInt, out: MutableBigInt) =
+    fun modSqr(a: BigIntBase, out: MutableBigInt) =
         impl.modSqr(a, out)
 
     /**
@@ -333,7 +316,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: BigInt, b: BigInt, out: MutableBigInt) {
+        fun modMul(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
             check (out !== mulTmp)
             mulTmp.setMul(a, b)
             reduceInto(mulTmp, out)
@@ -342,7 +325,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: MutableBigInt, b: Int, out: MutableBigInt) {
+        fun modMul(a: BigIntBase, b: Int, out: MutableBigInt) {
             check (a !== mulTmp && out !== mulTmp)
             if (b != 0) {
                 mulTmp.setMul(a, b.absoluteValue.toUInt())
@@ -355,28 +338,10 @@ class ModContext(val m: BigInt) {
         }
 
         /**
-         * Computes `(a * b) mod m`.
-         */
-        fun modMul(a: MutableBigInt, b: MutableBigInt, out: MutableBigInt) {
-            check (a !== mulTmp && b !== mulTmp && out !== mulTmp)
-            mulTmp.setMul(a, b)
-            reduceInto(mulTmp, out)
-        }
-
-        /**
          * Computes `(a * a) mod m`.
          */
-        fun modSqr(a: BigInt, out: MutableBigInt) {
+        fun modSqr(a: BigIntBase, out: MutableBigInt) {
             check (out !== mulTmp)
-            mulTmp.setSqr(a)
-            reduceInto(mulTmp, out)
-        }
-
-        /**
-         * Computes `(a * a) mod m`.
-         */
-        fun modSqr(a: MutableBigInt, out: MutableBigInt) {
-            check (a !== mulTmp && out !== mulTmp)
             mulTmp.setSqr(a)
             reduceInto(mulTmp, out)
         }
@@ -390,7 +355,7 @@ class ModContext(val m: BigInt) {
          * @param exp exponent (must be ≥ 0)
          * @param out destination accumulator for the result
          */
-        fun modPow(base: BigInt, exp: BigInt, out: MutableBigInt) {
+        fun modPow(base: BigIntBase, exp: BigIntBase, out: MutableBigInt) {
             if (exp < 0)
                 throw IllegalArgumentException()
             out.setOne()
@@ -420,7 +385,7 @@ class ModContext(val m: BigInt) {
          * @param a input value
          * @param out destination accumulator for the result
          */
-        fun modHalfLucas(a: MutableBigInt, out: MutableBigInt) {
+        fun modHalfLucas(a: BigIntBase, out: MutableBigInt) {
             check (m.isOdd())
             if (out !== a)
                 out.set(a)
@@ -428,5 +393,88 @@ class ModContext(val m: BigInt) {
                 out += m
             out.mutShr(1)
         }
+    }
+
+    class Montgomery(val modulus: BigInt) {
+        init { require (modulus >= 1 && modulus.isOdd()) }
+        val k = modulus.meta.normLen
+        val np = computeNp(modulus.magia[0].toUInt())
+        val r2 = MutableBigInt()
+            .setBit(64*k)
+            .montgomeryRedc(modulus, np)
+
+        companion object {
+            fun computeNp(n: UInt): UInt {
+                require((n and 1u) == 1u)
+
+                var x = (n * 3u) xor 2u  // 2 good bits
+                // repeat(4) {
+                //    x *= 2u - n * x      // Newton iteration mod 2^32
+                //}
+                x *= 2u - n * x
+                x *= 2u - n * x
+                x *= 2u - n * x
+                x *= 2u - n * x
+                return (-x.toInt()).toUInt()
+            }
+        }
+
+        inline fun toMontgomery(x: BigIntBase, out: MutableBigInt): MutableBigInt =
+            out.setMul(x, r2).montgomeryRedc(modulus, np)
+
+        inline fun fromMontgomery(xR: MutableBigInt): MutableBigInt =
+            xR.montgomeryRedc(modulus, np)
+
+        val aR = MutableBigInt()
+        val bR = MutableBigInt()
+
+        fun modMul(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
+            toMontgomery(a, aR)
+            toMontgomery(b, bR)
+            out.setMul(aR, bR)
+                .montgomeryRedc(modulus, np)
+            fromMontgomery(out)
+        }
+
+        fun montMul(aR: BigIntBase, bR: BigIntBase, out: MutableBigInt) =
+            out.setMul(aR, bR).montgomeryRedc(modulus, np)
+
+        val baseR = MutableBigInt()
+        val xR = MutableBigInt()
+
+        fun modPow(base: BigIntBase, exp: BigIntBase, out: MutableBigInt) {
+            // Zero exponent → return 1
+            if (exp.isZero()) {
+                out.set(1)
+                return
+            }
+
+            // Convert base → Montgomery domain
+            toMontgomery(base, baseR)      // = base * R mod N
+
+            // xR = 1 in Montgomery space => R mod N
+            xR.setOne()
+            xR.montgomeryRedc(modulus, np) // = R mod N
+
+            // Standard left-to-right binary exponentiation
+            val bitLen = exp.magnitudeBitLen()
+            for (i in bitLen - 1 downTo 0) {
+                // xR = xR^2 mod N  (still Montgomery)
+                montMul(xR, xR, xR)
+
+                if (exp.testBit(i)) {
+                    // xR = xR * baseR mod N
+                    montMul(xR, baseR, xR)
+                }
+            }
+
+            // Convert result back from Montgomery
+            fromMontgomery(xR)  // → Z-domain = base^exp mod N
+
+            // Move into output
+            out.set(xR)
+        }
+
+
     }
 }

@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+
+@file:Suppress("NOTHING_TO_INLINE")
+
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt.Companion.NEG_ONE
@@ -324,6 +328,71 @@ object BigIntAlgorithms {
         val squared = isqrt.sqr()
         return squared EQ radicand
     }
+
+    /**
+     * Montgomery REDC (CIOS form) using 32-bit limbs.
+     *
+     * Input:
+     *  - t[0 .. tLen-1], where tLen == 2*nLen, contains T
+     *  - n[0 .. nLen-1] contains modulus N (must be odd)
+     *  - np = -N^{-1} mod 2^32
+     *
+     * Output:
+     *  - t[0 .. nLen-1] holds the reduced value
+     *  - Returns new length = nLen
+     *
+     * Preconditions:
+     *  - T < N * R, where R = 2^(32 * nLen)
+     *  - t has room for at least tLen limbs
+     *  - n[0] is odd (so inverse exists)
+     */
+    fun redc(t: Magia, tLen: Int, n: Magia, k: Int, np: UInt): Int {
+        require(k > 0 && k <= n.size)
+        require(tLen <= t.size)
+        require(t.size >= 2*k)
+        require((n[0] and 1) != 0)
+
+        // --- Phase 1: eliminate low limbs one at a time ---
+        for (i in 0..<k) {
+            // m = (t[i] * np) mod 2^32
+            val m = (t[i].toUInt() * np).toULong()
+            println("m=$m")
+
+            var carry = 0uL
+            var j = 0
+
+            // t[i+j] += m * n[j] + carry
+            while (j < k) {
+                // 64-bit accumulator
+                val acc =
+                    t[i + j].toUInt().toULong() +
+                            m * n[j].toUInt().toULong() +
+                            carry
+
+                t[i + j] = acc.toInt()
+                carry   = acc shr 32
+                j++
+            }
+
+            // propagate carry into t[i + k]
+            t[i + k] += carry.toInt()
+            // any overflow beyond here is guaranteed to be 0,
+            // because max accumulator <= 2^64 - 1
+        }
+
+        // --- Phase 2: shift down the upper half ---
+        // result initially resides in t[k .. 2k-1]
+        t.copyInto(t, 0, k, k + k)
+
+        // --- Phase 3: conditional subtract modulus ---
+        // if T >= N, subtract once
+
+        val tNormLen = Mago.normLen(t, k)
+        if (Mago.compare(t, tNormLen, n, k) < 0)
+            return tNormLen
+        return Mago.setSub(t, t, tNormLen, n, k)
+    }
+
 
 }
 

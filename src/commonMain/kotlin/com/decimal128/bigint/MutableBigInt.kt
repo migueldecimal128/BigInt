@@ -1574,6 +1574,16 @@ class MutableBigInt private constructor (
         return dw and gt32Mask and nonZeroMask
     }
 
+    fun montgomeryRedc(modulus: BigInt, np: UInt): MutableBigInt {
+        require (modulus.isOdd())
+        val k = modulus.meta.normLen
+        require (meta.normLen <= 2 * k)
+        ensureCapacityCopy(2 * k)
+        val normLen = BigIntAlgorithms.redc(magia, meta.normLen, modulus.magia, k, np)
+        _meta = Meta(normLen)
+        return this
+    }
+
     /**
      * Function that performs a numeric value comparison for computational use.
      *
