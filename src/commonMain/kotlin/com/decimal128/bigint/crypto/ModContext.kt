@@ -3,7 +3,6 @@ package com.decimal128.bigint.crypto
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntBase
 import com.decimal128.bigint.MutableBigInt
-import com.decimal128.bigint.toBigInt
 import kotlin.math.absoluteValue
 
 /**
@@ -52,7 +51,9 @@ class ModContext(val m: BigInt) {
     }
     val kBits = m.magnitudeBitLen()
 
-    private val impl = Barrett(m)
+    private val barrett = Barrett(m)
+    private val montgomery: Montgomery? =
+        if (m.isOdd()) Montgomery(m) else null
 
     private val tmp = MutableBigInt()
 
@@ -99,7 +100,7 @@ class ModContext(val m: BigInt) {
      * @param out destination accumulator for the result
      */
     fun modMul(a: BigIntBase, b: BigIntBase, out: MutableBigInt) =
-        impl.modMul(a, b, out)
+        barrett.modMul(a, b, out)
 
     /**
      * Computes `(a * b) mod m`.
@@ -109,7 +110,7 @@ class ModContext(val m: BigInt) {
      * @param out destination accumulator for the result
      */
     fun modMul(a: BigIntBase, b: Int, out: MutableBigInt) =
-        impl.modMul(a, b, out)
+        barrett.modMul(a, b, out)
 
     /**
      * Computes `(a * a) mod m`.
@@ -118,7 +119,7 @@ class ModContext(val m: BigInt) {
      * @param out destination accumulator for the result
      */
     fun modSqr(a: BigIntBase, out: MutableBigInt) =
-        impl.modSqr(a, out)
+        barrett.modSqr(a, out)
 
     /**
      * Computes `(base^exp) mod m`.
@@ -128,7 +129,7 @@ class ModContext(val m: BigInt) {
      * @param out destination accumulator for the result
      */
     fun modPow(base: BigInt, exp: BigInt, out: MutableBigInt) =
-        impl.modPow(base, exp, out)
+        montgomery?.modPow(base, exp, out) ?: barrett.modPow(base, exp, out)
 
     /**
      * Computes `(a / 2) mod m` assuming an odd modulus.
@@ -137,7 +138,7 @@ class ModContext(val m: BigInt) {
      * @param out destination accumulator for the result
      */
     fun modHalfLucas(a: MutableBigInt, out: MutableBigInt) =
-        impl.modHalfLucas(a, out)
+        barrett.modHalfLucas(a, out)
 
     // modInv scratch for EEA Extended Euclidean Algorithm
 
@@ -399,10 +400,10 @@ class ModContext(val m: BigInt) {
         init { require (modulus >= 1 && modulus.isOdd()) }
         val k = modulus.meta.normLen
         val np = computeNp(modulus.magia[0].toUInt())
-        val r2 = MutableBigInt()
-            .setBit(64*k)
-            .montgomeryRedc(modulus, np)
+        val r2 = BigInt.withSetBit(64*k) % modulus
 
+
+        init { println("foo!") }
         companion object {
             fun computeNp(n: UInt): UInt {
                 require((n and 1u) == 1u)
@@ -419,10 +420,10 @@ class ModContext(val m: BigInt) {
             }
         }
 
-        inline fun toMontgomery(x: BigIntBase, out: MutableBigInt): MutableBigInt =
+        fun toMontgomery(x: BigIntBase, out: MutableBigInt): MutableBigInt =
             out.setMul(x, r2).montgomeryRedc(modulus, np)
 
-        inline fun fromMontgomery(xR: MutableBigInt): MutableBigInt =
+        fun fromMontgomery(xR: MutableBigInt): MutableBigInt =
             xR.montgomeryRedc(modulus, np)
 
         val aR = MutableBigInt()
@@ -436,13 +437,21 @@ class ModContext(val m: BigInt) {
             fromMontgomery(out)
         }
 
-        fun montMul(aR: BigIntBase, bR: BigIntBase, out: MutableBigInt) =
-            out.setMul(aR, bR).montgomeryRedc(modulus, np)
+        val tmp = MutableBigInt()
+
+        fun montMul(aR: BigIntBase, bR: BigIntBase, out: MutableBigInt) {
+            //out.setMul(aR, bR).montgomeryRedc(modulus, np)
+            tmp.setMul(aR, bR)
+            tmp.montgomeryRedc(modulus, np)
+            out.set(tmp)
+            }
 
         val baseR = MutableBigInt()
         val xR = MutableBigInt()
 
         fun modPow(base: BigIntBase, exp: BigIntBase, out: MutableBigInt) {
+            require (! exp.isNegative())
+
             // Zero exponent → return 1
             if (exp.isZero()) {
                 out.set(1)
@@ -450,13 +459,34 @@ class ModContext(val m: BigInt) {
             }
 
             // Convert base → Montgomery domain
-            toMontgomery(base, baseR)      // = base * R mod N
+
+            baseR.set(base)
+            baseR *= r2
+            baseR %= modulus
+            baseR.montgomeryRedc(modulus, np)
+
 
             // xR = 1 in Montgomery space => R mod N
-            xR.setOne()
+            xR.set(r2)
             xR.montgomeryRedc(modulus, np) // = R mod N
 
             // Standard left-to-right binary exponentiation
+
+            println("mod  = ${modulus.toBigInt()}")
+            println("r2   = ${r2.toBigInt()}")
+            println("baseR= ${baseR.toBigInt()}")
+            println("xR   = ${xR.toBigInt()}")
+
+            val test = MutableBigInt().also {
+                montMul(xR, xR, it)   // 1_R * 1_R
+            }
+            println("R*R = ${test.toBigInt()}")
+
+            // Test montMul(1_R, baseR) explicitly:
+            val testMul = MutableBigInt()
+            montMul(xR, baseR, testMul)
+            println("montMul(1_R, baseR) = ${testMul.toBigInt()}")
+
             val bitLen = exp.magnitudeBitLen()
             for (i in bitLen - 1 downTo 0) {
                 // xR = xR^2 mod N  (still Montgomery)

@@ -332,31 +332,48 @@ object BigIntAlgorithms {
     /**
      * Montgomery REDC (CIOS form) using 32-bit limbs.
      *
-     * Input:
-     *  - t[0 .. tLen-1], where tLen == 2*nLen, contains T
+     * Computes  t = t * R⁻¹ mod N,  where R = 2^(32*nLen).
+     *
+     * Input layout:
+     *  - t[0 .. tLen-1] contains the low limbs of T, with 0 ≤ tLen ≤ 2*nLen+1
      *  - n[0 .. nLen-1] contains modulus N (must be odd)
-     *  - np = -N^{-1} mod 2^32
+     *  - np = −N⁻¹ mod 2³² (32-bit Montgomery factor)
      *
-     * Output:
-     *  - t[0 .. nLen-1] holds the reduced value
-     *  - Returns new length = nLen
+     * Buffer requirements:
+     *  - t must provide capacity for **at least 2*nLen + 1 limbs**
+     *  - any limbs in t[tLen .. 2*nLen] must not contain live data
+     *    (this implementation clears them before use)
      *
-     * Preconditions:
-     *  - T < N * R, where R = 2^(32 * nLen)
-     *  - t has room for at least tLen limbs
-     *  - n[0] is odd (so inverse exists)
+     * Mathematical preconditions:
+     *  - N is odd
+     *  - 0 ≤ T < N * R   so that REDC produces a value < 2N
+     *
+     * Postconditions:
+     *  - t[0 .. k] holds a k-limb candidate, where k ≤ nLen+1
+     *  - if that value ≥ N, one subtraction is applied
+     *  - the final result satisfies 0 ≤ t < N and occupies ≤ nLen limbs
+     *
+     * Returns:
+     *  - the normalized limb length of the reduced residue
+     *
+     * Notes:
+     *  - This is the classic Coarsely Integrated Operand Scanning (CIOS) form.
+     *  - One extra limb of temporary space is used to hold carry propagation
+     *    during the elimination phase.
      */
     fun redc(t: Magia, tLen: Int, n: Magia, k: Int, np: UInt): Int {
         require(k > 0 && k <= n.size)
         require(tLen <= t.size)
-        require(t.size >= 2*k)
+        require(t.size >= 2*k + 1)
         require((n[0] and 1) != 0)
+
+        // clear garbage limbs up to t[2*k + 1]
+        t.fill(0, tLen, 2*k + 1)
 
         // --- Phase 1: eliminate low limbs one at a time ---
         for (i in 0..<k) {
             // m = (t[i] * np) mod 2^32
             val m = (t[i].toUInt() * np).toULong()
-            println("m=$m")
 
             var carry = 0uL
             var j = 0
@@ -373,21 +390,19 @@ object BigIntAlgorithms {
                 carry   = acc shr 32
                 j++
             }
-
-            // propagate carry into t[i + k]
-            t[i + k] += carry.toInt()
-            // any overflow beyond here is guaranteed to be 0,
-            // because max accumulator <= 2^64 - 1
+            carry += t[i + k].toUInt().toULong()
+            t[i + k] = carry.toInt()
+            t[i + k + 1] += (carry shr 32).toInt()
         }
 
         // --- Phase 2: shift down the upper half ---
         // result initially resides in t[k .. 2k-1]
-        t.copyInto(t, 0, k, k + k)
+        t.copyInto(t, 0, k, k + k + 1)
 
         // --- Phase 3: conditional subtract modulus ---
         // if T >= N, subtract once
 
-        val tNormLen = Mago.normLen(t, k)
+        val tNormLen = Mago.normLen(t, k + 1)
         if (Mago.compare(t, tNormLen, n, k) < 0)
             return tNormLen
         return Mago.setSub(t, t, tNormLen, n, k)

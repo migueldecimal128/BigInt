@@ -4,6 +4,7 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.Meta
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
 import kotlin.math.max
@@ -388,7 +389,8 @@ class MutableBigInt private constructor (
      * After the swap, the previous contents of `magia` become `tmp1`, and
      * the previous contents of `tmp1` become the active backing storage.
      */
-    private inline fun swapTmp1() {
+    private fun swapTmp1() {
+        check (tmp1.size >= 4)
         val t = tmp1; tmp1 = _magia; _magia = t
     }
 
@@ -716,16 +718,31 @@ class MutableBigInt private constructor (
      * @param y the right-hand operand (primitive or [BigInt]/[MutableBigInt], depending on overload)
      * @return this [MutableBigInt] for call chaining
      */
-    fun setMul(x: BigIntBase, n: Int) =
+    fun setMul(x: BigIntBase, n: Int): MutableBigInt =
         setMulImpl(x, n < 0, n.absoluteValue.toUInt())
-    fun setMul(x: BigIntBase, w: UInt) =
+    fun setMul(x: BigIntBase, w: UInt): MutableBigInt =
         setMulImpl(x, false, w)
-    fun setMul(x: BigIntBase, l: Long) =
+    fun setMul(x: BigIntBase, l: Long): MutableBigInt =
         setMulImpl(x, l < 0, l.absoluteValue.toULong())
-    fun setMul(x: BigIntBase, dw: ULong) =
+    fun setMul(x: BigIntBase, dw: ULong): MutableBigInt =
         setMulImpl(x, false, dw)
-    fun setMul(x: BigIntBase, y: BigIntBase) =
-        setMulImpl(x.meta, x.magia, y.meta, y.magia)
+    fun setMul(x: BigIntBase, y: BigIntBase): MutableBigInt {
+        val xNormLen = x.meta.normLen
+        val yNormLen = y.meta.normLen
+        when {
+            xNormLen == 0 || yNormLen == 0 -> return setZero()
+            // FIXME
+            //yNormLen <= 2 -> return setMulImpl(x, y.meta.signFlag, y.toULong())
+            //y.isMagnitudePowerOfTwo() -> return setShl(x, y.countTrailingZeroBits())
+        }
+        ensureTmp1Capacity(xNormLen + yNormLen)
+        _meta = Meta(
+            x.meta.signBit xor y.meta.signBit,
+            Mago.setMul(tmp1, x.magia, xNormLen, y.magia, yNormLen)
+        )
+        swapTmp1()
+        return this
+    }
 
     /**
      * Internal helper for multiplying a normalized operand by a 32-bit unsigned
@@ -854,13 +871,28 @@ class MutableBigInt private constructor (
     private fun setSqrImpl(xMeta: Meta, x: Magia): MutableBigInt {
         check(Mago.isNormalized(x, xMeta.normLen))
         val xNormLen = xMeta.normLen
-        ensureTmp1CapacityZeroed(xNormLen + xNormLen)
-        _meta = Meta(
-            0,
-            Mago.setSqr(tmp1, x, xNormLen)
-        )
-        swapTmp1()
-        return this
+        return when {
+            xNormLen > 2 -> {
+                ensureTmp1CapacityZeroed(xNormLen + xNormLen)
+                _meta = Meta(
+                    0,
+                    Mago.setSqr(tmp1, x, xNormLen)
+                )
+                swapTmp1()
+                this
+            }
+            xNormLen == 2 -> {
+                val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
+                val lo = xDw * xDw
+                val hi = unsignedMulHi(xDw, xDw)
+                set(false, hi, lo)
+            }
+            xNormLen == 1 -> {
+                val x0 = x[0].toUInt().toULong()
+                set(false, x0 * x0)
+            }
+            else -> setZero()
+        }
     }
 
     /**
@@ -1362,7 +1394,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      * @throws IllegalArgumentException if [bitCount] is negative
      */
-    fun setShl(x: MutableBigInt, bitCount: Int): MutableBigInt = when {
+    fun setShl(x: BigIntBase, bitCount: Int): MutableBigInt = when {
         bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         bitCount == 0 || x.isZero() -> set(x)
         else -> {
@@ -1577,8 +1609,8 @@ class MutableBigInt private constructor (
     fun montgomeryRedc(modulus: BigInt, np: UInt): MutableBigInt {
         require (modulus.isOdd())
         val k = modulus.meta.normLen
-        require (meta.normLen <= 2 * k)
-        ensureCapacityCopy(2 * k)
+        require (meta.normLen <= 2 * k + 1)
+        ensureCapacityCopy(2 * k + 1)
         val normLen = BigIntAlgorithms.redc(magia, meta.normLen, modulus.magia, k, np)
         _meta = Meta(normLen)
         return this
