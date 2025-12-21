@@ -1185,6 +1185,17 @@ class BigInt private constructor(
         return ZERO
     }
 
+    /**
+     * Returns `this^exp` as a new [BigInt].
+     *
+     * The exponent must be non-negative.
+     *
+     * @param exp the exponent
+     * @return `this` raised to [exp]
+     * @throws IllegalArgumentException if [exp] is negative
+     */
+    fun pow(exp: Int) = BigIntAlgorithms.pow(this, exp)
+
 
     fun withSetBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = true)
 

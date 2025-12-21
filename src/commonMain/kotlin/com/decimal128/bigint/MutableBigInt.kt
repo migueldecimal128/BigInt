@@ -649,7 +649,7 @@ class MutableBigInt private constructor (
                             Mago.setSub64(magia, xMagia, x.meta.normLen, yDw)
                         )
                     }
-                    cmp < 0 -> set(ySign, yDw - toRawULong())
+                    cmp < 0 -> set(ySign, yDw - x.toULongMagnitude())
                     else -> setZero()
                 }
             }
@@ -1595,15 +1595,16 @@ class MutableBigInt private constructor (
      * @return the low 64 bits of this value as a [ULong]
      */
     private inline fun toRawULong(): ULong {
-        //return when {
-        //    limbLen == 1 -> dw32(magia[0])
-        //    limbLen >= 2 -> (dw32(magia[1]) shl 32) or dw32(magia[0])
-        //    else -> 0uL
-        //}
-        val dw = (magia[1].toULong() shl 32) or magia[0].toUInt().toULong()
-        val nonZeroMask = ((-normLen).toLong() shr 63).toULong()
-        val gt32Mask = ((1 - normLen) shr 31).toLong().toULong() or 0xFFFF_FFFFuL
-        return dw and gt32Mask and nonZeroMask
+        val lo = magia[0].toUInt().toULong()
+        return when {
+            meta.normLen == 1 -> lo
+            meta.normLen >= 2 -> (magia[1].toULong() shl 32) or lo
+            else -> 0uL
+        }
+        //val dw = (magia[1].toULong() shl 32) or magia[0].toUInt().toULong()
+        //val nonZeroMask = ((-normLen).toLong() shr 63).toULong()
+        //val gt32Mask = ((1 - normLen) shr 31).toLong().toULong() or 0xFFFF_FFFFuL
+        //return dw and gt32Mask and nonZeroMask
     }
 
     fun montgomeryRedc(modulus: BigInt, np: UInt): MutableBigInt {

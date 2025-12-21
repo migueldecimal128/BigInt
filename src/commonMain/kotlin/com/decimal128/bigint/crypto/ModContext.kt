@@ -205,7 +205,7 @@ class ModContext(val m: BigInt) {
      */
     fun modSub(a: BigIntBase, b: Long, out: MutableBigInt) {
         out.setSub(a, b)
-        if (out >= m) out -= m
+        if (out.isNegative()) out += m
     }
 
     /**
