@@ -8,19 +8,20 @@ import com.decimal128.bigint.toMutableBigInt
 /**
  * Primality-testing utilities for [BigInt].
  *
- * Provides fast probabilistic primality checks based on the
- * **Baillie–PSW** test:
- * - Trial division by a fixed set of small primes
- * - Deterministic Miller–Rabin for 64-bit–safe bases
- * - Strong Lucas probable-prime test (Selfridge method)
+ * Provides a fast version of the **Baillie–PSW** test:
+ *  • Trial division by a fixed set of small primes
+ *  • One Miller–Rabin round with base 2
+ *  • A strong Lucas probable-prime test (Selfridge method)
  *
- * The combined test has no known counterexamples and is suitable for
- * cryptographic and numerical use.
- *
+ * The combined test has **no known counterexamples** and is regarded as
+ * suitable for cryptographic and numerical use.
+
  * ## Notes
  * - All algorithms are allocation-conscious and reuse
  *   [MutableBigInt] scratch storage where possible.
- * - Results are *probabilistic* but extremely reliable in practice.
+ * - Performance-optimized ... no constant-time guarantees.
+ * - Results from prime testing are *probabilistic* but extremely
+ *   reliable in practice.
  * - Negative values are rejected; `0` and `1` are composite.
  */
 object BigIntPrime {
@@ -66,7 +67,7 @@ object BigIntPrime {
             SmallPrimeResult.COMPOSITE -> false
             SmallPrimeResult.PRIME -> true
             SmallPrimeResult.INCONCLUSIVE -> {
-                if (! isMillerRabinProbablePrimeBase2(n, tmp)) return false
+                if (!isMillerRabinProbablePrimeBase2(n, tmp)) return false
                 val selfridge = selectSelfridgeParams(n)
                 selfridge.D != 0 && isStrongLucasProbablePrime(n, selfridge)
             }
@@ -148,9 +149,11 @@ object BigIntPrime {
      * @param bases the bases to use for the strong Miller–Rabin test
      */
 
-    fun isMillerRabinProbablePrime(n: BigInt, bases: IntArray,
-                                   tmpP: MutableBigInt? = null): Boolean {
-        require (n >= 3 && n.isOdd())
+    fun isMillerRabinProbablePrime(
+        n: BigInt, bases: IntArray,
+        tmpP: MutableBigInt? = null
+    ): Boolean {
+        require(n >= 3 && n.isOdd())
         val nMinusOne = n - 1
         val s = nMinusOne.countTrailingZeroBits()
         val d = nMinusOne ushr s
@@ -244,7 +247,7 @@ object BigIntPrime {
      * @return -1, 0, or 1 depending on the value of the Jacobi symbol
      */
     fun jacobi(a: Int, n: BigInt): Int {
-        require (n > 0 && n.isOdd())
+        require(n > 0 && n.isOdd())
         var v = n.toMutableBigInt()
         var u = a.toMutableBigInt()
         u %= v
@@ -254,7 +257,7 @@ object BigIntPrime {
         while (u.isNotZero()) {
             while (u.isEven()) {
                 u.mutShr(1)
-                check (! v.isNegative())
+                check(!v.isNegative())
                 val v8 = v.toInt() and 0x07
                 if (v8 == 3 || v8 == 5)
                     j = -j

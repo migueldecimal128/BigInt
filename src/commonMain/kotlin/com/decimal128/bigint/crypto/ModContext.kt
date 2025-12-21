@@ -25,7 +25,7 @@ import kotlin.math.absoluteValue
  *   from the bit-length of [m] to avoid resizing in hot paths.
  *
  * ## Supported operations
- * - Modular addition and subtraction
+ * - Modular addition and subtraction (`modAdd` `modSub`)
  * - Modular multiplication and squaring
  * - Modular exponentiation (`modPow`)
  * - Modular inverse via the extended Euclidean algorithm (`modInv`)
@@ -55,14 +55,41 @@ class ModContext(val m: BigInt) {
     private val montgomery: Montgomery? =
         if (m.isOdd()) Montgomery(m) else null
 
-    private val tmp = MutableBigInt()
+    /** Delegates to [modSet] for primitive input. */
+    fun modSet(a: Int, out: MutableBigInt) { modSet(a.toLong(), out) }
 
-    fun modSet(a: Int, out: MutableBigInt) {
+    /** Delegates to [modSet] for primitive input. */
+    fun modSet(a: Long, out: MutableBigInt) {
         if (a >= 0 && m > a)
             out.set(a)
         else {
-            tmp.set(a)
-            out.setRem(tmp, m)
+            out.set(a)
+            out.setRem(out, m)
+            if (out.isNegative())
+                out += m
+        }
+    }
+
+    /**
+     * Writes `a mod m` into [out], where `m` is this context's modulus.
+     *
+     * - If `0 <= a < m`, the value is copied directly without performing a reduction.
+     * - Otherwise the value is reduced modulo `m`, and any negative remainder
+     *   is normalized into the range `[0, m)`.
+     * - No heap allocation occurs; internal scratch buffers are reused.
+     *
+     * These overloads accept:
+     * - `Int` and `Long` for small primitive inputs
+     * - `BigIntBase` for arbitrary-width values
+     *
+     * @param a   the value to reduce (primitive or big-integer)
+     * @param out destination buffer that receives the reduced value
+     */
+    fun modSet(a: BigIntBase, out: MutableBigInt) {
+        if (a >= 0 && m > a)
+            out.set(a)
+        else {
+            out.setRem(a, m)
             if (out.isNegative())
                 out += m
         }
