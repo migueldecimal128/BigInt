@@ -63,9 +63,10 @@ import kotlin.math.absoluteValue
  * ```
  *
  * @param m modulus for all modular operations; must be ≥ 1
+ * @param useBarrettOnly do not use Montgomery, always use Barrett
  * @throws IllegalArgumentException if [m] < 1
  */
-class ModContext(val m: BigInt) {
+class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
     init {
         if (m < 1)
             throw IllegalArgumentException()
@@ -81,7 +82,7 @@ class ModContext(val m: BigInt) {
      * for modPow when m is odd.
      */
     private val montgomery: Montgomery? =
-        if (m.isOdd()) Montgomery(m) else null
+        if (m.isOdd() && !useBarrettOnly) Montgomery(m) else null
 
     /**
      * Writes `(a mod m)` into [out], returning [out].

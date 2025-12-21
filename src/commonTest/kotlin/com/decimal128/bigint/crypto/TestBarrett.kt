@@ -1,21 +1,24 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.MutableBigInt
 import com.decimal128.bigint.toBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class TestBarrett {
 
+    fun checkRemainder(m: BigInt, x: BigInt) {
+        val mod = MutableBigInt()
+        val ctx = ModContext(m, useBarrettOnly = true)
+        val r1 = ctx.modSet(x, mod)
+        val r2 = x % m
+        assertEquals(r1.toBigInt(), r2.toBigInt(), "Mismatch for x=$x, m=$m")
+    }
+
+
     @Test
     fun testBarrettAgainstKnuth() {
-
-        fun checkRemainder(m: BigInt, x: BigInt) {
-            val bar = Barrett(m)
-            val r1 = bar.reduce(x)
-            val r2 = x % m
-            assertEquals(r2, r1, "Mismatch for x=$x, m=$m")
-        }
 
         // ------------------------------------------------
         // 1. Small moduli
@@ -29,7 +32,6 @@ class TestBarrett {
         )
 
         for (m in smallMods) {
-            val bar = Barrett(m)
             val m2 = m * m
 
             checkRemainder(m, 0.toBigInt())
@@ -83,7 +85,6 @@ class TestBarrett {
         )
 
         for (m in pathologicalMods) {
-            val bar = Barrett(m)
             val m2 = m * m
 
             repeat(200) {
@@ -110,7 +111,6 @@ class TestBarrett {
         val bits = listOf(512, 1024, 1536, 2048, 3072, 4096)
         for (k in bits) {
             val m = BigInt.Companion.randomWithBitLen(k)
-            val bar = Barrett(m)
             val m2 = m * m
             repeat(1) {
                 val m2bit = m2.magnitudeBitLen()
@@ -118,7 +118,7 @@ class TestBarrett {
                 do {
                     x = BigInt.Companion.randomWithBitLen(m2bit)
                 } while (x >= m2)
-                assertEquals(x % m, bar.reduce(x))
+                checkRemainder(m, x)
             }
         }
     }
@@ -127,19 +127,13 @@ class TestBarrett {
     fun testProblem0() {
         val m = "12345678901234567890123".toBigInt()
         val x = "123456789012345678901234567890".toBigInt()
-        val barrett = Barrett(m)
-        val rKnuth = x % m
-        val rBarrett = barrett.reduce(x)
-        assertEquals(rKnuth, rBarrett)
+        checkRemainder(m, x)
     }
 
     @Test
     fun testProblem1() {
         val m = "15720338158108356290".toBigInt()
         val x = "235477347269641899085489191398656418338".toBigInt()
-        val barrett = Barrett(m)
-        val rKnuth = x % m
-        val rBarrett = barrett.reduce(x)
-        assertEquals(rKnuth, rBarrett)
+        checkRemainder(m, x)
     }
 }
