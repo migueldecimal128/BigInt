@@ -240,7 +240,7 @@ object BigIntAlgorithms {
      * @return the non-negative integer square root of this value.
      * @throws ArithmeticException if this value is negative.
      */
-    fun isqrt(radicand: BigIntBase): BigInt {
+    fun isqrt(radicand: BigIntNumber): BigInt {
         if (radicand.isNegative())
             throw ArithmeticException("Square root of a negative BigInt")
         val bitLen = radicand.magnitudeBitLen()
@@ -323,7 +323,7 @@ object BigIntAlgorithms {
      *
      * @param radicand the non-negative value to test
      */
-    fun isPerfectSquare(radicand: BigIntBase): Boolean {
+    fun isPerfectSquare(radicand: BigIntNumber): Boolean {
         val isqrt = isqrt(radicand)
         val squared = isqrt.sqr()
         return squared EQ radicand

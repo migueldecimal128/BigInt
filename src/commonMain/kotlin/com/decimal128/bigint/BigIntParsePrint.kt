@@ -372,10 +372,10 @@ object BigIntParsePrint {
      *
      * @return a hexadecimal string representing the value of this BigInt
      */
-    fun toHexString(bi: BigIntBase): String =
+    fun toHexString(bi: BigIntNumber): String =
         toHexString(bi, HEX_PREFIX_UTF8_0x, useUpperCase = true, minPrintLength = 1, HEX_SUFFIX_UTF8_nada)
 
-    fun toHexString(bi: BigIntBase, hexFormat: HexFormat): String {
+    fun toHexString(bi: BigIntNumber, hexFormat: HexFormat): String {
         if (hexFormat === HexFormat.UpperCase)
             return toHexString(bi)
         return toHexString(bi,
@@ -386,7 +386,7 @@ object BigIntParsePrint {
         )
     }
 
-    private fun toHexString(bi: BigIntBase, prefixUtf8: ByteArray, useUpperCase: Boolean, minPrintLength: Int, suffixUtf8: ByteArray): String {
+    private fun toHexString(bi: BigIntNumber, prefixUtf8: ByteArray, useUpperCase: Boolean, minPrintLength: Int, suffixUtf8: ByteArray): String {
         val signCount = bi.meta.signBit
         val prefixCount = prefixUtf8.size
         val nybbleCount = max((bitLen(bi.magia, bi.meta.normLen) + 3) / 4, minPrintLength)
@@ -408,7 +408,7 @@ object BigIntParsePrint {
         return utf8.decodeToString()
     }
 
-    fun toHexUtf8(bi: BigIntBase, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
+    fun toHexUtf8(bi: BigIntNumber, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
         check (bi.isNormalized())
         val alfaBase = if (useUpperCase) 'A' else 'a'
         var ichMax = off + digitCount

@@ -60,7 +60,7 @@ import kotlin.random.Random
 class BigInt private constructor(
     meta: Meta,
     magia: Magia
-) : Comparable<BigInt>, BigIntBase(meta, magia) {
+) : Comparable<BigInt>, BigIntNumber(meta, magia) {
 
     companion object {
         /**
@@ -232,9 +232,9 @@ class BigInt private constructor(
         /**
          * Constructs a new [BigInt] from a [MutableBigInt] or another [BigInt].
          */
-        fun from(other: BigIntBase): BigInt = BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
+        fun from(other: BigIntNumber): BigInt = BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
 
-        internal fun from(sign: Boolean, biMagnitude: BigIntBase): BigInt =
+        internal fun from(sign: Boolean, biMagnitude: BigIntNumber): BigInt =
             BigInt(Meta(sign, biMagnitude.meta.normLen),
                 biMagnitude.magia.copyOf(biMagnitude.meta.normLen))
 
@@ -1001,7 +1001,7 @@ class BigInt private constructor(
      *
      * @param other source of the sign
      */
-    fun withSignOf(other: BigIntBase) = if (isNegative() == other.isNegative()) this else negate()
+    fun withSignOf(other: BigIntNumber) = if (isNegative() == other.isNegative()) this else negate()
 
     override fun toBigInt() = this
 
@@ -1016,7 +1016,7 @@ class BigInt private constructor(
     operator fun unaryMinus() = negate()
     operator fun unaryPlus() = this
 
-    operator fun plus(other: BigIntBase): BigInt = this.addImpl(false, other)
+    operator fun plus(other: BigIntNumber): BigInt = this.addImpl(false, other)
     operator fun plus(n: Int): BigInt =
         this.addImpl(signFlipThis = false, n < 0, n.absoluteValue.toUInt().toULong())
     operator fun plus(w: UInt): BigInt =
@@ -1026,7 +1026,7 @@ class BigInt private constructor(
     operator fun plus(dw: ULong): BigInt =
         this.addImpl(signFlipThis = false, false, dw)
 
-    operator fun minus(other: BigIntBase): BigInt = this.addImpl(true, other)
+    operator fun minus(other: BigIntNumber): BigInt = this.addImpl(true, other)
     operator fun minus(n: Int): BigInt =
         this.addImpl(signFlipThis = false, n >= 0, n.absoluteValue.toUInt().toULong())
     operator fun minus(w: UInt): BigInt =
@@ -1036,7 +1036,7 @@ class BigInt private constructor(
     operator fun minus(dw: ULong): BigInt =
         this.addImpl(signFlipThis = false, true, dw)
 
-    operator fun times(other: BigIntBase): BigInt = mulImpl(other)
+    operator fun times(other: BigIntNumber): BigInt = mulImpl(other)
 
     operator fun times(n: Int): BigInt = mulImpl(n < 0, n.absoluteValue.toUInt().toULong())
 
@@ -1056,7 +1056,7 @@ class BigInt private constructor(
 
     operator fun div(dw: ULong): BigInt = divImpl(false, dw)
 
-    operator fun rem(other: BigIntBase): BigInt = remImpl(other)
+    operator fun rem(other: BigIntNumber): BigInt = remImpl(other)
 
     // note that in java/kotlin, the sign of remainder only depends upon
     // the dividend, so we just take the abs value of the divisor
@@ -1084,7 +1084,7 @@ class BigInt private constructor(
 
     infix fun mod(dw: ULong): BigInt = modImpl(dw)
 
-    infix fun mod(other: BigIntBase): BigInt = modImpl(other)
+    infix fun mod(other: BigIntNumber): BigInt = modImpl(other)
 
     /**
      * Divides the given [numerator] (primitive type) by this BigInt and returns the quotient.
@@ -1437,7 +1437,7 @@ class BigInt private constructor(
      * @param other the BigInt operand
      * @return a new BigInt representing the result
      */
-    fun addImpl(isSub: Boolean, other: BigIntBase): BigInt {
+    fun addImpl(isSub: Boolean, other: BigIntNumber): BigInt {
         val otherSign = isSub xor other.meta.isNegative
         when {
             other.isZero() -> return this
@@ -1463,7 +1463,7 @@ class BigInt private constructor(
         BigInt.fromNonNormalizedOrZero(this.meta.signFlag xor dwSign,
             Mago.newMul(this.magia, this.meta.normLen, dw))
 
-    fun mulImpl(other: BigIntBase): BigInt =
+    fun mulImpl(other: BigIntNumber): BigInt =
         BigInt.fromNonNormalizedOrZero(meta.signFlag xor other.meta.signFlag,
             Mago.newMul(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
 
@@ -1471,7 +1471,7 @@ class BigInt private constructor(
         BigInt.fromNonNormalizedOrZero(this.meta.signFlag xor dwSign,
             Mago.newDiv(magia, meta.normLen, dw))
 
-    fun divImpl(other: BigIntBase): BigInt =
+    fun divImpl(other: BigIntNumber): BigInt =
         BigInt.fromNonNormalizedOrZero(meta.signFlag xor other.meta.signFlag,
             Mago.newDiv(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
 
@@ -1480,7 +1480,7 @@ class BigInt private constructor(
             Mago.newRemOrMod64(magia, meta.normLen,
                 applyModRingNormalization = false, dw))
 
-    fun remImpl(other: BigIntBase): BigInt =
+    fun remImpl(other: BigIntNumber): BigInt =
         BigInt.fromNonNormalizedOrZero(meta.signFlag,
             Mago.newRemOrMod(this.magia, this.meta.normLen,
                 applyModRingNormalization = false, other.magia, other.meta.normLen))
@@ -1490,7 +1490,7 @@ class BigInt private constructor(
             Mago.newRemOrMod64(magia, meta.normLen,
                 applyModRingNormalization = this.meta.signFlag, dw))
 
-    fun modImpl(other: BigIntBase): BigInt =
+    fun modImpl(other: BigIntNumber): BigInt =
         BigInt.fromNonNormalizedOrZero(
             Mago.newRemOrMod(this.magia, this.meta.normLen,
                 applyModRingNormalization = meta.signFlag, other.magia, other.meta.normLen))

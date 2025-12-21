@@ -4,7 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Meta
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
 import kotlin.math.max
@@ -97,7 +96,7 @@ import kotlin.math.min
 class MutableBigInt private constructor (
     meta: Meta,
     magia: Magia,
-) : BigIntBase(meta, magia) {
+) : BigIntNumber(meta, magia) {
     constructor() : this(Meta(0), Magia(4))
 
     internal var tmp1: Magia = Mago.ZERO
@@ -498,7 +497,7 @@ class MutableBigInt private constructor (
      * @param bi the source value (either a [BigInt] or another [MutableBigInt])
      * @return this [MutableBigInt] for call chaining
      */
-    fun set(bi: BigIntBase): MutableBigInt = set(bi.meta, bi.magia)
+    fun set(bi: BigIntNumber): MutableBigInt = set(bi.meta, bi.magia)
 
     /**
      * Sets this value using an explicit sign and a 64-bit unsigned magnitude.
@@ -583,15 +582,15 @@ class MutableBigInt private constructor (
      * @param n the right-hand operand (primitive or [BigInt]/[MutableBigInt], depending on overload)
      * @return this [MutableBigInt] for call chaining
      */
-    fun setAdd(x: BigIntBase, n: Int) =
+    fun setAdd(x: BigIntNumber, n: Int) =
         setAddImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
-    fun setAdd(x: BigIntBase, w: UInt) =
+    fun setAdd(x: BigIntNumber, w: UInt) =
         setAddImpl(x, false, w.toULong())
-    fun setAdd(x: BigIntBase, l: Long) =
+    fun setAdd(x: BigIntNumber, l: Long) =
         setAddImpl(x, l < 0, l.absoluteValue.toULong())
-    fun setAdd(x: BigIntBase, dw: ULong) =
+    fun setAdd(x: BigIntNumber, dw: ULong) =
         setAddImpl(x, false, dw)
-    fun setAdd(x: BigIntBase, y: BigIntBase) =
+    fun setAdd(x: BigIntNumber, y: BigIntNumber) =
         setAddImpl(x, y.meta, y.magia)
 
     /**
@@ -603,15 +602,15 @@ class MutableBigInt private constructor (
      * @param y the right-hand operand (primitive or [BigInt]/[MutableBigInt], depending on overload)
      * @return this [MutableBigInt] for call chaining
      */
-    fun setSub(x: BigIntBase, n: Int) =
+    fun setSub(x: BigIntNumber, n: Int) =
         setAddImpl(x, n >= 0, n.absoluteValue.toUInt().toULong())
-    fun setSub(x: BigIntBase, w: UInt) =
+    fun setSub(x: BigIntNumber, w: UInt) =
         setAddImpl(x, true, w.toULong())
-    fun setSub(x: BigIntBase, l: Long) =
+    fun setSub(x: BigIntNumber, l: Long) =
         setAddImpl(x, l >= 0L, l.absoluteValue.toULong())
-    fun setSub(x: BigIntBase, dw: ULong) =
+    fun setSub(x: BigIntNumber, dw: ULong) =
         setAddImpl(x, true, dw)
-    fun setSub(x: BigIntBase, y: BigIntBase) =
+    fun setSub(x: BigIntNumber, y: BigIntNumber) =
         setAddImpl(x, y.meta.negate(), y.magia)
 
     /**
@@ -626,7 +625,7 @@ class MutableBigInt private constructor (
      * @param yDw the unsigned 64-bit magnitude of the addend
      * @return this [MutableBigInt] after mutation
      */
-    private fun setAddImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
+    private fun setAddImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
         check (x.isNormalized())
         val xMagia = x.magia // use only xMagia in here because of aliasing
         when {
@@ -669,7 +668,7 @@ class MutableBigInt private constructor (
      * @param yMagia the right operand’s limb array (little-endian magnitude)
      * @return this [MutableBigInt] after mutation
      */
-    private fun setAddImpl(x: BigIntBase, yMeta: Meta, yMagia: Magia): MutableBigInt {
+    private fun setAddImpl(x: BigIntNumber, yMeta: Meta, yMagia: Magia): MutableBigInt {
         check (x.isNormalized())
         check (Mago.isNormalized(yMagia, yMeta.normLen))
         val xMagia = x.magia // save for aliasing
@@ -718,15 +717,15 @@ class MutableBigInt private constructor (
      * @param y the right-hand operand (primitive or [BigInt]/[MutableBigInt], depending on overload)
      * @return this [MutableBigInt] for call chaining
      */
-    fun setMul(x: BigIntBase, n: Int): MutableBigInt =
+    fun setMul(x: BigIntNumber, n: Int): MutableBigInt =
         setMulImpl(x, n < 0, n.absoluteValue.toUInt())
-    fun setMul(x: BigIntBase, w: UInt): MutableBigInt =
+    fun setMul(x: BigIntNumber, w: UInt): MutableBigInt =
         setMulImpl(x, false, w)
-    fun setMul(x: BigIntBase, l: Long): MutableBigInt =
+    fun setMul(x: BigIntNumber, l: Long): MutableBigInt =
         setMulImpl(x, l < 0, l.absoluteValue.toULong())
-    fun setMul(x: BigIntBase, dw: ULong): MutableBigInt =
+    fun setMul(x: BigIntNumber, dw: ULong): MutableBigInt =
         setMulImpl(x, false, dw)
-    fun setMul(x: BigIntBase, y: BigIntBase): MutableBigInt {
+    fun setMul(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
         val xNormLen = x.meta.normLen
         val yNormLen = y.meta.normLen
         when {
@@ -754,7 +753,7 @@ class MutableBigInt private constructor (
      * @param w the unsigned 32-bit multiplier
      * @return this [MutableBigInt] after mutation
      */
-    private fun setMulImpl(x: BigIntBase, wSign: Boolean, w: UInt): MutableBigInt {
+    private fun setMulImpl(x: BigIntNumber, wSign: Boolean, w: UInt): MutableBigInt {
         val xMagia = x.magia
         ensureCapacityDiscard(x.meta.normLen + 1)
         _meta = Meta(
@@ -774,7 +773,7 @@ class MutableBigInt private constructor (
      * @param dw the unsigned 64-bit multiplier
      * @return this [MutableBigInt] after mutation
      */
-    private fun setMulImpl(x: BigIntBase, dwSign: Boolean, dw: ULong): MutableBigInt {
+    private fun setMulImpl(x: BigIntNumber, dwSign: Boolean, dw: ULong): MutableBigInt {
         val xMagia = x.magia
         ensureCapacityDiscard(x.meta.normLen + 2)
         _meta = Meta(
@@ -855,7 +854,7 @@ class MutableBigInt private constructor (
      * @param x the value to square
      * @return this [MutableBigInt] for call chaining
      */
-    fun setSqr(x: BigIntBase): MutableBigInt =
+    fun setSqr(x: BigIntNumber): MutableBigInt =
         setSqrImpl(x.meta, x.magia)
 
     /**
@@ -919,7 +918,7 @@ class MutableBigInt private constructor (
         setDivImpl(x, l < 0L, l.absoluteValue.toULong())
     fun setDiv(x: MutableBigInt, dw: ULong): MutableBigInt =
         setDivImpl(x, false, dw)
-    fun setDiv(x: BigIntBase, y: BigIntBase): MutableBigInt {
+    fun setDiv(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
         ensureCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
         if (trySetDivFastPath(x, y))
             return this
@@ -942,7 +941,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      * @throws ArithmeticException if division by zero is detected
      */
-    private fun setDivImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
+    private fun setDivImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
         ensureCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
         if (trySetDivFastPath64(x, ySign, yDw))
             return this
@@ -961,7 +960,7 @@ class MutableBigInt private constructor (
      * @param y the divisor (normalized)
      * @return `true` if the fast path was taken, `false` otherwise
      */
-    private fun trySetDivFastPath(x: BigIntBase, y: BigIntBase): Boolean {
+    private fun trySetDivFastPath(x: BigIntNumber, y: BigIntNumber): Boolean {
         val qSignFlag = x.meta.signFlag xor y.meta.signFlag
         val qNormLen = Mago.trySetDivFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
         if (qNormLen < 0)
@@ -980,7 +979,7 @@ class MutableBigInt private constructor (
      * @param yDw the unsigned 64-bit divisor magnitude
      * @return `true` if the fast path handled the division, `false` otherwise
      */
-    private fun trySetDivFastPath64(x: BigIntBase, ySign: Boolean, yDw: ULong): Boolean {
+    private fun trySetDivFastPath64(x: BigIntNumber, ySign: Boolean, yDw: ULong): Boolean {
         val qSignFlag = x.meta.signFlag xor ySign
         val qNormLen = Mago.trySetDivFastPath64(this.magia, x.magia, x.meta.normLen, yDw)
         if (qNormLen < 0)
@@ -998,7 +997,7 @@ class MutableBigInt private constructor (
      * @param y the divisor (normalized)
      * @return `true` if one of the fast path solutions was applied, `false` otherwise
      */
-    private fun trySetRemFastPath(x: BigIntBase, y: BigIntBase): Boolean {
+    private fun trySetRemFastPath(x: BigIntNumber, y: BigIntNumber): Boolean {
         val rSignFlag = x.meta.signFlag
         val rNormLen = Mago.trySetRemFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
         if (rNormLen < 0)
@@ -1022,15 +1021,15 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] for call chaining
      * @throws ArithmeticException if division by zero is detected
      */
-    fun setRem(x: BigIntBase, n: Int): MutableBigInt =
+    fun setRem(x: BigIntNumber, n: Int): MutableBigInt =
         setRemImpl(x, n.absoluteValue.toUInt().toULong())
-    fun setRem(x: BigIntBase, w: UInt): MutableBigInt =
+    fun setRem(x: BigIntNumber, w: UInt): MutableBigInt =
         setRemImpl(x, w.toULong())
-    fun setRem(x: BigIntBase, l: Long): MutableBigInt =
+    fun setRem(x: BigIntNumber, l: Long): MutableBigInt =
         setRemImpl(x, l.absoluteValue.toULong())
-    fun setRem(x: BigIntBase, dw: ULong): MutableBigInt =
+    fun setRem(x: BigIntNumber, dw: ULong): MutableBigInt =
         setRemImpl(x, dw)
-    fun setRem(x: BigIntBase, y: BigIntBase): MutableBigInt {
+    fun setRem(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
         ensureCapacityCopy(min(x.meta.normLen, y.meta.normLen))
         if (trySetRemFastPath(x, y))
             return this
@@ -1052,7 +1051,7 @@ class MutableBigInt private constructor (
      * @param yDw the unsigned 64-bit divisor magnitude
      * @return this [MutableBigInt] after mutation
      */
-    private fun setRemImpl(x: BigIntBase, yDw: ULong): MutableBigInt {
+    private fun setRemImpl(x: BigIntNumber, yDw: ULong): MutableBigInt {
         ensureTmp1Capacity(x.meta.normLen + 1)
         val rem = Mago.calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
         return set(x.meta.signFlag, rem)
@@ -1072,15 +1071,15 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] for call chaining
      * @throws ArithmeticException if the modulus is negative or zero
      */
-    fun setMod(x: BigIntBase, n: Int): MutableBigInt =
+    fun setMod(x: BigIntNumber, n: Int): MutableBigInt =
         setModImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
-    fun setMod(x: BigIntBase, w: UInt): MutableBigInt =
+    fun setMod(x: BigIntNumber, w: UInt): MutableBigInt =
         setModImpl(x, false, w.toULong())
-    fun setMod(x: BigIntBase, l: Long): MutableBigInt =
+    fun setMod(x: BigIntNumber, l: Long): MutableBigInt =
         setModImpl(x, l < 0, l.absoluteValue.toULong())
-    fun setMod(x: BigIntBase, dw: ULong): MutableBigInt =
+    fun setMod(x: BigIntNumber, dw: ULong): MutableBigInt =
         setModImpl(x, false, dw)
-    fun setMod(x: BigIntBase, y: BigIntBase): MutableBigInt {
+    fun setMod(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
         if (y.meta.isNegative)
             throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         setRem(x, y)
@@ -1100,7 +1099,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      * @throws ArithmeticException if a negative modulus is requested
      */
-    private fun setModImpl(x: BigIntBase, ySign: Boolean, yDw: ULong): MutableBigInt {
+    private fun setModImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
         if (ySign)
             throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
         setRem(x, yDw)
@@ -1143,7 +1142,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the value to add
      */
-    operator fun plusAssign(bi: BigIntBase) { setAdd(this, bi) }
+    operator fun plusAssign(bi: BigIntNumber) { setAdd(this, bi) }
 
     /**
      * Subtracts a signed 32-bit integer from this value in place.
@@ -1179,7 +1178,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the value to subtract
      */
-    operator fun minusAssign(bi: BigIntBase) { setSub(this, bi) }
+    operator fun minusAssign(bi: BigIntNumber) { setSub(this, bi) }
 
     /**
      * Multiplies this value by a signed 32-bit integer in place. This is the
@@ -1218,7 +1217,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the value to multiply by
      */
-    operator fun timesAssign(bi: BigIntBase) { setMul(this, bi) }
+    operator fun timesAssign(bi: BigIntNumber) { setMul(this, bi) }
 
 
     /**
@@ -1254,7 +1253,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the divisor
      */
-    operator fun divAssign(bi: BigIntBase) { setDiv(this, bi) }
+    operator fun divAssign(bi: BigIntNumber) { setDiv(this, bi) }
 
 
     /**
@@ -1290,7 +1289,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the divisor
      */
-    operator fun remAssign(bi: BigIntBase) { setRem(this, bi) }
+    operator fun remAssign(bi: BigIntNumber) { setRem(this, bi) }
 
 
     /**
@@ -1343,7 +1342,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the value to square and add
      */
-    fun addSquareOf(bi: BigIntBase) {
+    fun addSquareOf(bi: BigIntNumber) {
         ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
         val normLenSqr = Mago.setSqr(tmp1, bi.magia, bi.meta.normLen)
         setAddImpl(this, Meta(0, normLenSqr), tmp1)
@@ -1371,7 +1370,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the value to add
      */
-    fun addAbsValueOf(bi: BigIntBase) =
+    fun addAbsValueOf(bi: BigIntNumber) =
         // add if it is positive, subtract if it is negative
         setAddImpl(this, bi.meta.abs(), bi.magia)
 
@@ -1394,7 +1393,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      * @throws IllegalArgumentException if [bitCount] is negative
      */
-    fun setShl(x: BigIntBase, bitCount: Int): MutableBigInt = when {
+    fun setShl(x: BigIntNumber, bitCount: Int): MutableBigInt = when {
         bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         bitCount == 0 || x.isZero() -> set(x)
         else -> {
@@ -1427,7 +1426,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      * @throws IllegalArgumentException if [bitCount] is negative
      */
-    fun setUshr(x: BigIntBase, bitCount: Int): MutableBigInt {
+    fun setUshr(x: BigIntNumber, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
         return when {
             bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
@@ -1463,7 +1462,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      * @throws IllegalArgumentException if [bitCount] is negative
      */
-    fun setShr(x: BigIntBase, bitCount: Int): MutableBigInt {
+    fun setShr(x: BigIntNumber, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
         when {
             bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
@@ -1586,27 +1585,6 @@ class MutableBigInt private constructor (
         return this
     }
 
-
-    /**
-     * Function that returns the current magnitude truncated to a raw unsigned
-     * 64-bit quantity. If the magnitude exceeds 64 bits, only the least-significant
-     * 64 bits are returned. Intended for internal use.
-     *
-     * @return the low 64 bits of this value as a [ULong]
-     */
-    private inline fun toRawULong(): ULong {
-        val lo = magia[0].toUInt().toULong()
-        return when {
-            meta.normLen == 1 -> lo
-            meta.normLen >= 2 -> (magia[1].toULong() shl 32) or lo
-            else -> 0uL
-        }
-        //val dw = (magia[1].toULong() shl 32) or magia[0].toUInt().toULong()
-        //val nonZeroMask = ((-normLen).toLong() shr 63).toULong()
-        //val gt32Mask = ((1 - normLen) shr 31).toLong().toULong() or 0xFFFF_FFFFuL
-        //return dw and gt32Mask and nonZeroMask
-    }
-
     fun montgomeryRedc(modulus: BigInt, np: UInt): MutableBigInt {
         require (modulus.isOdd())
         val k = modulus.meta.normLen
@@ -1637,7 +1615,7 @@ class MutableBigInt private constructor (
      */
     override fun equals(other: Any?): Boolean {
         return when (other) {
-            is BigIntBase -> this EQ other
+            is BigIntNumber -> this EQ other
             is Int -> this EQ other
             is Long -> this EQ other
             is UInt -> this EQ other

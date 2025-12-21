@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.BigIntBase
+import com.decimal128.bigint.BigIntNumber
 import com.decimal128.bigint.MutableBigInt
 import kotlin.math.absoluteValue
 
@@ -93,7 +93,7 @@ class ModContext(val m: BigInt) {
      * @param out destination receiving `(a mod m)`
      * @return [out]
      */
-    fun modSet(a: BigIntBase, out: MutableBigInt): MutableBigInt =
+    fun modSet(a: BigIntNumber, out: MutableBigInt): MutableBigInt =
         out.setMod(a, m)
 
     /**
@@ -127,7 +127,7 @@ class ModContext(val m: BigInt) {
      * @param b second addend
      * @param out destination for the result
      */
-    fun modAdd(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
+    fun modAdd(a: BigIntNumber, b: BigIntNumber, out: MutableBigInt) {
         out.setAdd(a, b)
         if (out >= m) out -= m
     }
@@ -143,7 +143,7 @@ class ModContext(val m: BigInt) {
      * @param b second addend
      * @param out destination for the result
      */
-    fun modAdd(a: BigIntBase, b: Int, out: MutableBigInt) =
+    fun modAdd(a: BigIntNumber, b: Int, out: MutableBigInt) =
         modAdd(a, b.toLong(), out)
 
     /**
@@ -157,7 +157,7 @@ class ModContext(val m: BigInt) {
      * @param b second addend
      * @param out destination for the result
      */
-    fun modAdd(a: BigIntBase, b: Long, out: MutableBigInt) {
+    fun modAdd(a: BigIntNumber, b: Long, out: MutableBigInt) {
         out.setAdd(a, b)
         if (out >= m) out -= m
     }
@@ -173,7 +173,7 @@ class ModContext(val m: BigInt) {
      * @param b subtrahend
      * @param out destination for the result
      */
-    fun modSub(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
+    fun modSub(a: BigIntNumber, b: BigIntNumber, out: MutableBigInt) {
         out.setSub(a, b)
         if (out.isNegative()) out += m
     }
@@ -189,7 +189,7 @@ class ModContext(val m: BigInt) {
      * @param b subtrahend
      * @param out destination for the result
      */
-    fun modSub(a: BigIntBase, b: Int, out: MutableBigInt) =
+    fun modSub(a: BigIntNumber, b: Int, out: MutableBigInt) =
         modSub(a, b.toLong(), out)
 
     /**
@@ -203,7 +203,7 @@ class ModContext(val m: BigInt) {
      * @param b subtrahend
      * @param out destination for the result
      */
-    fun modSub(a: BigIntBase, b: Long, out: MutableBigInt) {
+    fun modSub(a: BigIntNumber, b: Long, out: MutableBigInt) {
         out.setSub(a, b)
         if (out.isNegative()) out += m
     }
@@ -218,7 +218,7 @@ class ModContext(val m: BigInt) {
      * @param b second multiplier
      * @param out destination for the result
      */
-    fun modMul(a: BigIntBase, b: BigIntBase, out: MutableBigInt) =
+    fun modMul(a: BigIntNumber, b: BigIntNumber, out: MutableBigInt) =
         barrett.modMul(a, b, out)
 
     /**
@@ -231,7 +231,7 @@ class ModContext(val m: BigInt) {
      * @param b second multiplier
      * @param out destination for the result
      */
-    fun modMul(a: BigIntBase, b: Int, out: MutableBigInt) =
+    fun modMul(a: BigIntNumber, b: Int, out: MutableBigInt) =
         barrett.modMul(a, b, out)
 
     /**
@@ -244,7 +244,7 @@ class ModContext(val m: BigInt) {
      * @param b second multiplier
      * @param out destination for the result
      */
-    fun modMul(a: BigIntBase, b: Long, out: MutableBigInt) =
+    fun modMul(a: BigIntNumber, b: Long, out: MutableBigInt) =
         barrett.modMul(a, b, out)
 
     /**
@@ -256,7 +256,7 @@ class ModContext(val m: BigInt) {
      * @param a value to square
      * @param out destination for the result
      */
-    fun modSqr(a: BigIntBase, out: MutableBigInt) =
+    fun modSqr(a: BigIntNumber, out: MutableBigInt) =
         barrett.modSqr(a, out)
 
     /**
@@ -271,7 +271,7 @@ class ModContext(val m: BigInt) {
      * @param out destination for the result
      * @throws IllegalArgumentException if [exp] is negative
      */
-    fun modPow(base: BigIntBase, exp: BigInt, out: MutableBigInt) =
+    fun modPow(base: BigIntNumber, exp: BigInt, out: MutableBigInt) =
         montgomery?.modPow(base, exp, out) ?: barrett.modPow(base, exp, out)
 
     /**
@@ -286,7 +286,7 @@ class ModContext(val m: BigInt) {
      * @param out destination for the result
      * @throws IllegalArgumentException if [exp] is negative
      */
-    fun modPow(base: BigIntBase, exp: Int, out: MutableBigInt) =
+    fun modPow(base: BigIntNumber, exp: Int, out: MutableBigInt) =
         modPow(base, exp.toLong(), out)
 
     /**
@@ -301,7 +301,7 @@ class ModContext(val m: BigInt) {
      * @param out destination for the result
      * @throws IllegalArgumentException if [exp] is negative
      */
-    fun modPow(base: BigIntBase, exp: Long, out: MutableBigInt) =
+    fun modPow(base: BigIntNumber, exp: Long, out: MutableBigInt) =
         montgomery?.modPow(base, exp, out) ?: barrett.modPow(base, exp, out)
 
     /**
@@ -340,7 +340,7 @@ class ModContext(val m: BigInt) {
      * @throws IllegalArgumentException if `a !in [0, m)`
      * @throws ArithmeticException if `gcd(a, m) ≠ 1` (no inverse exists)
      */
-    fun modInv(a: BigIntBase, out: MutableBigInt) {
+    fun modInv(a: BigIntNumber, out: MutableBigInt) {
         require(a >= 0 && a < m)
 
         invR.set(m)
@@ -492,7 +492,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
+        fun modMul(a: BigIntNumber, b: BigIntNumber, out: MutableBigInt) {
             check (out !== mulTmp)
             mulTmp.setMul(a, b)
             reduceInto(mulTmp, out)
@@ -501,7 +501,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: BigIntBase, b: Long, out: MutableBigInt) {
+        fun modMul(a: BigIntNumber, b: Long, out: MutableBigInt) {
             check (a !== mulTmp && out !== mulTmp)
             if (b != 0L) {
                 mulTmp.setMul(a, b.absoluteValue.toULong())
@@ -516,7 +516,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
-        fun modMul(a: BigIntBase, b: Int, out: MutableBigInt) {
+        fun modMul(a: BigIntNumber, b: Int, out: MutableBigInt) {
             check (a !== mulTmp && out !== mulTmp)
             if (b != 0) {
                 mulTmp.setMul(a, b.absoluteValue.toUInt())
@@ -531,7 +531,7 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * a) mod m`.
          */
-        fun modSqr(a: BigIntBase, out: MutableBigInt) {
+        fun modSqr(a: BigIntNumber, out: MutableBigInt) {
             check (out !== mulTmp)
             mulTmp.setSqr(a)
             reduceInto(mulTmp, out)
@@ -546,7 +546,7 @@ class ModContext(val m: BigInt) {
          * @param exp exponent (must be ≥ 0)
          * @param out destination accumulator for the result
          */
-        fun modPow(base: BigIntBase, exp: BigIntBase, out: MutableBigInt) {
+        fun modPow(base: BigIntNumber, exp: BigIntNumber, out: MutableBigInt) {
             if (exp < 0)
                 throw IllegalArgumentException()
             out.setOne()
@@ -573,10 +573,10 @@ class ModContext(val m: BigInt) {
             }
         }
 
-        fun modPow(base: BigIntBase, exp: Int, out: MutableBigInt) =
+        fun modPow(base: BigIntNumber, exp: Int, out: MutableBigInt) =
             modPow(base, exp.toLong(), out)
 
-        fun modPow(base: BigIntBase, exp: Long, out: MutableBigInt) {
+        fun modPow(base: BigIntNumber, exp: Long, out: MutableBigInt) {
             if (exp < 0)
                 throw IllegalArgumentException()
             out.setOne()
@@ -606,7 +606,7 @@ class ModContext(val m: BigInt) {
          * @param a input value
          * @param out destination accumulator for the result
          */
-        fun modHalfLucas(a: BigIntBase, out: MutableBigInt) {
+        fun modHalfLucas(a: BigIntNumber, out: MutableBigInt) {
             check (m.isOdd())
             if (out !== a)
                 out.set(a)
@@ -638,19 +638,19 @@ class ModContext(val m: BigInt) {
             }
         }
 
-        fun toMontgomery(x: BigIntBase, out: MutableBigInt): MutableBigInt =
+        fun toMontgomery(x: BigIntNumber, out: MutableBigInt): MutableBigInt =
             out.setMul(x, r2).montgomeryRedc(modulus, np)
 
         fun fromMontgomery(xR: MutableBigInt): MutableBigInt =
             xR.montgomeryRedc(modulus, np)
 
-        fun montMul(aR: BigIntBase, bR: BigIntBase, out: MutableBigInt) =
+        fun montMul(aR: BigIntNumber, bR: BigIntNumber, out: MutableBigInt) =
             out.setMul(aR, bR).montgomeryRedc(modulus, np)
 
         val baseR = MutableBigInt()
         val xR = MutableBigInt()
 
-        fun modPow(base: BigIntBase, exp: BigIntBase, out: MutableBigInt) {
+        fun modPow(base: BigIntNumber, exp: BigIntNumber, out: MutableBigInt) {
             require (! exp.isNegative())
 
             // Zero exponent → return 1
@@ -686,7 +686,7 @@ class ModContext(val m: BigInt) {
             out.set(xR)
         }
 
-        fun modPow(base: BigIntBase, exp: Long, out: MutableBigInt) {
+        fun modPow(base: BigIntNumber, exp: Long, out: MutableBigInt) {
             require (! exp.isNegative())
 
             // Zero exponent → return 1

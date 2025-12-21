@@ -3,7 +3,51 @@ package com.decimal128.bigint
 import com.decimal128.bigint.Mago.normLen
 import kotlin.math.absoluteValue
 
-sealed class BigIntBase(
+/**
+ * Abstract sealed superclass for arbitrary-precision signed integers.
+ *
+ * `BigIntNumber` defines the common operations shared by
+ * immutable [`BigInt`] values and mutable
+ * [`MutableBigInt`] accumulators.  Each instance stores:
+ *
+ *  * a packed sign/normalized-length descriptor ([Meta]), and
+ *  * a little-endian limb array ([Magia]) representing the magnitude.
+ *
+ * This base class provides read-only predicates and serialization
+ * functions:
+ *
+ *  * standard numeric queries (`isZero`, `isOne`, `isNegative`, `isOdd`, …)
+ *  * bit-length, set-bit, population, and trailing-zero queries
+ *  * comparisons against [BigIntNumber] and primitive integer types
+ *  * magnitude-only comparisons against [BigIntNumber] and primitive
+ *    integer types
+ *  * conversions to and from primitive integer types
+ *  * two’s-complement and magnitude-only binary encodings
+ *  * integer decimal and hexadecimal string formatting
+ *
+ * No arithmetic operations or mutation is defined here.
+ * Subclasses implement value generation, determine mutability
+ * and thread-safety:
+ *
+ * Subclasses determine mutability and thread‐safety:
+ *
+ *  * [BigInt] is **immutable**, **thread-safe**, and hashable
+ *
+ *  * [MutableBigInt] is **destructively updatable**, **not thread-safe**,
+ *    and deliberately disables `hashCode` so it cannot be used as
+ *    a stable collection key.
+ *
+ * Representation notes:
+ *
+ *  * [BigInt] canonicalizes all ZERO values to a shared singleton.
+ *  * Normalization means `meta.normLen` matches the highest non-zero limb.
+ *  * Magnitude comparisons ignore sign; full comparisons apply sign.
+ *  * All operations exposed here avoid heap allocation and are safe
+ *    for tight inner-loop use (conversions, comparisons, hashing).
+ *
+ * Subclasses must implement [toBigInt] to provide an immutable snapshot.
+ */
+sealed class BigIntNumber(
     internal var _meta: Meta,
     internal var _magia: Magia
 ) {
@@ -393,7 +437,7 @@ sealed class BigIntBase(
      *  * `0` if this value is equal to [other],
      *  * `1` if this value is greater than [other].
      */
-    operator fun compareTo(other: BigIntBase): Int {
+    operator fun compareTo(other: BigIntNumber): Int {
         if (meta.signMask != other.meta.signMask)
             return meta.signMask or 1
         val cmp = Mago.compare(magia, meta.normLen, other.magia, other.meta.normLen)
@@ -488,7 +532,7 @@ sealed class BigIntBase(
         Mago.compare(magia, meta.normLen, dw)
     fun magnitudeCompareTo(littleEndianIntArray: IntArray, length: Int = littleEndianIntArray.size) =
         Mago.compare(magia, meta.normLen, littleEndianIntArray, Mago.normLen(littleEndianIntArray, length))
-    fun magnitudeCompareTo(other: BigIntBase): Int =
+    fun magnitudeCompareTo(other: BigIntNumber): Int =
         Mago.compare(magia, meta.normLen, other.magia, other.meta.normLen)
     internal fun magnitudeCompareTo(otherMeta: Meta, otherMagia: Magia) =
         Mago.compare(magia, meta.normLen, otherMagia, otherMeta.normLen)
@@ -500,7 +544,7 @@ sealed class BigIntBase(
      * @param other the [BigInt] or [MutableBigInt] to compare with
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
-    infix fun EQ(other: BigIntBase): Boolean =
+    infix fun EQ(other: BigIntNumber): Boolean =
         compareTo(other) == 0
 
     /**
@@ -591,7 +635,7 @@ sealed class BigIntBase(
      * @param other the [BigInt] or [MutableBigInt] to compare with
      * @return `true` if both have the same sign and identical magnitude, `false` otherwise
      */
-    infix fun magEQ(other: BigIntBase): Boolean = magnitudeCompareTo(other) == 0
+    infix fun magEQ(other: BigIntNumber): Boolean = magnitudeCompareTo(other) == 0
 
     /**
      * Comparison predicate for numerical equality with a signed 32-bit integer.

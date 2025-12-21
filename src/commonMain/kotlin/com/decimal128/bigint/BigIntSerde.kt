@@ -20,7 +20,7 @@ object BigIntSerde {
      * @param magia magnitude limb array in little-endian order.
      * @return a big-endian two’s-complement byte array.
      */
-    fun toTwosComplementBigEndianByteArray(bi: BigIntBase): ByteArray =
+    fun toTwosComplementBigEndianByteArray(bi: BigIntNumber): ByteArray =
         toBinaryByteArray(bi, isTwosComplement = true, isBigEndian = true)
 
     /**
@@ -38,7 +38,7 @@ object BigIntSerde {
      *
      * @throws IllegalArgumentException if the magnitude is not normalized.
      */
-    fun toBinaryByteArray(bi: BigIntBase, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
+    fun toBinaryByteArray(bi: BigIntNumber, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
         check (bi.isNormalized())
         if (bi.meta.normLen >= 0 && bi.meta.normLen <= bi.magia.size) {
             val bitLen =
@@ -75,7 +75,7 @@ object BigIntSerde {
      * @throws IndexOutOfBoundsException if [bytes] is too small.
      * @throws IllegalStateException if [meta] normLen does not fit size of [magia]
      */
-    fun toBinaryBytes(bi: BigIntBase,
+    fun toBinaryBytes(bi: BigIntNumber,
                       isTwosComplement: Boolean, isBigEndian: Boolean,
                       bytes: ByteArray, offset: Int = 0, requestedLen: Int = -1
     ): Int {
@@ -240,7 +240,7 @@ object BigIntSerde {
      *
      * @return a new IntArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianIntArray(bi: BigIntBase): IntArray =
+    fun magnitudeToLittleEndianIntArray(bi: BigIntNumber): IntArray =
         bi.magia.copyOf(bi.meta.normLen)
 
     /**
@@ -252,7 +252,7 @@ object BigIntSerde {
      *
      * @return a new LongArray containing the magnitude in little-endian order
      */
-    fun magnitudeToLittleEndianLongArray(bi: BigIntBase): LongArray {
+    fun magnitudeToLittleEndianLongArray(bi: BigIntNumber): LongArray {
         val intLen = bi.meta.normLen
         val longLen = (intLen + 1) ushr 1
         val z = LongArray(longLen)
