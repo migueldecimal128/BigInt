@@ -52,6 +52,11 @@ operator fun UInt.rem(other: BigInt) = other.remInverse(this)
 operator fun Long.rem(other: BigInt) = other.remInverse(this)
 operator fun ULong.rem(other: BigInt) = other.remInverse(false, this)
 
+infix fun Int.mod(other: BigInt) = other.modInverse(this)
+infix fun UInt.mod(other: BigInt) = other.modInverse(this)
+infix fun Long.mod(other: BigInt) = other.modInverse(this)
+infix fun ULong.mod(other: BigInt) = other.modInverse(false, this)
+
 
 /**
  * Compares this [Int] value with a [BigInt] for numerical equality

@@ -6,42 +6,63 @@ import com.decimal128.bigint.MutableBigInt
 import kotlin.math.absoluteValue
 
 /**
- * Provides a reusable modular-arithmetic context for a fixed modulus [m].
+ * Provides a reusable modular–arithmetic context for a fixed modulus [m].
  *
- * `ModContext` precomputes and caches all state required to efficiently perform
- * modular operations modulo [m], including Barrett-reduction parameters and
- * scratch buffers. It is intended for repeated operations with the same modulus,
- * such as in cryptographic algorithms (e.g. modular exponentiation, inverses,
- * Lucas sequences).
+ * `ModContext` precomputes all state required for fast modular operations
+ * modulo [m], including Barrett parameters and (when `m` is odd) a full
+ * Montgomery reduction environment.  All operations use caller–supplied
+ * [MutableBigInt] outputs to avoid heap allocation.
  *
  * ## Design notes
- * - The modulus [m] must be ≥ 1 and is immutable for the lifetime of the context.
- * - All operations write their result into a caller-supplied [MutableBigInt]
- *   to avoid heap allocation.
- * - Internal scratch accumulators are owned by the context; therefore,
- *   **instances are not thread-safe** and must not be shared across threads
- *   without external synchronization.
- * - Reduction is implemented using Barrett reduction, with capacities sized
- *   from the bit-length of [m] to avoid resizing in hot paths.
+ * - The modulus [m] is immutable and must satisfy `m ≥ 1`.
+ * - Internal scratch storage is owned by the context.  Because this state
+ *   is mutated during reduction and exponentiation, **instances are not
+ *   thread–safe** and must not be shared across threads without external
+ *   synchronization.
+ * - For **odd moduli**, modular exponentiation uses Montgomery arithmetic
+ *   (conversion to/from the Montgomery domain plus Montgomery‐ladder style
+ *   square-and-multiply).
+ * - For **even moduli**, Montgomery is not applicable; the context falls
+ *   back to its internal Barrett reducer.
+ * - For addition, subtraction, multiplication, squaring, and inversion, the
+ *   context writes directly into the caller’s [MutableBigInt] to eliminate
+ *   allocation and avoid resizing in hot paths.
+ *
+ * ## Caller responsibilities
+ * For performance reasons, the context does **not** universally normalize
+ * its inputs.  It is the caller's responsibility to ensure that operands are
+ * interpreted as values in the residue class modulo [m]:
+ *
+ * - Inputs should satisfy `0 ≤ a < m` if an operation assumes a canonical
+ *   representative (e.g., `modInv` requires `0 ≤ a < m`).
+ * - If values may exceed the modulus, the caller should first reduce them
+ *   using [modSet] (or a field-specific normalization strategy).
+ * - Negative inputs are not automatically mapped into `[0, m)` unless
+ *   documented for that specific primitive overload.
+ *
+ * This policy is standard for high–performance modular arithmetic and avoids
+ * redundant work in exponentiation, signature loops, and Lucas sequences.
  *
  * ## Supported operations
- * - Modular addition and subtraction (`modAdd` `modSub`)
- * - Modular multiplication and squaring
+ * - Modular addition, subtraction (`modAdd`, `modSub`)
+ * - Modular multiplication and squaring (`modMul`, `modSqr`)
  * - Modular exponentiation (`modPow`)
+ *   - uses **Montgomery** for odd moduli
+ *   - uses **Barrett** for even moduli
  * - Modular inverse via the extended Euclidean algorithm (`modInv`)
- * - Modular “half” operation for odd moduli (`modHalfLucas`)
+ * - Modular halving for odd moduli (`modHalfLucas`)
  *
  * ## Usage
  * ```
  * val ctx = ModContext(m)
- * val out = MutableBigInt()
+ * val x = MutableBigInt()
  *
- * ctx.modMul(a, b, out)
- * ctx.modPow(base, exp, out)
- * ctx.modInv(a, out)
+ * ctx.modMul(a, b, x)
+ * ctx.modPow(a, e, x)
+ * ctx.modInv(a, x)
  * ```
  *
- * @param m the modulus for all operations; must be ≥ 1
+ * @param m modulus for all modular operations; must be ≥ 1
  * @throws IllegalArgumentException if [m] < 1
  */
 class ModContext(val m: BigInt) {
@@ -51,56 +72,60 @@ class ModContext(val m: BigInt) {
     }
     val kBits = m.magnitudeBitLen()
 
+    /**
+     * Internal Barrett reduction implementation.
+     */
     private val barrett = Barrett(m)
+    /**
+     * Internal Montgomery reduction implementation, used
+     * for modPow when m is odd.
+     */
     private val montgomery: Montgomery? =
         if (m.isOdd()) Montgomery(m) else null
 
-    /** Delegates to [modSet] for primitive input. */
-    fun modSet(a: Int, out: MutableBigInt) { modSet(a.toLong(), out) }
-
-    /** Delegates to [modSet] for primitive input. */
-    fun modSet(a: Long, out: MutableBigInt) {
-        if (a >= 0 && m > a)
-            out.set(a)
-        else {
-            out.set(a)
-            out.setRem(out, m)
-            if (out.isNegative())
-                out += m
-        }
-    }
-
     /**
-     * Writes `a mod m` into [out], where `m` is this context's modulus.
+     * Writes `(a mod m)` into [out], returning [out].
      *
-     * - If `0 <= a < m`, the value is copied directly without performing a reduction.
-     * - Otherwise the value is reduced modulo `m`, and any negative remainder
-     *   is normalized into the range `[0, m)`.
-     * - No heap allocation occurs; internal scratch buffers are reused.
+     * Uses `[out].setMod(a, m)` to canonicalize into `[0, m)` with no allocation.
+     * Suitable for pre-normalizing values before modular arithmetic.
      *
-     * These overloads accept:
-     * - `Int` and `Long` for small primitive inputs
-     * - `BigIntBase` for arbitrary-width values
-     *
-     * @param a   the value to reduce (primitive or big-integer)
-     * @param out destination buffer that receives the reduced value
+     * @param a   value to reduce
+     * @param out destination receiving `(a mod m)`
+     * @return [out]
      */
-    fun modSet(a: BigIntBase, out: MutableBigInt) {
-        if (a >= 0 && m > a)
-            out.set(a)
-        else {
-            out.setRem(a, m)
-            if (out.isNegative())
-                out += m
-        }
-    }
+    fun modSet(a: BigIntBase, out: MutableBigInt): MutableBigInt =
+        out.setMod(a, m)
 
     /**
-     * Computes `(a + b) mod m`.
+     * Reduces a [Long] modulo `m` into `[out]`, returning [out].
+     *
+     * @param a   primitive value to reduce
+     * @param out destination
+     * @return [out]
+     */
+    fun modSet(a: Int, out: MutableBigInt): MutableBigInt =
+        run { out.set(a); out.setMod(out, m) }
+
+    /**
+     * Reduces a [Long] modulo `m` into `[out]`, returning [out].
+     *
+     * @param a   primitive value to reduce
+     * @param out destination
+     * @return [out]
+     */
+    fun modSet(a: Long, out: MutableBigInt): MutableBigInt =
+        run { out.set(a); out.setMod(out, m) }
+
+    /**
+     * Computes `(a + b) mod m` into [out].
+     *
+     * Assumes non-negative inputs already lie in the residue range `[0, m)`;
+     * this performs at most one post-addition correction (subtracting `m` once
+     * if needed), not a full reduction.
      *
      * @param a first addend
      * @param b second addend
-     * @param out destination accumulator for the result
+     * @param out destination for the result
      */
     fun modAdd(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
         out.setAdd(a, b)
@@ -108,11 +133,45 @@ class ModContext(val m: BigInt) {
     }
 
     /**
-     * Computes `(a - b) mod m`.
+     * Computes `(a + b) mod m` into [out].
+     *
+     * Assumes non-negative inputs already lie in the residue range `[0, m)`;
+     * this performs at most one post-addition correction (subtracting `m` once
+     * if needed), not a full reduction.
+     *
+     * @param a first addend
+     * @param b second addend
+     * @param out destination for the result
+     */
+    fun modAdd(a: BigIntBase, b: Int, out: MutableBigInt) =
+        modAdd(a, b.toLong(), out)
+
+    /**
+     * Computes `(a + b) mod m` into [out].
+     *
+     * Assumes non-negative inputs already lie in the residue range `[0, m)`;
+     * this performs at most one post-addition correction (subtracting `m` once
+     * if needed), not a full reduction.
+     *
+     * @param a first addend
+     * @param b second addend
+     * @param out destination for the result
+     */
+    fun modAdd(a: BigIntBase, b: Long, out: MutableBigInt) {
+        out.setAdd(a, b)
+        if (out >= m) out -= m
+    }
+
+    /**
+     * Computes `(a - b) mod m` into [out].
+     *
+     * Assumes non-negative operands already lie in the residue range `[0, m)`; this
+     * performs at most one correction (adding `m` once if the raw difference is
+     * negative), not a full reduction.
      *
      * @param a minuend
      * @param b subtrahend
-     * @param out destination accumulator for the result
+     * @param out destination for the result
      */
     fun modSub(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
         out.setSub(a, b)
@@ -120,49 +179,139 @@ class ModContext(val m: BigInt) {
     }
 
     /**
-     * Computes `(a * b) mod m`.
+     * Computes `(a - b) mod m` into [out].
      *
-     * @param a first multiplicand
-     * @param b second multiplicand
-     * @param out destination accumulator for the result
+     * Assumes non-negative operands already lie in the residue range `[0, m)`; this
+     * performs at most one correction (adding `m` once if the raw difference is
+     * negative), not a full reduction.
+     *
+     * @param a minuend
+     * @param b subtrahend
+     * @param out destination for the result
+     */
+    fun modSub(a: BigIntBase, b: Int, out: MutableBigInt) =
+        modSub(a, b.toLong(), out)
+
+    /**
+     * Computes `(a - b) mod m` into [out].
+     *
+     * Assumes non-negative operands already lie in the residue range `[0, m)`; this
+     * performs at most one correction (adding `m` once if the raw difference is
+     * negative), not a full reduction.
+     *
+     * @param a minuend
+     * @param b subtrahend
+     * @param out destination for the result
+     */
+    fun modSub(a: BigIntBase, b: Long, out: MutableBigInt) {
+        out.setSub(a, b)
+        if (out >= m) out -= m
+    }
+
+    /**
+     * Computes `(a * b) mod m` into [out].
+     *
+     * Assumes non-negative operands already lie in the residue range `[0, m)`; this
+     * path performs full Barrett reduction rather than multiple corrective steps.
+     *
+     * @param a first multiplier
+     * @param b second multiplier
+     * @param out destination for the result
      */
     fun modMul(a: BigIntBase, b: BigIntBase, out: MutableBigInt) =
         barrett.modMul(a, b, out)
 
     /**
-     * Computes `(a * b) mod m`.
+     * Computes `(a * b) mod m` into [out].
      *
-     * @param a first multiplicand
-     * @param b second multiplicand
-     * @param out destination accumulator for the result
+     * Assumes non-negative operands already lie in the residue range `[0, m)`; this
+     * path performs full Barrett reduction rather than multiple corrective steps.
+     *
+     * @param a first multiplier
+     * @param b second multiplier
+     * @param out destination for the result
      */
     fun modMul(a: BigIntBase, b: Int, out: MutableBigInt) =
         barrett.modMul(a, b, out)
 
     /**
-     * Computes `(a * a) mod m`.
+     * Computes `(a * b) mod m` into [out].
+     *
+     * Assumes non-negative operands already lie in the residue range `[0, m)`; this
+     * path performs full Barrett reduction rather than multiple corrective steps.
+     *
+     * @param a first multiplier
+     * @param b second multiplier
+     * @param out destination for the result
+     */
+    fun modMul(a: BigIntBase, b: Long, out: MutableBigInt) =
+        barrett.modMul(a, b, out)
+
+    /**
+     * Computes `(a * a) mod m` into [out].
+     *
+     * Assumes a non-negative operand already in `[0, m)` and applies full
+     * Barrett reduction.
      *
      * @param a value to square
-     * @param out destination accumulator for the result
+     * @param out destination for the result
      */
     fun modSqr(a: BigIntBase, out: MutableBigInt) =
         barrett.modSqr(a, out)
 
     /**
-     * Computes `(base^exp) mod m`.
+     * Computes `(base^exp) mod m` into [out].
      *
-     * @param base base value
-     * @param exp exponent (must be ≥ 0)
-     * @param out destination accumulator for the result
+     * Uses Montgomery exponentiation when `m` is odd; otherwise falls back to
+     * Barrett-based exponentiation. Inputs are assumed to be non-negative and
+     * already reduced into `[0, m)`—no implicit normalization is performed.
+     *
+     * @param base base value (caller ensures `0 ≤ base < m`)
+     * @param exp exponent (must be non-negative)
+     * @param out destination for the result
+     * @throws IllegalArgumentException if [exp] is negative
      */
-    fun modPow(base: BigInt, exp: BigInt, out: MutableBigInt) =
+    fun modPow(base: BigIntBase, exp: BigInt, out: MutableBigInt) =
         montgomery?.modPow(base, exp, out) ?: barrett.modPow(base, exp, out)
 
     /**
-     * Computes `(a / 2) mod m` assuming an odd modulus.
+     * Computes `(base^exp) mod m` into [out].
+     *
+     * Uses Montgomery exponentiation when `m` is odd; otherwise falls back to
+     * Barrett-based exponentiation. Inputs are assumed to be non-negative and
+     * already reduced into `[0, m)`—no implicit normalization is performed.
+     *
+     * @param base base value (caller ensures `0 ≤ base < m`)
+     * @param exp exponent (must be non-negative)
+     * @param out destination for the result
+     * @throws IllegalArgumentException if [exp] is negative
+     */
+    fun modPow(base: BigIntBase, exp: Int, out: MutableBigInt) =
+        modPow(base, exp.toLong(), out)
+
+    /**
+     * Computes `(base^exp) mod m` into [out].
+     *
+     * Uses Montgomery exponentiation when `m` is odd; otherwise falls back to
+     * Barrett-based exponentiation. Inputs are assumed to be non-negative and
+     * already reduced into `[0, m)`—no implicit normalization is performed.
+     *
+     * @param base base value (caller ensures `0 ≤ base < m`)
+     * @param exp exponent (must be non-negative)
+     * @param out destination for the result
+     * @throws IllegalArgumentException if [exp] is negative
+     */
+    fun modPow(base: BigIntBase, exp: Long, out: MutableBigInt) =
+        montgomery?.modPow(base, exp, out) ?: barrett.modPow(base, exp, out)
+
+    /**
+     * Computes `(a / 2) mod m` into [out], assuming an odd modulus.
+     *
+     * If `a` is odd, adds `m` before the shift so the result remains in `[0, m)`.
+     * Caller is responsible for ensuring `0 ≤ a < m`.
      *
      * @param a input value
-     * @param out destination accumulator for the result
+     * @param out destination for the result
      */
     fun modHalfLucas(a: MutableBigInt, out: MutableBigInt) =
         barrett.modHalfLucas(a, out)
@@ -181,18 +330,17 @@ class ModContext(val m: BigInt) {
     private val invQNewT = MutableBigInt.withInitialBitCapacity(kBits + 1)
 
     /**
-     * Computes the modular multiplicative inverse of [a] modulo [m].
+     * Computes the multiplicative inverse of [a] modulo [m] and writes it into [out],
+     * producing a value `x` such that `(a * x) % m == 1`.
      *
-     * On success, writes `x` to [out] such that `(a * x) % m == 1`.
-     * Uses an allocation-free extended Euclidean algorithm with
-     * internal scratch state owned by this [ModContext].
+     * Requires `0 ≤ a < m`; the caller must normalize inputs beforehand.
      *
-     * @param a value to invert, must satisfy `0 ≤ a < m`
-     * @param out destination accumulator for the inverse
-     * @throws IllegalArgumentException if `a` is out of range
-     * @throws ArithmeticException if the inverse does not exist
+     * @param a value to invert within `[0, m)`
+     * @param out destination for the inverse
+     * @throws IllegalArgumentException if `a !in [0, m)`
+     * @throws ArithmeticException if `gcd(a, m) ≠ 1` (no inverse exists)
      */
-    fun modInv(a: BigInt, out: MutableBigInt) {
+    fun modInv(a: BigIntBase, out: MutableBigInt) {
         require(a >= 0 && a < m)
 
         invR.set(m)
@@ -353,6 +501,21 @@ class ModContext(val m: BigInt) {
         /**
          * Computes `(a * b) mod m`.
          */
+        fun modMul(a: BigIntBase, b: Long, out: MutableBigInt) {
+            check (a !== mulTmp && out !== mulTmp)
+            if (b != 0L) {
+                mulTmp.setMul(a, b.absoluteValue.toULong())
+                reduceInto(mulTmp, out)
+                if (b < 0 && out.isNotZero())
+                    out.setSub(m, out)
+            } else {
+                out.setZero()
+            }
+        }
+
+        /**
+         * Computes `(a * b) mod m`.
+         */
         fun modMul(a: BigIntBase, b: Int, out: MutableBigInt) {
             check (a !== mulTmp && out !== mulTmp)
             if (b != 0) {
@@ -384,6 +547,36 @@ class ModContext(val m: BigInt) {
          * @param out destination accumulator for the result
          */
         fun modPow(base: BigIntBase, exp: BigIntBase, out: MutableBigInt) {
+            if (exp < 0)
+                throw IllegalArgumentException()
+            out.setOne()
+            if (exp.isZero())
+                return
+            // FIXME - why am I checking base here?
+            //  should I use modSet ?
+            //  is it the caller's responsibility?
+            baseTmp.set(base)
+            if (base >= m) {
+                if (base < mSquared)
+                    reduceInto(baseTmp, baseTmp)
+                else
+                    baseTmp.setRem(base, m)
+            }
+            out.set(baseTmp)
+            val topBitIndex = exp.magnitudeBitLen() - 1
+            for (i in topBitIndex - 1 downTo 0) {
+                // result = result^2 mod m
+                modSqr(out, out)
+
+                if (exp.testBit(i))
+                    modMul(out, baseTmp, out)
+            }
+        }
+
+        fun modPow(base: BigIntBase, exp: Int, out: MutableBigInt) =
+            modPow(base, exp.toLong(), out)
+
+        fun modPow(base: BigIntBase, exp: Long, out: MutableBigInt) {
             if (exp < 0)
                 throw IllegalArgumentException()
             out.setOne()
@@ -493,6 +686,52 @@ class ModContext(val m: BigInt) {
             out.set(xR)
         }
 
+        fun modPow(base: BigIntBase, exp: Long, out: MutableBigInt) {
+            require (! exp.isNegative())
+
+            // Zero exponent → return 1
+            if (exp.isZero()) {
+                out.set(1)
+                return
+            }
+
+            // Convert base → Montgomery domain
+            //baseR.setMul(base, r2)
+            //baseR.montgomeryRedc(modulus, np)
+            toMontgomery(base, baseR)
+
+            // xR = 1 in Montgomery space => R mod N
+            toMontgomery(BigInt.ONE, xR)
+
+            // Standard left-to-right binary exponentiation
+            val bitLen = exp.magnitudeBitLen()
+            for (i in bitLen - 1 downTo 0) {
+                // xR = xR^2 mod N  (still Montgomery)
+                montMul(xR, xR, xR)
+
+                if (exp.testBit(i)) {
+                    // xR = xR * baseR mod N
+                    montMul(xR, baseR, xR)
+                }
+            }
+
+            // Convert result back from Montgomery
+            fromMontgomery(xR)  // → Z-domain = base^exp mod N
+
+            // Move into output
+            out.set(xR)
+        }
+
 
     }
 }
+
+/**
+ * with these three extension functions the bodies primitive
+ * overload functions can be exact clones of the BigInt versions.
+ */
+private fun Long.isZero() = this == 0L
+private fun Long.isNegative() = this < 0L
+private fun Long.magnitudeBitLen() = 64 - this.countLeadingZeroBits()
+private fun Long.testBit(bitIndex: Int) = (1L shl bitIndex) != 0L
+
