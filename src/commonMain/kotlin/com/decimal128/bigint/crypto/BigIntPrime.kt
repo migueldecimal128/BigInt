@@ -199,12 +199,12 @@ object BigIntPrime {
     /**
      * Deterministic Miller–Rabin bases sufficient for testing 64-bit–range values.
      *
-     * Sinclair & Jaeschke. Feitsma & Galway.
+     * Jaeschke, Sinclair, Feitsma, & Galway.
      *
      * When used together, these bases make the Miller–Rabin test
      * deterministic for all `n < 2^64`.
      */
-    private val MILLER_RABIN_2_64_BASES = intArrayOf(
+    private val MILLER_RABIN_JAESCHKE_BASES = intArrayOf(
         2,
         325,
         9375,
@@ -228,8 +228,8 @@ object BigIntPrime {
      * @return `true` if [n] passes all Miller–Rabin bases, `false` if composite
      * @throws IllegalArgumentException if [n] is negative
      */
-    fun isMillerRabin_2_64(n: BigInt, tmp: MutableBigInt?): Boolean =
-        isMillerRabinProbablePrime(n, MILLER_RABIN_2_64_BASES, tmp)
+    fun isMillerRabinProbablePrimeJaeschke(n: BigInt, tmp: MutableBigInt?): Boolean =
+        isMillerRabinProbablePrime(n, MILLER_RABIN_JAESCHKE_BASES, tmp)
 
     /**
      * Computes the Jacobi symbol (a | n).

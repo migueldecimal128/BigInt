@@ -97,9 +97,11 @@ class TestBigIntMulDivRem {
         val mbi = MutableBigInt().set(x)
         mbi.setRem(x, y)
 
-        println("mbi.magia = ${mbi.magia.joinToString()}")
-        println("meta.normLen = ${mbi.meta.normLen}")
-        println("normLen(magia) = ${Mago.normLen(mbi.magia)}")
+        if (verbose) {
+            println("mbi.magia = ${mbi.magia.joinToString()}")
+            println("meta.normLen = ${mbi.meta.normLen}")
+            println("normLen(magia) = ${Mago.normLen(mbi.magia)}")
+        }
     }
 
     // ------------------------------------------------------------
