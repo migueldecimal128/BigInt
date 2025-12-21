@@ -402,8 +402,6 @@ class ModContext(val m: BigInt) {
         val np = computeNp(modulus.magia[0].toUInt())
         val r2 = BigInt.withSetBit(64*k) % modulus
 
-
-        init { println("foo!") }
         companion object {
             fun computeNp(n: UInt): UInt {
                 require((n and 1u) == 1u)
@@ -426,25 +424,8 @@ class ModContext(val m: BigInt) {
         fun fromMontgomery(xR: MutableBigInt): MutableBigInt =
             xR.montgomeryRedc(modulus, np)
 
-        val aR = MutableBigInt()
-        val bR = MutableBigInt()
-
-        fun modMul(a: BigIntBase, b: BigIntBase, out: MutableBigInt) {
-            toMontgomery(a, aR)
-            toMontgomery(b, bR)
-            out.setMul(aR, bR)
-                .montgomeryRedc(modulus, np)
-            fromMontgomery(out)
-        }
-
-        val tmp = MutableBigInt()
-
-        fun montMul(aR: BigIntBase, bR: BigIntBase, out: MutableBigInt) {
-            //out.setMul(aR, bR).montgomeryRedc(modulus, np)
-            tmp.setMul(aR, bR)
-            tmp.montgomeryRedc(modulus, np)
-            out.set(tmp)
-            }
+        fun montMul(aR: BigIntBase, bR: BigIntBase, out: MutableBigInt) =
+            out.setMul(aR, bR).montgomeryRedc(modulus, np)
 
         val baseR = MutableBigInt()
         val xR = MutableBigInt()
@@ -459,34 +440,14 @@ class ModContext(val m: BigInt) {
             }
 
             // Convert base → Montgomery domain
-
-            baseR.set(base)
-            baseR *= r2
-            baseR %= modulus
-            baseR.montgomeryRedc(modulus, np)
-
+            //baseR.setMul(base, r2)
+            //baseR.montgomeryRedc(modulus, np)
+            toMontgomery(base, baseR)
 
             // xR = 1 in Montgomery space => R mod N
-            xR.set(r2)
-            xR.montgomeryRedc(modulus, np) // = R mod N
+            toMontgomery(BigInt.ONE, xR)
 
             // Standard left-to-right binary exponentiation
-
-            println("mod  = ${modulus.toBigInt()}")
-            println("r2   = ${r2.toBigInt()}")
-            println("baseR= ${baseR.toBigInt()}")
-            println("xR   = ${xR.toBigInt()}")
-
-            val test = MutableBigInt().also {
-                montMul(xR, xR, it)   // 1_R * 1_R
-            }
-            println("R*R = ${test.toBigInt()}")
-
-            // Test montMul(1_R, baseR) explicitly:
-            val testMul = MutableBigInt()
-            montMul(xR, baseR, testMul)
-            println("montMul(1_R, baseR) = ${testMul.toBigInt()}")
-
             val bitLen = exp.magnitudeBitLen()
             for (i in bitLen - 1 downTo 0) {
                 // xR = xR^2 mod N  (still Montgomery)
