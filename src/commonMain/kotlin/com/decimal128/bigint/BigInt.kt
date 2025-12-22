@@ -593,6 +593,7 @@ class BigInt private constructor(
          * @param rng the random number generator used for both magnitude and sign.
          * @param withRandomSign if `true`, assigns a random sign; otherwise the result
          *                       is always non-negative.
+         * @param ensureOdd if `true` will always set the low bit, unless bitLen == 0
          *
          * ## Returns
          * A `BigInt` whose magnitude has exactly `bitLen` bits (or zero if `bitLen == 0`).
@@ -602,7 +603,8 @@ class BigInt private constructor(
         fun randomWithBitLen(
             bitLen: Int,
             rng: Random = Random.Default,
-            withRandomSign: Boolean = false
+            withRandomSign: Boolean = false,
+            ensureOdd: Boolean = false
         ): BigInt = when {
             bitLen > 0 -> {
                 val magia = Mago.newWithBitLen(bitLen)
@@ -617,6 +619,7 @@ class BigInt private constructor(
                 val limbIndex = topBitIndex ushr 5
                 check (limbIndex == magia.size - 1)
                 magia[limbIndex] = magia[limbIndex] or (1 shl (topBitIndex and 0x1F))
+                magia[0] = magia[0] or if (ensureOdd) 1 else 0
                 val sign = withRandomSign && rng.nextBoolean()
                 fromNormalizedNonZero(sign, magia)
             }

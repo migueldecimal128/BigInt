@@ -590,7 +590,9 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
                 else
                     baseTmp.setRem(base, m)
             }
+            // once for the MSB
             out.set(baseTmp)
+
             val topBitIndex = exp.magnitudeBitLen() - 1
             for (i in topBitIndex - 1 downTo 0) {
                 // result = result^2 mod m
@@ -734,5 +736,5 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
 private fun Long.isZero() = this == 0L
 private fun Long.isNegative() = this < 0L
 private fun Long.magnitudeBitLen() = 64 - this.countLeadingZeroBits()
-private fun Long.testBit(bitIndex: Int) = (1L shl bitIndex) != 0L
+private fun Long.testBit(bitIndex: Int) = (1L shl bitIndex) and this != 0L
 
