@@ -228,7 +228,7 @@ internal object Mago {
     }
 
     fun isNormalized(x: Magia, xOff: Int, xLen: Int): Boolean {
-        check (xOff >= 0 && xLen >= 0 && xOff + xLen <= x.size)
+        require (xOff >= 0 && xLen >= 0 && xOff + xLen <= x.size)
         return xLen == 0 || x[xOff + xLen - 1] != 0
     }
 
@@ -464,7 +464,7 @@ internal object Mago {
      * @throws ArithmeticException if the result does not fit in [z]
      */
     fun setAdd(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-        if (TEST_OFFSET_ARITHMETIC)
+        if (TEST_OFFSET_ARITHMETIC && z.size > max(xNormLen, yNormLen))
             return setAdd(z, 0, x, 0, xNormLen, y, 0, yNormLen)
         check (isNormalized(x, xNormLen))
         check (isNormalized(y, yNormLen))
@@ -504,38 +504,34 @@ internal object Mago {
     fun setAdd(z: Magia, zOff: Int,
                x: Magia, xOff: Int, xNormLen: Int,
                y: Magia, yOff: Int, yNormLen: Int): Int {
-        check (isNormalized(x, xOff, xNormLen))
-        check (isNormalized(y, yOff, yNormLen))
+        require (isNormalized(x, xOff, xNormLen))
+        require (isNormalized(y, yOff, yNormLen))
         if (xNormLen >= 0 && xOff >= 0 && xOff + xNormLen <= x.size &&
             yNormLen >= 0 && yOff >= 0 && yOff + yNormLen <= y.size) {
             val maxNormLen = max(xNormLen, yNormLen)
             val minNormLen = min(xNormLen, yNormLen)
-            if (maxNormLen <= zOff + z.size) {
+            if (zOff + maxNormLen < z.size) {
                 var carry = 0uL
                 var i = 0
                 while (i < minNormLen) {
                     val t = dw32(x[xOff + i]) + dw32(y[yOff + i]) + carry
                     z[zOff + i] = t.toInt()
                     carry = t shr 32
-                    check((carry shr 1) == 0uL)
                     ++i
                 }
                 val longer = if (xNormLen > yNormLen) x else y
                 val longerOff = if (xNormLen > yNormLen) xOff else yOff
-                while (i < maxNormLen && zOff + i < z.size) {
+                while (i < maxNormLen) {
                     val t = dw32(longer[longerOff + i]) + carry
                     z[zOff + i] = t.toInt()
                     carry = t shr 32
                     ++i
                 }
-                if (carry != 0uL) {
-                    if (zOff + i == z.size)
-                        throw ArithmeticException(ERR_MSG_ADD_OVERFLOW)
-                    z[zOff + i] = 1
-                    ++i
-                }
-                check (isNormalized(z, zOff, i))
-                return i
+                val finalCarryOrZero = carry.toInt()
+                z[zOff + i] = finalCarryOrZero
+                val zNormLen = i + (-finalCarryOrZero ushr 31)
+                check (isNormalized(z, zOff, zNormLen))
+                return zNormLen
             }
         }
         throw IllegalArgumentException()
@@ -702,7 +698,7 @@ internal object Mago {
                x: Magia, xOff: Int, xNormLen: Int,
                y: Magia, yOff: Int, yNormLen: Int): Int {
         if (xOff >= 0 && xNormLen >= 0 && xOff + xNormLen <= x.size &&
-            yOff >= 0 && yNormLen >= 0 && yNormLen <= y.size) {
+            yOff >= 0 && yNormLen >= 0 && yOff + yNormLen <= y.size) {
             if (zOff + xNormLen <= z.size) {
                 if (xNormLen >= yNormLen) {
                     var borrow = 0uL
