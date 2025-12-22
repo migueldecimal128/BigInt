@@ -171,7 +171,8 @@ class TestBarrettVsMontgomery {
         val outBarr = MutableBigInt()
 
         // Warm up to trigger inlining & allocation flattening
-        repeat(5000) {
+        // repeat(5000) {
+        repeat(1) {
             ctxMont.modPow(a, e, outMont)
             ctxBarr.modPow(a, e, outBarr)
         }

@@ -4,6 +4,7 @@ import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntNumber
 import com.decimal128.bigint.MutableBigInt
 import kotlin.math.absoluteValue
+import kotlin.math.min
 
 /**
  * Provides a reusable modular–arithmetic context for a fixed modulus [m].
@@ -673,15 +674,49 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
             // xR = 1 in Montgomery space => R mod N
             toMontgomery(BigInt.ONE, xR)
 
+            val w = calcWindowSize(exp)
+            precomputeOddPowers(baseR, w)
+
             // Standard left-to-right binary exponentiation
             val bitLen = exp.magnitudeBitLen()
-            for (i in bitLen - 1 downTo 0) {
-                // xR = xR^2 mod N  (still Montgomery)
-                montSqr(xR, xR)
+            var i = bitLen - 1
 
-                if (exp.testBit(i)) {
-                    // xR = xR * baseR mod N
-                    montMul(xR, baseR, xR)
+            // ---- skip initial squarings until first 1 ----
+            while (i >= 0 && !exp.testBit(i)) {
+                montSqr(xR, xR)
+                --i
+            }
+
+            while (i >= 0) {
+                // we are on a '1' bit: form a window up to width w
+                val maxWidth = minOf(w, i + 1)
+                var width = 1
+                var window = 1  // the top bit is 1
+
+                // absorb following bits while they exist and keep window odd
+                var j = 1
+                while (j < maxWidth) {
+                    val bit = exp.testBit(i - j)
+                    if (!bit) break
+                    window = (window shl 1) or 1
+                    width++
+                    j++
+                }
+
+                // consume the window bits
+                i -= width
+
+                // square width times
+                repeat(width) { montSqr(xR, xR) }
+
+                // multiply by odd power
+                val idx = window ushr 1   // (2k+1) → k
+                montMul(xR, precomputedPowers[idx], xR)
+
+                // now skip zeros until next 1
+                while (i >= 0 && !exp.testBit(i)) {
+                    montSqr(xR, xR)
+                    i--
                 }
             }
 
@@ -726,6 +761,38 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
 
             // Move into output
             out.set(xR)
+        }
+
+        fun calcWindowSize(exp: BigIntNumber): Int {
+            val n = exp.magnitudeBitLen()
+            return when {
+                n < 128  -> 3
+                n < 512  -> 4
+                n < 2048 -> 5
+                else     -> 6
+            }
+        }
+
+        val MAX_WINDOW_WIDTH = 6
+        val precomputedPowers = Array(1 shl MAX_WINDOW_WIDTH) { MutableBigInt() }
+
+        fun precomputeOddPowers(
+            baseR: BigIntNumber,
+            w: Int,
+        ) {
+            val numOdd = 1 shl (w - 1)
+
+            // table[0] = baseR^(1)
+            precomputedPowers[0].set(baseR)
+
+            // Compute base^2
+            val baseSq = MutableBigInt()
+            montMul(baseR, baseR, baseSq) // Montgomery square
+
+            // Fill table[i] = table[i-1] * baseSq
+            for (i in 1 until numOdd)
+                montMul(precomputedPowers[i - 1], baseSq, precomputedPowers[i])
+
         }
 
 
