@@ -120,7 +120,8 @@ class TestOffsetSetAdd {
         val x = intArrayOf(1)
 
         assertFailsWith<IllegalArgumentException> {
-            Mago.setAdd(z, 0, x, 0, 1, x, 0, 1) // insufficient space for sum
+            // z must have 2 limbs to handle overflow from 1 limb + 1 limb
+            Mago.setAdd(z, 0, x, 0, 1, x, 0, 1)
         }
     }
 

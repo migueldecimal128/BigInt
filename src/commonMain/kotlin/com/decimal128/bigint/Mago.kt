@@ -1040,7 +1040,7 @@ internal object Mago {
      * @return the normalized limb length of the result.
      */
     fun setSqr(z: Magia, x: Magia, xNormLen: Int) : Int {
-        if (TEST_OFFSET_ARITHMETIC)
+        if (TEST_OFFSET_ARITHMETIC && z.size >= 2 * xNormLen)
             return setSqr(z, 0, x, 0, xNormLen)
         if (xNormLen > 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
@@ -1116,16 +1116,16 @@ internal object Mago {
     }
 
     fun setSqr(z: Magia, zOff: Int, x: Magia, xOff: Int, xNormLen: Int) : Int {
-        val zMaxLen = 2*xNormLen
+        val zMaxLen = 2 * xNormLen
         require (xOff >= 0)
         require (xOff + xNormLen <= x.size)
         require (zOff >= 0)
-        require (zOff + zMaxLen - 1 <= z.size)
+        require (zOff + zMaxLen <= z.size)
 
         if (xNormLen == 0)
             return 0
 
-        z.fill(0, zOff, zOff + min(z.size, 2 * xNormLen))
+        z.fill(0, zOff, zOff + zMaxLen)
 
         // 1) Cross terms: for i<j, add (x[i]*x[j]) twice into p[i+j]
         // these terms are doubled
@@ -1160,7 +1160,8 @@ internal object Mago {
         // 2) Diagonals: add x[i]**2 into columns 2*i and 2*i+1
         // terms on the diagonal are not doubled
         for (i in 0..<xNormLen) {
-            val sq = dw32(x[xOff + i]) * dw32(x[xOff + i])
+            val xi = x[xOff + i].toUInt().toULong()
+            val sq = xi * xi
             // add low 32 to p[2*i]
             var t = dw32(z[zOff + 2 * i]) + (sq and 0xFFFF_FFFFuL)
             z[zOff + 2 * i] = t.toInt()
@@ -1174,8 +1175,6 @@ internal object Mago {
                 // propagate any remaining carry
                 var k = 2 * i + 2
                 while (carry != 0uL) {
-                    if (zOff + k >= z.size)
-                        throw IllegalArgumentException(ERR_MSG_MUL_OVERFLOW)
                     t = dw32(z[zOff + k]) + carry
                     z[zOff + k] = t.toInt()
                     carry = t shr 32
@@ -1185,7 +1184,7 @@ internal object Mago {
         }
         val lastIndex = 2 * xNormLen - 1
         val zNormLen = lastIndex +
-                if (zOff + lastIndex >= z.size || z[zOff + lastIndex] == 0) 0 else 1
+                if (z[zOff + lastIndex] == 0) 0 else 1
         check (isNormalized(z, zOff, zNormLen))
         return zNormLen
     }
