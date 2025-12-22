@@ -650,6 +650,9 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
         fun montMul(aR: BigIntNumber, bR: BigIntNumber, out: MutableBigInt) =
             out.setMul(aR, bR).montgomeryRedc(modulus, np)
 
+        fun montSqr(aR: BigIntNumber, out: MutableBigInt) =
+            out.setSqr(aR).montgomeryRedc(modulus, np)
+
         val baseR = MutableBigInt()
         val xR = MutableBigInt()
 
@@ -674,7 +677,7 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
             val bitLen = exp.magnitudeBitLen()
             for (i in bitLen - 1 downTo 0) {
                 // xR = xR^2 mod N  (still Montgomery)
-                montMul(xR, xR, xR)
+                montSqr(xR, xR)
 
                 if (exp.testBit(i)) {
                     // xR = xR * baseR mod N
@@ -710,7 +713,7 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
             val bitLen = exp.magnitudeBitLen()
             for (i in bitLen - 1 downTo 0) {
                 // xR = xR^2 mod N  (still Montgomery)
-                montMul(xR, xR, xR)
+                montSqr(xR, xR)
 
                 if (exp.testBit(i)) {
                     // xR = xR * baseR mod N

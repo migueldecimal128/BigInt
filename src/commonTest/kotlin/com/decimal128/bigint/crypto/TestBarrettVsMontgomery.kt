@@ -33,7 +33,7 @@ class TestBarrettVsMontgomery {
     }
 
 
-    //@Test
+    @Test
     fun compareBarrettVsMontgomery_modMul_2kBits() {
         val bitLen = 2048
 
@@ -85,7 +85,7 @@ class TestBarrettVsMontgomery {
         println("ratio Barrett/Mont = $ratioRounded")
     }
 
-    //@Test
+    @Test
     fun compareBarrettVsMontgomery_modPow_2kBits_Long() {
         val bitLen = 2048
 
@@ -151,7 +151,7 @@ class TestBarrettVsMontgomery {
         println("ratio Barrett/Mont = $rounded")
     }
 
-    //@Test
+    @Test
     fun compareBarrettVsMontgomery_modPow_2kBits_2k() {
         val bitLen = 2048
 
