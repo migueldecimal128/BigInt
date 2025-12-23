@@ -1,13 +1,12 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.Karatsuba.karatsubaSquare1
-import com.decimal128.bigint.toBigInt
+import com.decimal128.bigint.Karatsuba.karatsubaSquare
 import kotlin.test.*
 
 class TestKaratsubaSquare1 {
 
-    private fun checkKaratsubaSquare1(a: BigInt) {
+    private fun checkKaratsubaSquare(a: BigInt) {
         val n = a.meta.normLen
         require(n >= 2)
 
@@ -16,10 +15,11 @@ class TestKaratsubaSquare1 {
         val k1 = n - k0
         val t = IntArray(3 * k1 + 3)
 
-        val zLen = karatsubaSquare1(
+        val zLen = karatsubaSquare(
             z, 0,
             a.magia, 0, n,
-            t, 0
+            t, 0,
+            2
         )
 
         val got = BigInt.fromLittleEndianIntArray(
@@ -42,7 +42,7 @@ class TestKaratsubaSquare1 {
             ),
             2
         )
-        checkKaratsubaSquare1(a)
+        checkKaratsubaSquare(a)
     }
 
     @Test
@@ -56,7 +56,7 @@ class TestKaratsubaSquare1 {
             ),
             3
         )
-        checkKaratsubaSquare1(a)
+        checkKaratsubaSquare(a)
     }
 
     @Test
@@ -68,7 +68,7 @@ class TestKaratsubaSquare1 {
             ),
             3
         )
-        checkKaratsubaSquare1(a)
+        checkKaratsubaSquare(a)
     }
 
     @Test
@@ -79,7 +79,7 @@ class TestKaratsubaSquare1 {
 
             // Ensure we stay in-domain
             if (a.meta.normLen >= 2) {
-                checkKaratsubaSquare1(a)
+                checkKaratsubaSquare(a)
             }
         }
     }
@@ -90,7 +90,7 @@ class TestKaratsubaSquare1 {
             val a = BigInt.randomWithMaxBitLen(512)
 
             if (a.meta.normLen >= 2) {
-                checkKaratsubaSquare1(a)
+                checkKaratsubaSquare(a)
             }
         }
     }

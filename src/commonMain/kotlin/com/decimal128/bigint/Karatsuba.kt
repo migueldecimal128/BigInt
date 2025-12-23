@@ -7,6 +7,24 @@ import com.decimal128.bigint.Mago.setSub
 
 object Karatsuba {
 
+    private const val DEFAULT_KARATSUBA_SQR_THRESHOLD = 2
+
+    fun karatsubaSquare(
+        z: Magia, zOff: Int,
+        a: Magia, aOff: Int, aNormLen: Int,
+        t: Magia, tOff: Int,
+        minLimbThreshold: Int = DEFAULT_KARATSUBA_SQR_THRESHOLD
+    ): Int {
+        if (aNormLen < minLimbThreshold)
+            return setSqr(z, zOff, a, aOff, aNormLen)
+
+        return karatsubaSquare1(
+            z, zOff,
+            a, aOff, aNormLen,
+            t, tOff
+        )
+    }
+
     fun karatsubaSquare1(
         z: Magia, zOff: Int,
         a: Magia, aOff: Int, aNormLen: Int,
