@@ -1,4 +1,5 @@
 package com.decimal128.bigint
+import com.decimal128.bigint.Karatsuba.setSub
 import kotlin.test.*
 
 class TestOffsetSetSub {
@@ -9,7 +10,7 @@ class TestOffsetSetSub {
         val x = IntArray(2)
         val y = IntArray(2)
 
-        val len = Mago.setSub(z, 1, x, 1, 0, y, 1, 0)
+        val len = setSub(z, 1, x, 1, 0, y, 1, 0)
 
         assertEquals(0, len, "zero normalized length")
     }
@@ -20,7 +21,7 @@ class TestOffsetSetSub {
         val x = intArrayOf(99, 7, 99)
         val y = intArrayOf(99, 5, 99)
 
-        val len = Mago.setSub(z, 1, x, 1, 1, y, 1, 1)
+        val len = setSub(z, 1, x, 1, 1, y, 1, 1)
 
         assertEquals(1, len)
         assertEquals(2, z[1])
@@ -33,7 +34,7 @@ class TestOffsetSetSub {
         val x = intArrayOf(99,0, 1,99)
         val y = intArrayOf(99,1,99)
 
-        val len = Mago.setSub(z, 1, x, 1, 2, y, 1, 1)
+        val len = setSub(z, 1, x, 1, 2, y, 1, 1)
 
         assertEquals(1, len)
         assertEquals(-1, z[1])
@@ -46,7 +47,7 @@ class TestOffsetSetSub {
         val x = intArrayOf(99,99,10, 20, 99)
         val y = intArrayOf(99,5,99)
 
-        val len = Mago.setSub(z, 3, x, 2, 2, y, 1, 1)
+        val len = setSub(z, 3, x, 2, 2, y, 1, 1)
 
         assertEquals(99, z[2])
         assertEquals(2, len)
@@ -61,7 +62,7 @@ class TestOffsetSetSub {
         val x = intArrayOf(99, 1, 0, 0, 1, 99) // both max limbs
         val y = intArrayOf(99, 2, 99)
 
-        val len = Mago.setSub(z, 0, x, 1, 4, y, 1, 1)
+        val len = setSub(z, 0, x, 1, 4, y, 1, 1)
 
         assertEquals(3, len)
         assertEquals(-1, z[0])
@@ -76,7 +77,7 @@ class TestOffsetSetSub {
         val x = intArrayOf(1)
 
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSub(z, 0, x, 1, 1, x, 0, 1)
+            setSub(z, 0, x, 1, 1, x, 0, 1)
         }
     }
 
@@ -86,7 +87,7 @@ class TestOffsetSetSub {
         val x = intArrayOf(1)
 
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSub(z, 1, x, 0, 1, x, 0, 1) // insufficient space for sum
+            setSub(z, 1, x, 0, 1, x, 0, 1) // insufficient space for sum
         }
     }
 
@@ -96,19 +97,19 @@ class TestOffsetSetSub {
         val x = intArrayOf(1)
 
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSub(z, -1, x, 0, -1, x, 0, 1)
+            setSub(z, -1, x, 0, -1, x, 0, 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSub(z, 0, x, -1, 0, x, 0, 1)
+            setSub(z, 0, x, -1, 0, x, 0, 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSub(z, 0, x, 0, -1, x, 0, 1)
+            setSub(z, 0, x, 0, -1, x, 0, 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSub(z, 0, x, 0, 1, x, 0, -1)
+            setSub(z, 0, x, 0, 1, x, 0, -1)
         }
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSub(z, 0, x, 0, -1, x, 0, 1)
+            setSub(z, 0, x, 0, -1, x, 0, 1)
         }
     }
 }
