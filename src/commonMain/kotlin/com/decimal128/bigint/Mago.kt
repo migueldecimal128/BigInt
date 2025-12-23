@@ -963,22 +963,22 @@ internal object Mago {
     }
 
     /**
-     * Multiplies the first [xLen] limbs of [x] by the first [yLen] limbs of [y],
+     * Multiplies the first [xNormLen] limbs of [x] by the first [yNormLen] limbs of [y],
      * accumulating the result into [z].
      *
      * Requirements:
      * - [z] must be of sufficient size to hold the product
-     *   `bitLen(x) + bitLen(y)`, at least [xLen] + [yLen] - 1.
-     * - [xLen] and [yLen] must be greater than zero and within the array bounds.
+     *   `bitLen(x) + bitLen(y)`, at least [xNormLen] + [yNormLen] - 1.
+     * - [xNormLen] and [yNormLen] must be greater than zero and within the array bounds.
      * - For efficiency, if one array is longer, it is preferable to use it as [y].
      *
      * @return the normalized number of limbs actually used in [z].
      * @throws IllegalArgumentException if preconditions on array sizes or lengths are violated.
      */
-    fun setMul(z: Magia, x: Magia, xLen: Int, y: Magia, yLen: Int): Int {
-        if (xLen > 0 && xLen <= x.size && yLen > 0 && yLen <= y.size && z.size >= xLen + yLen - 1) {
-            val xNormLen = normLen(x, xLen)
-            val yNormLen = normLen(y, yLen)
+    fun setMul(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
+        if (xNormLen > 0 && xNormLen <= x.size && yNormLen > 0 && yNormLen <= y.size && z.size >= xNormLen + yNormLen - 1) {
+            check (isNormalized(x, xNormLen))
+            check (isNormalized(y, yNormLen))
             val corto = if (xNormLen < yNormLen) x else y
             val largo = if (xNormLen < yNormLen) y else x
             val cortoLen = if (xNormLen < yNormLen) xNormLen else yNormLen
@@ -1008,7 +1008,7 @@ internal object Mago {
             val zNormLen = lastIndex + 1
             check (isNormalized(z, zNormLen))
             return zNormLen
-        } else if (xLen == 0 || yLen == 0) {
+        } else if (xNormLen == 0 || yNormLen == 0) {
             return 0
         } else {
             throw IllegalArgumentException()
