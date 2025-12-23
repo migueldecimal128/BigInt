@@ -1,5 +1,5 @@
 package com.decimal128.bigint
-import com.decimal128.bigint.Karatsuba.schoolbookSetSqr
+import com.decimal128.bigint.crypto.Karatsuba.schoolbookSetSqr
 import kotlin.test.*
 
 class TestOffsetSetSqr {

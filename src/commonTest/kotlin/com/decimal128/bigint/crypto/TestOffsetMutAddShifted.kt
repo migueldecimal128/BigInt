@@ -1,7 +1,9 @@
-package com.decimal128.bigint
-import com.decimal128.bigint.Karatsuba.mutAddShifted
-import com.decimal128.bigint.Karatsuba.setAdd
-import kotlin.test.*
+package com.decimal128.bigint.crypto
+
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class TestOffsetMutAddShifted {
 
@@ -10,11 +12,11 @@ class TestOffsetMutAddShifted {
         val z = intArrayOf(99,99,99)
         val x = intArrayOf(99,99)
 
-        val len = mutAddShifted(z, 1, 0, x, 1, 0, 1)
+        val len = Karatsuba.mutAddShifted(z, 1, 0, x, 1, 0, 1)
 
         assertEquals(0, len, "zero normalized length")
-        assertContentEquals(intArrayOf(99,99,99), z)
-        assertContentEquals(intArrayOf(99,99), x)
+        assertContentEquals(intArrayOf(99, 99, 99), z)
+        assertContentEquals(intArrayOf(99, 99), x)
     }
 
     @Test
@@ -22,11 +24,11 @@ class TestOffsetMutAddShifted {
         val z = intArrayOf(99,5,-1, 99)
         val x = intArrayOf(99,7, 99)
 
-        val len = mutAddShifted(z, 1, 1, x, 1, 1, 0)
+        val len = Karatsuba.mutAddShifted(z, 1, 1, x, 1, 1, 0)
 
         assertEquals(1, len)
         assertContentEquals(intArrayOf(99, 12, 0, 99), z)
-        assertContentEquals(intArrayOf(99,7,99), x)
+        assertContentEquals(intArrayOf(99, 7, 99), x)
     }
 
     @Test
@@ -34,11 +36,11 @@ class TestOffsetMutAddShifted {
         val z = intArrayOf(99,5,-1, -1, 99)
         val x = intArrayOf(99,7, 99)
 
-        val len = mutAddShifted(z, 1, 1, x, 1, 1, 1)
+        val len = Karatsuba.mutAddShifted(z, 1, 1, x, 1, 1, 1)
 
         assertEquals(2, len)
         assertContentEquals(intArrayOf(99, 5, 7, 0, 99), z)
-        assertContentEquals(intArrayOf(99,7,99), x)
+        assertContentEquals(intArrayOf(99, 7, 99), x)
     }
 
     @Test
@@ -46,11 +48,11 @@ class TestOffsetMutAddShifted {
         val z = intArrayOf(99,5,-1, -1, -1, 99)
         val x = intArrayOf(99,7, 99)
 
-        val len = mutAddShifted(z, 1, 1, x, 1, 1, 2)
+        val len = Karatsuba.mutAddShifted(z, 1, 1, x, 1, 1, 2)
 
         assertEquals(3, len)
         assertContentEquals(intArrayOf(99, 5, 0, 7, 0, 99), z)
-        assertContentEquals(intArrayOf(99,7,99), x)
+        assertContentEquals(intArrayOf(99, 7, 99), x)
     }
 
     @Test
@@ -58,11 +60,11 @@ class TestOffsetMutAddShifted {
         val z = intArrayOf(99,5,-1, -1, -1, -1, 99)
         val x = intArrayOf(99,7, 99)
 
-        val len = mutAddShifted(z, 1, 1, x, 1, 1, 3)
+        val len = Karatsuba.mutAddShifted(z, 1, 1, x, 1, 1, 3)
 
         assertEquals(4, len)
         assertContentEquals(intArrayOf(99, 5, 0, 0, 7, 0, 99), z)
-        assertContentEquals(intArrayOf(99,7,99), x)
+        assertContentEquals(intArrayOf(99, 7, 99), x)
     }
     @Test
     fun rejects_out_of_bounds_x() {
@@ -70,7 +72,7 @@ class TestOffsetMutAddShifted {
         val x = intArrayOf(1)
 
         assertFailsWith<IllegalArgumentException> {
-            setAdd(z, 0, x, 1, 1, x, 0, 1)
+            Karatsuba.setAdd(z, 0, x, 1, 1, x, 0, 1)
         }
     }
 
@@ -81,7 +83,7 @@ class TestOffsetMutAddShifted {
 
         assertFailsWith<IllegalArgumentException> {
             // z must have 2 limbs to handle overflow from 1 limb + 1 limb
-            setAdd(z, 0, x, 0, 1, x, 0, 1)
+            Karatsuba.setAdd(z, 0, x, 0, 1, x, 0, 1)
         }
     }
 
@@ -90,22 +92,22 @@ class TestOffsetMutAddShifted {
         val z = intArrayOf(99,5,-1, -1, 99)
         val x = intArrayOf(99,7, 99)
 
-        val len = mutAddShifted(z, 1, 1, x, 1, 1, 1)
+        val len = Karatsuba.mutAddShifted(z, 1, 1, x, 1, 1, 1)
 
         assertFailsWith<IllegalArgumentException> {
-            val len = mutAddShifted(z, -1, 1, x, 1, 1, 1)
+            val len = Karatsuba.mutAddShifted(z, -1, 1, x, 1, 1, 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            val len = mutAddShifted(z, 1, -1, x, 1, 1, 1)
+            val len = Karatsuba.mutAddShifted(z, 1, -1, x, 1, 1, 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            val len = mutAddShifted(z, 1, 1, x, -1, 1, 1)
+            val len = Karatsuba.mutAddShifted(z, 1, 1, x, -1, 1, 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            val len = mutAddShifted(z, 1, 1, x, 1, -1, 1)
+            val len = Karatsuba.mutAddShifted(z, 1, 1, x, 1, -1, 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            val len = mutAddShifted(z, 1, 1, x, 1, 1, -1)
+            val len = Karatsuba.mutAddShifted(z, 1, 1, x, 1, 1, -1)
         }
     }
 }

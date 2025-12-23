@@ -1,5 +1,6 @@
 package com.decimal128.bigint
-import com.decimal128.bigint.Karatsuba.setSub
+
+import com.decimal128.bigint.crypto.Karatsuba.setSub
 import kotlin.test.*
 
 class TestOffsetSetSub {

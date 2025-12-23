@@ -1,5 +1,5 @@
 package com.decimal128.bigint
-import com.decimal128.bigint.Karatsuba.setAdd
+import com.decimal128.bigint.crypto.Karatsuba.setAdd
 import kotlin.test.*
 
 class TestOffsetSetAdd {

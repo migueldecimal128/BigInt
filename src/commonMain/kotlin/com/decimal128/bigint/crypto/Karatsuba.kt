@@ -1,10 +1,7 @@
-// SPDX-License-Identifier: MIT
+package com.decimal128.bigint.crypto
 
-@file:Suppress("NOTHING_TO_INLINE")
-
-package com.decimal128.bigint
-
-import com.decimal128.bigint.Mago.isNormalized
+import com.decimal128.bigint.Magia
+import com.decimal128.bigint.Mago
 import kotlin.math.max
 import kotlin.math.min
 
@@ -35,7 +32,7 @@ object Karatsuba {
         t: Magia,
         minLimbThreshold: Int
     ): Int {
-        check (isNormalized(a, aOff, aNormLen))
+        check (Mago.isNormalized(a, aOff, aNormLen))
         val n = aNormLen
         val k0 = n / 2
         val k1 = n - k0
@@ -75,7 +72,7 @@ object Karatsuba {
         val z0z2Len = 2*k0 + z2Len
         val zNormLen = mutAddShifted(z, zOff, z0z2Len, z1, z1Off, z1Len, k0)
 
-        check (isNormalized(z, zOff, zNormLen))
+        check (Mago.isNormalized(z, zOff, zNormLen))
         return zNormLen
     }
 
@@ -84,7 +81,7 @@ object Karatsuba {
         a: Magia, aOff: Int, aNormLen: Int,
         t: Magia, tOff: Int
     ): Int {
-        check (isNormalized(a, aOff, aNormLen))
+        check (Mago.isNormalized(a, aOff, aNormLen))
         val n = aNormLen
         val k0 = n / 2
         val k1 = n - k0
@@ -122,7 +119,7 @@ object Karatsuba {
         val z0z2Len = 2*k0 + z2Len
         val zNormLen = mutAddShifted(z, zOff, z0z2Len, z1, z1Off, z1Len, k0)
 
-        check (isNormalized(z, zOff, zNormLen))
+        check (Mago.isNormalized(z, zOff, zNormLen))
         return zNormLen
     }
 
@@ -137,8 +134,8 @@ object Karatsuba {
     fun setAdd(z: Magia, zOff: Int,
                x: Magia, xOff: Int, xNormLen: Int,
                y: Magia, yOff: Int, yNormLen: Int): Int {
-        require (isNormalized(x, xOff, xNormLen))
-        require (isNormalized(y, yOff, yNormLen))
+        require (Mago.isNormalized(x, xOff, xNormLen))
+        require (Mago.isNormalized(y, yOff, yNormLen))
         if (xNormLen >= 0 && xOff >= 0 && xOff + xNormLen <= x.size &&
             yNormLen >= 0 && yOff >= 0 && yOff + yNormLen <= y.size) {
             val maxNormLen = max(xNormLen, yNormLen)
@@ -163,7 +160,7 @@ object Karatsuba {
                 val finalCarryOrZero = carry.toInt()
                 z[zOff + i] = finalCarryOrZero
                 val zNormLen = i + (-finalCarryOrZero ushr 31)
-                check (isNormalized(z, zOff, zNormLen))
+                check (Mago.isNormalized(z, zOff, zNormLen))
                 return zNormLen
             }
         }
@@ -175,8 +172,8 @@ object Karatsuba {
      */
     fun mutAddShifted(x: Magia, xOff: Int, xNormLen: Int,
                       y: Magia, yOff: Int, yNormLen: Int, yLimbShift: Int): Int {
-        require (isNormalized(x, xOff, xNormLen))
-        require (isNormalized(y, yOff, yNormLen))
+        require (Mago.isNormalized(x, xOff, xNormLen))
+        require (Mago.isNormalized(y, yOff, yNormLen))
         require (xNormLen >= 0 && xOff >= 0 && xOff + xNormLen <= x.size)
         require (yNormLen >= 0 && yOff >= 0 && yOff + yNormLen <= y.size)
         require (max(xNormLen, yNormLen + yLimbShift) + 1 <= x.size)
@@ -260,7 +257,7 @@ object Karatsuba {
                     }
                     if (borrow == 0uL) {
                         val zNormLen = lastNonZeroIndex + 1
-                        check(isNormalized(z, zOff, zNormLen))
+                        check(Mago.isNormalized(z, zOff, zNormLen))
                         return zNormLen
                     }
                 }
@@ -276,8 +273,8 @@ object Karatsuba {
         if (xOff >= 0 && xNormLen >= 0 && xOff + xNormLen <= x.size &&
             yOff >= 0 && yNormLen >= 0 && yOff + yNormLen <= y.size &&
             zOff >= 0 && zOff + xNormLen + yNormLen <= z.size) {
-            check (isNormalized(x, xOff, xNormLen))
-            check (isNormalized(y, yOff, yNormLen))
+            check (Mago.isNormalized(x, xOff, xNormLen))
+            check (Mago.isNormalized(y, yOff, yNormLen))
 
             if (xNormLen == 0 || yNormLen == 0)
                 return 0
@@ -302,7 +299,7 @@ object Karatsuba {
             val lastIndex = xNormLen + yNormLen - 1
             val zNormLen = lastIndex +
                     if (z[zOff + lastIndex] == 0) 0 else 1
-            check (isNormalized(z, zOff, zNormLen))
+            check (Mago.isNormalized(z, zOff, zNormLen))
             return zNormLen
         }
         throw IllegalArgumentException()
@@ -378,7 +375,7 @@ object Karatsuba {
         val lastIndex = 2 * xNormLen - 1
         val zNormLen = lastIndex +
                 if (z[zOff + lastIndex] == 0) 0 else 1
-        check (isNormalized(z, zOff, zNormLen))
+        check (Mago.isNormalized(z, zOff, zNormLen))
         return zNormLen
     }
 }

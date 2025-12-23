@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.Karatsuba.karatsubaSetSqr
+import com.decimal128.bigint.crypto.Karatsuba.karatsubaSetSqr
 import kotlin.test.*
 
 class TestKaratsubaSquare1 {
