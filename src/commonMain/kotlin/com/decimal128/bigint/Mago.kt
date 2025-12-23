@@ -538,6 +538,66 @@ internal object Mago {
     }
 
     /**
+     * @return the updated xNormLen
+     */
+    fun mutAddShifted(x: Magia, xOff: Int, xNormLen: Int,
+                      y: Magia, yOff: Int, yNormLen: Int, yLimbShift: Int): Int {
+        require (isNormalized(x, xOff, xNormLen))
+        require (isNormalized(y, yOff, yNormLen))
+        require (xNormLen >= 0 && xOff >= 0 && xOff + xNormLen <= x.size)
+        require (yNormLen >= 0 && yOff >= 0 && yOff + yNormLen <= y.size)
+        require (max(xNormLen, yNormLen + yLimbShift) + 1 <= x.size)
+        require (yLimbShift >= 0)
+
+        if (yNormLen == 0)
+            return xNormLen
+        val overlap = xNormLen - yLimbShift
+        if (overlap <= 0) {
+            // no overlap
+            x.fill(0, xOff + xNormLen, xOff + yLimbShift)
+            y.copyInto(x, xOff + yLimbShift, yOff, yOff + yNormLen)
+            val retNormLen = yLimbShift + yNormLen
+            // always write to max (xLen, yLimbShift + yLen)
+            // as though there were a carry out.
+            x[xOff + retNormLen] = 0
+            return retNormLen
+        }
+        val xOffShifted = xOff + (xNormLen - overlap)
+        val xLenShifted = overlap
+        var carry = 0uL
+        var i = 0
+        val minLen = min(xLenShifted, yNormLen)
+        while (i < minLen) {
+            val t = dw32(x[xOffShifted + i]) + dw32(y[yOff + i]) + carry
+            x[xOffShifted + i] = t.toInt()
+            carry = t shr 32
+            ++i
+        }
+        if (i < yNormLen) {
+            do {
+                val t = dw32(y[yOff + i]) + carry
+                x[xOffShifted + i] = t.toInt()
+                carry = t shr 32
+                ++i
+            } while (i < yNormLen)
+            val finalCarryOrZero = carry.toInt()
+            check (finalCarryOrZero == 1 || finalCarryOrZero == 0)
+            x[xOffShifted + yNormLen] = finalCarryOrZero
+            return yNormLen + yLimbShift + (-finalCarryOrZero ushr 31)
+        }
+        while (i < xLenShifted && carry != 0uL) {
+            val t = dw32(x[xOffShifted + i]) + carry
+            x[xOffShifted + i] = t.toInt()
+            carry = t shr 32
+            ++i
+        }
+        val finalCarryOrZero = carry.toInt()
+        check (xOffShifted + xLenShifted == xOff + xNormLen)
+        x[xOff + xNormLen] = finalCarryOrZero
+        return xNormLen + (-finalCarryOrZero ushr 31)
+    }
+
+    /**
      * Returns a new limb array representing [x] minus the unsigned 64-bit value [dw].
      * The caller must ensure that x >= y.
      *
