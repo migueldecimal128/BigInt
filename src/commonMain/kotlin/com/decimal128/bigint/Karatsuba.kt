@@ -9,7 +9,7 @@ object Karatsuba {
 
     private const val DEFAULT_KARATSUBA_SQR_THRESHOLD = 2
 
-    fun karatsubaSquare(
+    fun karatsubaSqr(
         z: Magia, zOff: Int,
         a: Magia, aOff: Int, aNormLen: Int,
         t: Magia, tOff: Int,
@@ -18,14 +18,65 @@ object Karatsuba {
         if (aNormLen < minLimbThreshold)
             return setSqr(z, zOff, a, aOff, aNormLen)
 
-        return karatsubaSquare1(
+        return karatsubaSqrRecurse(
             z, zOff,
             a, aOff, aNormLen,
-            t, tOff
+            t, tOff,
+            minLimbThreshold
         )
     }
 
-    fun karatsubaSquare1(
+    fun karatsubaSqrRecurse(
+        z: Magia, zOff: Int,
+        a: Magia, aOff: Int, aNormLen: Int,
+        t: Magia, tOff: Int,
+        minLimbThreshold: Int
+    ): Int {
+        check (isNormalized(a, aOff, aNormLen))
+        val n = aNormLen
+        val k0 = n / 2
+        val k1 = n - k0
+        require (aNormLen >= 2)
+        require (zOff >= 0 && z.size >= zOff + 2*n)
+        require (tOff >= 0 && t.size >= tOff + (3*k1 + 3))
+
+        val a0 = a
+        val a0Off = aOff
+        val a0Len = k0
+
+        val a1 = a
+        val a1Off = a0Off + a0Len
+        val a1Len = k1
+
+        val z0Off = zOff
+        val z0Len = karatsubaSqr(z, z0Off,
+            a0, a0Off, a0Len, t, tOff, minLimbThreshold)
+
+        val z2Off = zOff + 2*k0
+        val z2Len = karatsubaSqr(z, z2Off,
+            a1, a1Off, a1Len, t, tOff, minLimbThreshold)
+
+        val s = t
+        val sOff = tOff
+        val sLen = setAdd(s, sOff, a0, aOff, a0Len, a1, a1Off, a1Len)
+
+        val s2 = t
+        val s2Off = sOff + a1Len + 1
+        val s2Len = setSqr(s2, s2Off, s, sOff, sLen)
+
+        val z1 = s2
+        val z1Off = s2Off
+        var z1Len = setSub(z1, z1Off, s2, s2Off, s2Len, z, z0Off, z0Len)
+        z1Len = setSub(z1, z1Off, z1, z1Off, z1Len, z, z2Off, z2Len)
+
+        val z0z2Len = 2*k0 + z2Len
+        val zNormLen = Mago.mutAddShifted(z, zOff, z0z2Len, z1, z1Off, z1Len, k0)
+
+        check (isNormalized(z, zOff, zNormLen))
+        return zNormLen
+    }
+
+    fun karatsubaSqr1(
         z: Magia, zOff: Int,
         a: Magia, aOff: Int, aNormLen: Int,
         t: Magia, tOff: Int
