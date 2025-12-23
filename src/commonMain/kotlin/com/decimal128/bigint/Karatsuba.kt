@@ -16,6 +16,7 @@ object Karatsuba {
         val n = aNormLen
         val k0 = n / 2
         val k1 = n - k0
+        require (aNormLen >= 2)
         require (zOff >= 0 && z.size >= zOff + 2*n)
         require (tOff >= 0 && t.size >= tOff + (3*k1 + 3))
 
@@ -46,7 +47,8 @@ object Karatsuba {
         var z1Len = setSub(z1, z1Off, s2, s2Off, s2Len, z, z0Off, z0Len)
         z1Len = setSub(z1, z1Off, z1, z1Off, z1Len, z, z2Off, z2Len)
 
-        val zNormLen = Mago.mutAddShifted(z, zOff, 2*n, z1, z1Off, z1Len, k0)
+        val z0z2Len = 2*k0 + z2Len
+        val zNormLen = Mago.mutAddShifted(z, zOff, z0z2Len, z1, z1Off, z1Len, k0)
 
         check (isNormalized(z, zOff, zNormLen))
         return zNormLen
