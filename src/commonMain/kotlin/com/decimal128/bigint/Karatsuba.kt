@@ -1,27 +1,28 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.Mago.isNormalized
+import com.decimal128.bigint.Mago.mutAddShifted
 import com.decimal128.bigint.Mago.setAdd
-import com.decimal128.bigint.Mago.setSqr
+import com.decimal128.bigint.Mago.schoolbookSetSqr
 import com.decimal128.bigint.Mago.setSub
 
 object Karatsuba {
 
     private const val DEFAULT_KARATSUBA_SQR_THRESHOLD = 2
 
-    fun karatsubaSqr(
+    fun karatsubaSetSqr(
         z: Magia, zOff: Int,
         a: Magia, aOff: Int, aNormLen: Int,
-        t: Magia, tOff: Int,
+        t: Magia,
         minLimbThreshold: Int = DEFAULT_KARATSUBA_SQR_THRESHOLD
     ): Int {
         if (aNormLen < minLimbThreshold)
-            return setSqr(z, zOff, a, aOff, aNormLen)
+            return schoolbookSetSqr(z, zOff, a, aOff, aNormLen)
 
         return karatsubaSqrRecurse(
             z, zOff,
             a, aOff, aNormLen,
-            t, tOff,
+            t,
             minLimbThreshold
         )
     }
@@ -29,7 +30,7 @@ object Karatsuba {
     fun karatsubaSqrRecurse(
         z: Magia, zOff: Int,
         a: Magia, aOff: Int, aNormLen: Int,
-        t: Magia, tOff: Int,
+        t: Magia,
         minLimbThreshold: Int
     ): Int {
         check (isNormalized(a, aOff, aNormLen))
@@ -38,7 +39,7 @@ object Karatsuba {
         val k1 = n - k0
         require (aNormLen >= 2)
         require (zOff >= 0 && z.size >= zOff + 2*n)
-        require (tOff >= 0 && t.size >= tOff + (3*k1 + 3))
+        require (t.size >= (3*k1 + 3))
 
         val a0 = a
         val a0Off = aOff
@@ -49,20 +50,20 @@ object Karatsuba {
         val a1Len = k1
 
         val z0Off = zOff
-        val z0Len = karatsubaSqr(z, z0Off,
-            a0, a0Off, a0Len, t, tOff, minLimbThreshold)
+        val z0Len = karatsubaSetSqr(z, z0Off,
+            a0, a0Off, a0Len, t, minLimbThreshold)
 
         val z2Off = zOff + 2*k0
-        val z2Len = karatsubaSqr(z, z2Off,
-            a1, a1Off, a1Len, t, tOff, minLimbThreshold)
+        val z2Len = karatsubaSetSqr(z, z2Off,
+            a1, a1Off, a1Len, t, minLimbThreshold)
 
         val s = t
-        val sOff = tOff
+        val sOff = 0
         val sLen = setAdd(s, sOff, a0, aOff, a0Len, a1, a1Off, a1Len)
 
         val s2 = t
         val s2Off = sOff + a1Len + 1
-        val s2Len = setSqr(s2, s2Off, s, sOff, sLen)
+        val s2Len = schoolbookSetSqr(s2, s2Off, s, sOff, sLen)
 
         val z1 = s2
         val z1Off = s2Off
@@ -70,7 +71,7 @@ object Karatsuba {
         z1Len = setSub(z1, z1Off, z1, z1Off, z1Len, z, z2Off, z2Len)
 
         val z0z2Len = 2*k0 + z2Len
-        val zNormLen = Mago.mutAddShifted(z, zOff, z0z2Len, z1, z1Off, z1Len, k0)
+        val zNormLen = mutAddShifted(z, zOff, z0z2Len, z1, z1Off, z1Len, k0)
 
         check (isNormalized(z, zOff, zNormLen))
         return zNormLen
@@ -98,10 +99,10 @@ object Karatsuba {
         val a1Len = k1
 
         val z0Off = zOff
-        val z0Len = setSqr(z, z0Off, a0, a0Off, a0Len)
+        val z0Len = schoolbookSetSqr(z, z0Off, a0, a0Off, a0Len)
 
         val z2Off = zOff + 2*k0
-        val z2Len = setSqr(z, z2Off, a1, a1Off, a1Len)
+        val z2Len = schoolbookSetSqr(z, z2Off, a1, a1Off, a1Len)
 
         val s = t
         val sOff = tOff
@@ -109,7 +110,7 @@ object Karatsuba {
 
         val s2 = t
         val s2Off = sOff + a1Len + 1
-        val s2Len = setSqr(s2, s2Off, s, sOff, sLen)
+        val s2Len = schoolbookSetSqr(s2, s2Off, s, sOff, sLen)
 
         val z1 = s2
         val z1Off = s2Off
@@ -117,7 +118,7 @@ object Karatsuba {
         z1Len = setSub(z1, z1Off, z1, z1Off, z1Len, z, z2Off, z2Len)
 
         val z0z2Len = 2*k0 + z2Len
-        val zNormLen = Mago.mutAddShifted(z, zOff, z0z2Len, z1, z1Off, z1Len, k0)
+        val zNormLen = mutAddShifted(z, zOff, z0z2Len, z1, z1Off, z1Len, k0)
 
         check (isNormalized(z, zOff, zNormLen))
         return zNormLen

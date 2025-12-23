@@ -1129,7 +1129,7 @@ internal object Mago {
             return ZERO
         val sqrBitLen = 2 * bitLen
         val z = newWithBitLen(sqrBitLen)
-        val zNormLen = setSqr(z, x, xNormLen)
+        val zNormLen = schoolbookSetSqr(z, x, xNormLen)
         check (isNormalized(z, zNormLen))
         return z
     }
@@ -1142,9 +1142,9 @@ internal object Mago {
      *
      * @return the normalized limb length of the result.
      */
-    fun setSqr(z: Magia, x: Magia, xNormLen: Int) : Int {
+    fun schoolbookSetSqr(z: Magia, x: Magia, xNormLen: Int) : Int {
         if (TEST_OFFSET_ARITHMETIC && z.size >= 2 * xNormLen)
-            return setSqr(z, 0, x, 0, xNormLen)
+            return schoolbookSetSqr(z, 0, x, 0, xNormLen)
         if (xNormLen > 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
             if (z.size >= 2 * xNormLen - 1) {
@@ -1218,7 +1218,7 @@ internal object Mago {
         throw IllegalArgumentException()
     }
 
-    fun setSqr(z: Magia, zOff: Int, x: Magia, xOff: Int, xNormLen: Int) : Int {
+    fun schoolbookSetSqr(z: Magia, zOff: Int, x: Magia, xOff: Int, xNormLen: Int) : Int {
         val zMaxLen = 2 * xNormLen
         require (xOff >= 0)
         require (xOff + xNormLen <= x.size)

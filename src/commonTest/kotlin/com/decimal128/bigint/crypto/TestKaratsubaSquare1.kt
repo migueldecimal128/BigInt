@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.Karatsuba.karatsubaSqr
+import com.decimal128.bigint.Karatsuba.karatsubaSetSqr
 import kotlin.test.*
 
 class TestKaratsubaSquare1 {
@@ -15,10 +15,10 @@ class TestKaratsubaSquare1 {
         val k1 = n - k0
         val t = IntArray(3 * k1 + 3)
 
-        val zLen = karatsubaSqr(
+        val zLen = karatsubaSetSqr(
             z, 0,
             a.magia, 0, n,
-            t, 0,
+            t,
             2
         )
 

@@ -875,7 +875,7 @@ class MutableBigInt private constructor (
                 ensureTmp1CapacityZeroed(xNormLen + xNormLen)
                 _meta = Meta(
                     0,
-                    Mago.setSqr(tmp1, x, xNormLen)
+                    Mago.schoolbookSetSqr(tmp1, x, xNormLen)
                 )
                 swapTmp1()
                 this
@@ -1344,7 +1344,7 @@ class MutableBigInt private constructor (
      */
     fun addSquareOf(bi: BigIntNumber) {
         ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
-        val normLenSqr = Mago.setSqr(tmp1, bi.magia, bi.meta.normLen)
+        val normLenSqr = Mago.schoolbookSetSqr(tmp1, bi.magia, bi.meta.normLen)
         setAddImpl(this, Meta(0, normLenSqr), tmp1)
         validate()
     }

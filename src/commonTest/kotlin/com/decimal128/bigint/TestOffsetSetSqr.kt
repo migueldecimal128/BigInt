@@ -9,7 +9,7 @@ class TestOffsetSetSqr {
         val x = IntArray(2)
         val y = IntArray(2)
 
-        val len = Mago.setSqr(z, 1, x, 1, 0)
+        val len = Mago.schoolbookSetSqr(z, 1, x, 1, 0)
 
         assertEquals(0, len, "zero normalized length")
     }
@@ -19,7 +19,7 @@ class TestOffsetSetSqr {
         val z = intArrayOf(99,-1,-1, 99)
         val x = intArrayOf(99, 5, 99)
 
-        val len = Mago.setSqr(z, 1, x, 1, 1)
+        val len = Mago.schoolbookSetSqr(z, 1, x, 1, 1)
 
         assertEquals(1, len)
         assertEquals(25, z[1])
@@ -31,7 +31,7 @@ class TestOffsetSetSqr {
         val z = intArrayOf(99,99,99,-1,-1,99,99,99)
         val x = intArrayOf(99,99,0x2000_0000,99,99) // 0xFFFFFFFF
 
-        val len = Mago.setSqr(z, 3, x, 2, 1)
+        val len = Mago.schoolbookSetSqr(z, 3, x, 2, 1)
 
         // 0xffffffff + 1 = 1_0000_0000 => limb=0, carry=1 => normalized length = 2
         assertEquals(2, len)
@@ -45,7 +45,7 @@ class TestOffsetSetSqr {
         val x = intArrayOf(1)
 
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSqr(z, 0, x, 1, 1)
+            Mago.schoolbookSetSqr(z, 0, x, 1, 1)
         }
     }
 
@@ -56,7 +56,7 @@ class TestOffsetSetSqr {
 
         assertFailsWith<IllegalArgumentException> {
             // z must have 2 limbs for (1 limb)**2
-            Mago.setSqr(z, 0, x, 0, 1)
+            Mago.schoolbookSetSqr(z, 0, x, 0, 1)
         }
     }
 
@@ -66,13 +66,13 @@ class TestOffsetSetSqr {
         val x = intArrayOf(1)
 
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSqr(z, -1, x, 0, 1)
+            Mago.schoolbookSetSqr(z, -1, x, 0, 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSqr(z, 0, x, -1, 0)
+            Mago.schoolbookSetSqr(z, 0, x, -1, 0)
         }
         assertFailsWith<IllegalArgumentException> {
-            Mago.setSqr(z, 0, x, 0, -1)
+            Mago.schoolbookSetSqr(z, 0, x, 0, -1)
         }
     }
 }
