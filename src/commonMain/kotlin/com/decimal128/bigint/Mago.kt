@@ -976,9 +976,17 @@ internal object Mago {
      * @throws IllegalArgumentException if preconditions on array sizes or lengths are violated.
      */
     fun setMul(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-        if (xNormLen > 0 && xNormLen <= x.size && yNormLen > 0 && yNormLen <= y.size && z.size >= xNormLen + yNormLen - 1) {
+        if (TEST_OFFSET_ARITHMETIC && z.size >= xNormLen + yNormLen)
+            return setMul(z, 0, x, 0, xNormLen, y, 0, yNormLen)
+        if (xNormLen >= 0 && xNormLen <= x.size &&
+            yNormLen >= 0 && yNormLen <= y.size &&
+            z.size >= xNormLen + yNormLen - 1) {
             check (isNormalized(x, xNormLen))
             check (isNormalized(y, yNormLen))
+
+            if (xNormLen == 0 || yNormLen == 0)
+                return 0
+
             val corto = if (xNormLen < yNormLen) x else y
             val largo = if (xNormLen < yNormLen) y else x
             val cortoLen = if (xNormLen < yNormLen) xNormLen else yNormLen
@@ -1008,11 +1016,46 @@ internal object Mago {
             val zNormLen = lastIndex + 1
             check (isNormalized(z, zNormLen))
             return zNormLen
-        } else if (xNormLen == 0 || yNormLen == 0) {
-            return 0
-        } else {
-            throw IllegalArgumentException()
         }
+        throw IllegalArgumentException()
+    }
+
+    fun setMul(z: Magia, zOff: Int,
+               x: Magia, xOff: Int, xNormLen: Int,
+               y: Magia, yOff: Int, yNormLen: Int): Int {
+        if (xOff >= 0 && xNormLen >= 0 && xOff + xNormLen <= x.size &&
+            yOff >= 0 && yNormLen >= 0 && yOff + yNormLen <= y.size &&
+            zOff >= 0 && zOff + xNormLen + yNormLen <= z.size) {
+            check (isNormalized(x, xOff, xNormLen))
+            check (isNormalized(y, yOff, yNormLen))
+
+            if (xNormLen == 0 || yNormLen == 0)
+                return 0
+
+            // karatsuba produces balanced operands,
+            // so no need to check/swap longer/shorter
+
+            // zero out the minimum amount needed
+            // higher limbs will be written before read
+            z.fill(0, zOff, zOff + yNormLen)
+            for (i in 0..<xNormLen) {
+                val xLimb = dw32(x[xOff + i])
+                var carry = 0uL
+                for (j in 0..<yNormLen) {
+                    val yLimb = dw32(y[yOff + j])
+                    val t = xLimb * yLimb + dw32(z[zOff + i + j]) + carry
+                    z[zOff + i + j] = t.toInt()
+                    carry = t shr 32
+                }
+                z[zOff + i + yNormLen] = carry.toInt()
+            }
+            val lastIndex = xNormLen + yNormLen - 1
+            val zNormLen = lastIndex +
+                    if (z[zOff + lastIndex] == 0) 0 else 1
+            check (isNormalized(z, zOff, zNormLen))
+            return zNormLen
+        }
+        throw IllegalArgumentException()
     }
 
     /**
