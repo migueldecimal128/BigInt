@@ -1057,9 +1057,8 @@ internal object Mago {
     fun setSqrComba(z: IntArray, a: IntArray, n: Int): Int {
         require (z.size >= 2 * n)
         require (z !== a)
-        var c0: Long = 0
-        var c1: Long = 0
-        var c2: Long = 0
+        var c0: Long = 0 // holds 32 bits
+        var c1: Long = 0 // holds 64 bits ... all carries
         val MASK32 = 0xFFFFFFFFL
 
         for (k in 0 until (2 * n - 1)) {
@@ -1081,8 +1080,6 @@ internal object Mago {
                     c0 += low
                     c1 += high + (c0 ushr 32)
                     c0 = c0 and MASK32
-                    c2 += (c1 ushr 32)
-                    c1 = c1 and MASK32
                 }
             }
 
@@ -1096,20 +1093,18 @@ internal object Mago {
                     c0 += sq and MASK32
                     c1 += (sq ushr 32) + (c0 ushr 32)
                     c0 = c0 and MASK32
-                    c2 += (c1 ushr 32)
-                    c1 = c1 and MASK32
                 }
             }
 
             // 3. Write limb k and slide the window
             z[k] = c0.toInt()
-            c0 = c1
-            c1 = c2
-            c2 = 0
+            c0 = c1 and MASK32
+            c1 = c1 ushr 32
         }
 
         // Final limb
         z[2 * n - 1] = c0.toInt()
+        check (c1 == 0L)
 
         // Normalization
         var zLen = 2 * n
