@@ -77,6 +77,7 @@ internal object Mago {
     private inline fun bitLen(n: Int) = 32 - n.countLeadingZeroBits()
 
     private const val MASK32 = 0xFFFF_FFFFuL
+    private const val MASK32L = 0xFFFF_FFFFL
 
     /**
      * The one true zero-length array that is usually used to represent
@@ -972,12 +973,13 @@ internal object Mago {
     fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
         val v = IntArray(z.size)
         val vNormLen = setSqrComba(v, x, xNormLen)
+        val w = IntArray(z.size)
+        val wNormLen = setSqrCombaSplit(w, x, xNormLen)
         val zNormLen = setSqrSchoolbook(z, x, xNormLen)
-        check (vNormLen == zNormLen)
-        for (i in 0..<vNormLen) {
-            if (z[i] != v[i])
-                throw IllegalStateException()
-        }
+
+        check (EQ(z, zNormLen, v, vNormLen))
+        check (EQ(z, zNormLen, w, wNormLen))
+
         return zNormLen
     }
 
@@ -1047,6 +1049,7 @@ internal object Mago {
                 }
             }
         }
+        // normalization
         val lastIndex = 2 * xNormLen - 1
         val zNormLen = lastIndex +
                 if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
@@ -1059,7 +1062,6 @@ internal object Mago {
         require (z !== a)
         var c0: Long = 0 // holds 32 bits
         var c1: Long = 0 // holds 64 bits ... all carries
-        val MASK32 = 0xFFFFFFFFL
 
         for (k in 0 until (2 * n - 1)) {
             val start = maxOf(0, k - (n - 1))
@@ -1070,16 +1072,16 @@ internal object Mago {
                 for (i in start..end) {
                     val j = k - i
                     // Standard 32x32 -> 64-bit product
-                    val prod = (a[i].toLong() and MASK32) * (a[j].toLong() and MASK32)
+                    val prod = (a[i].toLong() and MASK32L) * (a[j].toLong() and MASK32L)
 
                     // Double the product BEFORE adding it to the accumulator.
                     // This prevents the 'carry-shift' bug found in earlier attempts.
-                    val low = (prod shl 1) and MASK32
+                    val low = (prod shl 1) and MASK32L
                     val high = (prod ushr 31) // This captures the carry of (prod * 2)
 
                     c0 += low
                     c1 += high + (c0 ushr 32)
-                    c0 = c0 and MASK32
+                    c0 = c0 and MASK32L
                 }
             }
 
@@ -1087,18 +1089,18 @@ internal object Mago {
             if ((k and 1) == 0) {
                 val i = k ushr 1
                 if (i < n) {
-                    val ai = a[i].toLong() and MASK32
+                    val ai = a[i].toLong() and MASK32L
                     val sq = ai * ai
 
-                    c0 += sq and MASK32
+                    c0 += sq and MASK32L
                     c1 += (sq ushr 32) + (c0 ushr 32)
-                    c0 = c0 and MASK32
+                    c0 = c0 and MASK32L
                 }
             }
 
             // 3. Write limb k and slide the window
             z[k] = c0.toInt()
-            c0 = c1 and MASK32
+            c0 = c1 and MASK32L
             c1 = c1 ushr 32
         }
 
@@ -1106,10 +1108,99 @@ internal object Mago {
         z[2 * n - 1] = c0.toInt()
         check (c1 == 0L)
 
-        // Normalization
-        var zLen = 2 * n
-        while (zLen > 0 && z[zLen - 1] == 0) zLen--
-        return zLen
+        // normalization
+        val lastIndex = 2 * n - 1
+        val zNormLen = lastIndex +
+                if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
+        check (isNormalized(z, zNormLen))
+        return zNormLen
+    }
+
+    /**
+     * Comba squaring with split diagonal:
+     *  - Phase 1: off-diagonals only (2*a[i]*a[j]), i < j
+     *  - Phase 2: diagonals only (a[i]^2) added to column 2*i
+     *
+     * Accumulators:
+     *  - c0: current column low 32
+     *  - c1: carry stream (full 64), peeled by slide
+     */
+    fun setSqrCombaSplit(z: IntArray, a: IntArray, n: Int): Int {
+        require(z.size >= 2 * n)
+        require(z !== a)
+
+        // ---------- Phase 1: off-diagonals ----------
+        var c0 = 0L
+        var c1 = 0L
+
+        for (k in 0 until (2 * n - 1)) {
+            val start = maxOf(0, k - (n - 1))
+            val end   = minOf(n - 1, (k - 1) ushr 1)
+
+            if (k > 0 && start <= end) {
+                var i = start
+                while (i <= end) {
+                    val j = k - i
+                    val prod =
+                        (a[i].toLong() and MASK32L) *
+                                (a[j].toLong() and MASK32L)
+
+                    // add 2*prod
+                    c0 += (prod shl 1) and MASK32L
+                    c1 += (prod ushr 31) + (c0 ushr 32)
+                    c0 = c0 and MASK32L
+
+                    i++
+                }
+            }
+
+            // write column k (without diagonal)
+            z[k] = c0.toInt()
+
+            // slide: peel next carry limb
+            val t = c1
+            c0 = t and MASK32L
+            c1 = t ushr 32
+        }
+
+        // last limb from off-diagonals
+        z[2 * n - 1] = c0.toInt()
+        check(c1 == 0L)
+
+        // ---------- Phase 2: diagonals ----------
+        // add a[i]^2 into column 2*i
+        for (i in 0 until n) {
+            val ai = a[i].toLong() and MASK32L
+            val sq = ai * ai
+            val k = 2 * i
+
+            // add low 32
+            var t = (z[k].toLong() and MASK32L) + (sq and MASK32L)
+            z[k] = t.toInt()
+            var carry = t ushr 32
+
+            // add high 32 + carry
+            t = (z[k + 1].toLong() and MASK32L) + (sq ushr 32) + carry
+            z[k + 1] = t.toInt()
+            carry = t ushr 32
+
+            // ripple (rare; but correct)
+            var kk = k + 2
+            while (carry != 0L) {
+                if (kk >= z.size) throw ArithmeticException("mul overflow")
+                t = (z[kk].toLong() and MASK32L) + carry
+                z[kk] = t.toInt()
+                carry = t ushr 32
+                kk++
+            }
+        }
+
+        // normalization
+        val lastIndex = 2 * n - 1
+        val zNormLen = lastIndex +
+                if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
+        check (isNormalized(z, zNormLen))
+        return zNormLen
     }
 
     /**
