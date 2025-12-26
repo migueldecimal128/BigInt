@@ -954,13 +954,8 @@ internal object Mago {
      */
     fun newSqr(x: Magia, xNormLen: Int): Magia {
         check (isNormalized(x, xNormLen))
-        val bitLen = bitLen(x, xNormLen)
-        if (bitLen == 0)
-            return ZERO
-        val sqrBitLen = 2 * bitLen
-        val z = newWithBitLen(sqrBitLen)
+        val z = IntArray(2 * xNormLen)
         val zNormLen = setSqr(z, x, xNormLen)
-        check (isNormalized(z, zNormLen))
         return z
     }
 
@@ -968,91 +963,18 @@ internal object Mago {
      * Squares the first [xLen] limbs of [x], storing the result in [z].
      *
      * Requirements:
-     * - [z.size] must be sufficient to hold the squared result (2 * [xLen] or 2 * [xLen] - 1 limbs).
+     * - [z.size] must be 2 * [xLen] ... allows higher performance
+     *   at very low cost
      *
      * @return the normalized limb length of the result.
      */
-    fun setSqrX(z: Magia, x: Magia, xNormLen: Int) : Int {
-        if (xNormLen > 0 && xNormLen <= x.size) {
-            check (isNormalized(x, xNormLen))
-            if (z.size >= 2 * xNormLen - 1) {
-                z.fill(0, 0, min(z.size, 2 * xNormLen))
-
-                // 1) Cross terms: for i<j, add (x[i]*x[j]) twice into p[i+j]
-                // these terms are doubled
-                for (i in 0..<xNormLen) {
-                    val xi = dw32(x[i])
-                    var carry = 0uL
-                    var j = i + 1
-                    var k = i + i + 1
-                    while (j < xNormLen) {
-                        val prod = xi * dw32(x[j])        // 32x32 -> 64
-                        // add once
-                        val t1 = prod + dw32(z[k]) + carry
-                        val p1 = t1 and MASK32
-                        carry = t1 shr 32
-                        // add second time (doubling) — avoids (prod << 1) overflow
-                        val t2 = prod + p1
-                        z[k] = t2.toInt()
-                        carry += t2 shr 32
-                        ++j
-                        ++k
-                    }
-                    // flush carry to the next limb(s)
-                    if (carry != 0uL) {
-                        val t = dw32(z[k]) + carry
-                        z[k] = t.toInt()
-                        carry = t shr 32
-                        if (carry != 0uL)
-                            ++z[k + 1]
-                    }
-                }
-
-                // 2) Diagonals: add x[i]**2 into columns 2*i and 2*i+1
-                // terms on the diagonal are not doubled
-                for (i in 0..<xNormLen) {
-                    val sq = dw32(x[i]) * dw32(x[i])
-                    // add low 32 to p[2*i]
-                    var t = dw32(z[2 * i]) + (sq and MASK32)
-                    z[2 * i] = t.toInt()
-                    var carry = t shr 32
-                    // add high 32 (and carry) to p[2*i+1]
-                    val s = (sq shr 32) + carry
-                    if (s != 0uL) {
-                        t = dw32(z[2 * i + 1]) + s
-                        z[2 * i + 1] = t.toInt()
-                        carry = t shr 32
-                        // propagate any remaining carry
-                        var k = 2 * i + 2
-                        while (carry != 0uL) {
-                            if (k >= z.size)
-                                throw IllegalArgumentException(ERR_MSG_MUL_OVERFLOW)
-                            t = dw32(z[k]) + carry
-                            z[k] = t.toInt()
-                            carry = t shr 32
-                            k++
-                        }
-                    }
-                }
-                val lastIndex = 2 * xNormLen - 1
-                val zNormLen = lastIndex +
-                        if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
-                check (isNormalized(z, zNormLen))
-                return zNormLen
-            }
-        } else if (xNormLen == 0) {
-            return 0
-        }
-        throw IllegalArgumentException()
-    }
-
-    fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
+     fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
         require(xNormLen >= 0 && xNormLen <= x.size)
-        require(2 * xNormLen - 1 <= z.size)
+        require(2 * xNormLen <= z.size)
         if (xNormLen == 0)
             return 0
-
-        z.fill(0, 0, min(z.size, 2 * xNormLen))
+        val zLen = 2 * xNormLen
+        z.fill(0, 0, zLen)
         // 1) Cross terms: for i<j, add 2*a[i]*a[j] into column (i+j)
         for (i in 0 until xNormLen) {
             val ai = dw32(x[i])
