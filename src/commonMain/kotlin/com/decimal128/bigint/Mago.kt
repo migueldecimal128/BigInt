@@ -968,7 +968,20 @@ internal object Mago {
      *
      * @return the normalized limb length of the result.
      */
-     fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
+
+    fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
+        val v = IntArray(z.size)
+        val vNormLen = setSqrComba(v, x, xNormLen)
+        val zNormLen = setSqrSchoolbook(z, x, xNormLen)
+        check (vNormLen == zNormLen)
+        for (i in 0..<vNormLen) {
+            if (z[i] != v[i])
+                throw IllegalStateException()
+        }
+        return zNormLen
+    }
+
+    fun setSqrSchoolbook(z: Magia, x: Magia, xNormLen: Int): Int {
         require(xNormLen >= 0 && xNormLen <= x.size)
         require(2 * xNormLen <= z.size)
         if (xNormLen == 0)
@@ -1041,6 +1054,68 @@ internal object Mago {
         return zNormLen
     }
 
+    fun setSqrComba(z: IntArray, a: IntArray, n: Int): Int {
+        require (z.size >= 2 * n)
+        require (z !== a)
+        var c0: Long = 0
+        var c1: Long = 0
+        var c2: Long = 0
+        val MASK32 = 0xFFFFFFFFL
+
+        for (k in 0 until (2 * n - 1)) {
+            val start = maxOf(0, k - (n - 1))
+            val end   = minOf(n - 1, (k - 1) ushr 1)
+
+            // 1. Off-diagonals (i < j)
+            if (k > 0 && start <= end) {
+                for (i in start..end) {
+                    val j = k - i
+                    // Standard 32x32 -> 64-bit product
+                    val prod = (a[i].toLong() and MASK32) * (a[j].toLong() and MASK32)
+
+                    // Double the product BEFORE adding it to the accumulator.
+                    // This prevents the 'carry-shift' bug found in earlier attempts.
+                    val low = (prod shl 1) and MASK32
+                    val high = (prod ushr 31) // This captures the carry of (prod * 2)
+
+                    c0 += low
+                    c1 += high + (c0 ushr 32)
+                    c0 = c0 and MASK32
+                    c2 += (c1 ushr 32)
+                    c1 = c1 and MASK32
+                }
+            }
+
+            // 2. Pure Square (Diagonal term where i == j)
+            if ((k and 1) == 0) {
+                val i = k ushr 1
+                if (i < n) {
+                    val ai = a[i].toLong() and MASK32
+                    val sq = ai * ai
+
+                    c0 += sq and MASK32
+                    c1 += (sq ushr 32) + (c0 ushr 32)
+                    c0 = c0 and MASK32
+                    c2 += (c1 ushr 32)
+                    c1 = c1 and MASK32
+                }
+            }
+
+            // 3. Write limb k and slide the window
+            z[k] = c0.toInt()
+            c0 = c1
+            c1 = c2
+            c2 = 0
+        }
+
+        // Final limb
+        z[2 * n - 1] = c0.toInt()
+
+        // Normalization
+        var zLen = 2 * n
+        while (zLen > 0 && z[zLen - 1] == 0) zLen--
+        return zLen
+    }
 
     /**
      * Returns a new [Magia] representing [x] logically shifted right by [bitCount] bits.

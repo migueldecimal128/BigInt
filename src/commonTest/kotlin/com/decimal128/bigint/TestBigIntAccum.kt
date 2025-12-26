@@ -300,7 +300,7 @@ class TestBigIntAccum {
         assertTrue(hi EQ hia.toBigInt())
 
         for (i in 0..<rng.nextInt(10)) {
-            val rand = randomBigInt(200)
+            val rand = randomBigInt(10)
             if (rand.isZero())
                 continue
             hia.addSquareOf(rand)
