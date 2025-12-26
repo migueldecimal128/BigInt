@@ -816,7 +816,15 @@ class BigInt private constructor(
             throw IllegalArgumentException()
         }
 
-        /**
+        fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray,
+                                     off: Int, len: Int): BigInt {
+            require (off >= 0 && len >= 0 && off + len <= littleEndianIntArray.size)
+            return fromNonNormalizedOrZero(false,
+                littleEndianIntArray.copyOfRange(off, off+len))
+        }
+
+
+            /**
          * Constructs a positive BigInt with a single bit turned on at the zero-based bitIndex.
          *
          * The returned BigInt value will be 2**bitIndex

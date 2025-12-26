@@ -106,7 +106,7 @@ class TestBarrettVsMontgomery {
         val outBarr = MutableBigInt()
 
         // Warm up to trigger inlining & allocation flattening
-        repeat(5000) {
+        repeat(1) {
             ctxMont.modPow(a, e, outMont)
             ctxBarr.modPow(a, e, outBarr)
         }
@@ -126,8 +126,8 @@ class TestBarrettVsMontgomery {
         assertEquals(ref, outMont.toBigInt(), "Montgomery correctness")
 
         // Benchmark Montgomery
-        val montTimes = LongArray(10)
-        repeat(10) { i ->
+        val montTimes = LongArray(15)
+        repeat(montTimes.size) { i ->
             montTimes[i] = measureNano {
                 ctxMont.modPow(a, e, outMont)
             }
@@ -135,8 +135,8 @@ class TestBarrettVsMontgomery {
         val montMedian = montTimes.sorted()[montTimes.size / 2]
 
         // Benchmark Barrett
-        val barrTimes = LongArray(10)
-        repeat(10) { i ->
+        val barrTimes = LongArray(15)
+        repeat(barrTimes.size) { i ->
             barrTimes[i] = measureNano {
                 ctxBarr.modPow(a, e, outBarr)
             }
@@ -214,5 +214,67 @@ class TestBarrettVsMontgomery {
         println("ratio Barrett/Mont = $rounded")
     }
 
+    @Test
+    fun compareBarrettVsMontgomery_modPow_X() {
+        val bitLen = 64
+
+        // 2048-bit odd modulus (Montgomery eligible)
+        val m = BigInt.randomWithBitLen(bitLen, ensureOdd = true)
+
+        // Engines
+        val ctxMont = ModContext(m, useBarrettOnly = false)
+        val ctxBarr = ModContext(m, useBarrettOnly = true)
+
+        // Base < m
+        val a = BigInt.randomBelow(m)
+
+        val e = BigInt.randomWithMaxBitLen(bitLen-1)
+
+        val outMont = MutableBigInt()
+        val outBarr = MutableBigInt()
+
+        // Warm up to trigger inlining & allocation flattening
+        // repeat(5000) {
+        repeat(1) {
+            ctxMont.modPow(a, e, outMont)
+            ctxBarr.modPow(a, e, outBarr)
+        }
+        assertEquals(outMont, outBarr)
+
+        // Compute reference using your existing int-exponent operator(s)
+        // i.e., (a^e) % m computed naïvely through BigInt mul
+        val ref = modPowRef(a, e, m)
+
+        // Correctness check
+        ctxMont.modPow(a, e, outMont)
+        ctxBarr.modPow(a, e, outBarr)
+        assertEquals(ref, outBarr.toBigInt(), "Barrett correctness")
+        assertEquals(ref, outMont.toBigInt(), "Montgomery correctness")
+
+        // Benchmark Montgomery
+        val montTimes = LongArray(10)
+        repeat(10) { i ->
+            montTimes[i] = measureNano {
+                ctxMont.modPow(a, e, outMont)
+            }
+        }
+        val montMedian = montTimes.sorted()[montTimes.size / 2]
+
+        // Benchmark Barrett
+        val barrTimes = LongArray(10)
+        repeat(10) { i ->
+            barrTimes[i] = measureNano {
+                ctxBarr.modPow(a, e, outBarr)
+            }
+        }
+        val barrMedian = barrTimes.sorted()[barrTimes.size / 2]
+
+        println("Montgomery modPow median = $montMedian ns")
+        println("Barrett    modPow median = $barrMedian ns")
+
+        val ratio = barrMedian.toDouble() / montMedian
+        val rounded = (ratio * 1000).toInt() / 1000.0
+        println("ratio Barrett/Mont = $rounded")
+    }
 
 }

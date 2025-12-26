@@ -1,6 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
+import com.decimal128.bigint.Mago.normLen
 import com.decimal128.bigint.crypto.Karatsuba.karatsubaSetSqr
 import kotlin.test.*
 
@@ -15,12 +16,13 @@ class TestKaratsubaSquare1 {
         val k1 = n - k0
         val t = IntArray(3 * k1 + 3)
 
-        val zLen = karatsubaSetSqr(
+        karatsubaSetSqr(
             z, 0,
             a.magia, 0, n,
-            t,
-            2
+            t
         )
+
+        val zLen = normLen(z, z.size)
 
         val got = BigInt.fromLittleEndianIntArray(
             false,   // non-negative

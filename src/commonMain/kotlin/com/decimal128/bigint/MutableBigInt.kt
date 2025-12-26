@@ -4,6 +4,7 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.crypto.Karatsuba
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
 import kotlin.math.max
@@ -268,6 +269,13 @@ class MutableBigInt private constructor (
             resizeDiscard(minLimbLen)
     }
 
+    private inline fun ensureCapacityDiscardZeroed(minLimbLen: Int) {
+        if (magia.size < minLimbLen)
+            resizeDiscard(minLimbLen)
+        else
+            magia.fill(0, 0, minLimbLen)
+    }
+
     /**
      * Ensures that the backing limb array has capacity **at least** [minLimbLen].
      *
@@ -391,6 +399,11 @@ class MutableBigInt private constructor (
     private fun swapTmp1() {
         check (tmp1.size >= 4)
         val t = tmp1; tmp1 = _magia; _magia = t
+    }
+
+    private fun swapTmp2() {
+        check (tmp2.size >= 4)
+        val t = tmp2; tmp2 = _magia; _magia = t
     }
 
     /**
@@ -875,7 +888,7 @@ class MutableBigInt private constructor (
                 ensureTmp1CapacityZeroed(xNormLen + xNormLen)
                 _meta = Meta(
                     0,
-                    Mago.schoolbookSetSqr(tmp1, x, xNormLen)
+                    Mago.setSqr(tmp1, x, xNormLen)
                 )
                 swapTmp1()
                 this
@@ -1344,7 +1357,7 @@ class MutableBigInt private constructor (
      */
     fun addSquareOf(bi: BigIntNumber) {
         ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
-        val normLenSqr = Mago.schoolbookSetSqr(tmp1, bi.magia, bi.meta.normLen)
+        val normLenSqr = Mago.setSqr(tmp1, bi.magia, bi.meta.normLen)
         setAddImpl(this, Meta(0, normLenSqr), tmp1)
         validate()
     }
@@ -1592,6 +1605,26 @@ class MutableBigInt private constructor (
         ensureCapacityCopy(2 * k + 1)
         val normLen = BigIntAlgorithms.redc(magia, meta.normLen, modulus.magia, k, np)
         _meta = Meta(normLen)
+        return this
+    }
+
+    fun karatsubaSetSqr(a: BigIntNumber): MutableBigInt {
+        val n = a.meta.normLen
+        if (n <= 1)
+            return setSqr(a)
+        val k0 = n / 2
+        val k1 = n - k0
+        val zLen = 2*n
+        ensureTmp1CapacityZeroed(zLen + 1)
+        val tmpSize = 3*k1 + 3
+        ensureTmp2Capacity(tmpSize)
+        Karatsuba.karatsubaSetSqr(
+            tmp1, 0,
+            a.magia, 0, a.meta.normLen,
+            tmp2)
+        val zNormLen = zLen - if (tmp1[zLen - 1] == 0) 1 else 0
+        swapTmp1()
+        _meta = Meta(zNormLen)
         return this
     }
 

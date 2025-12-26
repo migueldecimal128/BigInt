@@ -76,6 +76,8 @@ internal object Mago {
 
     private inline fun bitLen(n: Int) = 32 - n.countLeadingZeroBits()
 
+    private const val MASK32 = 0xFFFF_FFFFuL
+
     /**
      * The one true zero-length array that is usually used to represent
      * the value ZERO.
@@ -197,6 +199,16 @@ internal object Mago {
         if (xLen >= 0 && xLen <= x.size) {
             for (i in xLen - 1 downTo 0)
                 if (x[i] != 0)
+                    return i + 1
+            return 0
+        }
+        throw IllegalArgumentException()
+    }
+
+    fun normLen(x: Magia, xOff: Int, xLen: Int): Int {
+        if (xOff >= 0 && xLen >= 0 && xOff + xLen <= x.size) {
+            for (i in xLen - 1 downTo 0)
+                if (x[xOff + i] != 0)
                     return i + 1
             return 0
         }
@@ -364,7 +376,7 @@ internal object Mago {
         val z = newWithBitLen(newBitLen)
         var carry = dw
         for (i in 0..<xNormLen) {
-            val t = dw32(x[i]) + (carry and 0xFFFF_FFFFuL)
+            val t = dw32(x[i]) + (carry and MASK32)
             z[i] = t.toInt()
             carry = (t shr 32) + (carry shr 32)
         }
@@ -430,7 +442,7 @@ internal object Mago {
             var carry = dw
             var i = 0
             while (carry != 0uL && i < xNormLen) {
-                val s = dw32(x[i]) + (carry and 0xFFFF_FFFFuL)
+                val s = dw32(x[i]) + (carry and MASK32)
                 z[i] = s.toInt()
                 carry = (carry shr 32) + (s shr 32)
                 ++i
@@ -510,7 +522,7 @@ internal object Mago {
             var orAccumulator = 0
             var borrow = 0uL
             if (z.isNotEmpty()) {
-                val t0 = dw32(x[0]) - (dw and 0xFFFF_FFFFuL)
+                val t0 = dw32(x[0]) - (dw and MASK32)
                 val z0 = t0.toInt()
                 z[0] = z0
                 orAccumulator = z0
@@ -563,7 +575,7 @@ internal object Mago {
                 var borrow = dw
                 var i = 0
                 while (i < xNormLen) {
-                    val t = dw32(x[i]) - (borrow and 0xFFFF_FFFFuL)
+                    val t = dw32(x[i]) - (borrow and MASK32)
                     val zi = t.toInt()
                     z[i] = zi
                     val carryOut = t shr 63         // 1 if borrow-in consumed more than limb
@@ -759,7 +771,7 @@ internal object Mago {
             return setMul32(z, x, xNormLen, dw.toUInt())
         if (xNormLen >= 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
-            val lo = dw and 0xFFFF_FFFFuL
+            val lo = dw and MASK32
             val hi = dw shr 32
 
             var ppPrevHi = 0uL
@@ -768,7 +780,7 @@ internal object Mago {
             while (i < xNormLen) {
                 val xi = dw32(x[i])
 
-                val pp = xi * lo + (ppPrevHi and 0xFFFF_FFFFuL)
+                val pp = xi * lo + (ppPrevHi and MASK32)
                 z[i] = pp.toInt()
 
                 ppPrevHi = xi * hi + (ppPrevHi shr 32) + (pp shr 32)
@@ -947,7 +959,7 @@ internal object Mago {
             return ZERO
         val sqrBitLen = 2 * bitLen
         val z = newWithBitLen(sqrBitLen)
-        val zNormLen = schoolbookSetSqr(z, x, xNormLen)
+        val zNormLen = setSqr(z, x, xNormLen)
         check (isNormalized(z, zNormLen))
         return z
     }
@@ -960,7 +972,7 @@ internal object Mago {
      *
      * @return the normalized limb length of the result.
      */
-    fun schoolbookSetSqr(z: Magia, x: Magia, xNormLen: Int) : Int {
+    fun setSqrX(z: Magia, x: Magia, xNormLen: Int) : Int {
         if (xNormLen > 0 && xNormLen <= x.size) {
             check (isNormalized(x, xNormLen))
             if (z.size >= 2 * xNormLen - 1) {
@@ -977,7 +989,7 @@ internal object Mago {
                         val prod = xi * dw32(x[j])        // 32x32 -> 64
                         // add once
                         val t1 = prod + dw32(z[k]) + carry
-                        val p1 = t1 and 0xFFFF_FFFFuL
+                        val p1 = t1 and MASK32
                         carry = t1 shr 32
                         // add second time (doubling) — avoids (prod << 1) overflow
                         val t2 = prod + p1
@@ -1001,7 +1013,7 @@ internal object Mago {
                 for (i in 0..<xNormLen) {
                     val sq = dw32(x[i]) * dw32(x[i])
                     // add low 32 to p[2*i]
-                    var t = dw32(z[2 * i]) + (sq and 0xFFFF_FFFFuL)
+                    var t = dw32(z[2 * i]) + (sq and MASK32)
                     z[2 * i] = t.toInt()
                     var carry = t shr 32
                     // add high 32 (and carry) to p[2*i+1]
@@ -1034,6 +1046,78 @@ internal object Mago {
         throw IllegalArgumentException()
     }
 
+    fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
+        require(xNormLen >= 0 && xNormLen <= x.size)
+        require(2 * xNormLen - 1 <= z.size)
+        if (xNormLen == 0)
+            return 0
+
+        z.fill(0, 0, min(z.size, 2 * xNormLen))
+        // 1) Cross terms: for i<j, add 2*a[i]*a[j] into column (i+j)
+        for (i in 0 until xNormLen) {
+            val ai = dw32(x[i])
+            for (j in i + 1 until xNormLen) {
+                val k = i + j
+                val prod = ai * dw32(x[j]) // 64-bit
+
+                // Compute 2*prod split into (lo32, hi32)
+                val lo = (prod shl 1) and MASK32
+                var carry = (prod shr 31)          // hi32 of (prod*2)
+
+                // Add lo into z[k]
+                var t = dw32(z[k]) + lo
+                z[k] = t.toInt()
+                carry += (t shr 32)
+
+                // Ripple carry into higher limbs
+                var kk = k + 1
+                while (carry != 0uL) {
+                    t = dw32(z[kk]) + (carry and MASK32)
+                    z[kk] = t.toInt()
+                    carry = (carry shr 32) + (t shr 32)
+                    kk++
+                }
+            }
+        }
+
+        // 2) Diagonals: add a[i]^2 into columns (2*i) and (2*i+1)
+        for (i in 0 until xNormLen) {
+            val ai = dw32(x[i])
+            val sq = ai * ai
+            var k = 2 * i
+
+            // low limb
+            var t = dw32(z[k]) + (sq and MASK32)
+            z[k] = t.toInt()
+            var carry = t shr 32
+            ++k
+
+            if (k == z.size) {
+                check (carry == 0uL)
+            } else {
+                // high limb + carry
+                t = dw32(z[k]) + (sq shr 32) + carry
+                z[k] = t.toInt()
+                carry = t shr 32
+                ++k
+
+                // ripple remaining carry
+                while (carry != 0uL) {
+                    if (k >= z.size)
+                        throw IllegalArgumentException(ERR_MSG_MUL_OVERFLOW)
+                    t = dw32(z[k]) + carry
+                    z[k] = t.toInt()
+                    carry = t shr 32
+                    ++k
+                }
+            }
+        }
+        val lastIndex = 2 * xNormLen - 1
+        val zNormLen = lastIndex +
+                if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
+        check (isNormalized(z, zNormLen))
+        return zNormLen
+    }
 
 
     /**
@@ -2323,7 +2407,7 @@ internal object Mago {
             for (i in 0 until n) {
                 val prod = qhat * dw32(vn[i])
                 val prodHi = prod shr 32
-                val prodLo = prod and 0xFFFF_FFFFuL
+                val prodLo = prod and MASK32
                 val unIJ = dw32(un[j + i])
                 val t = unIJ - prodLo - carry
                 un[j + i] = t.toInt()
@@ -2435,7 +2519,7 @@ internal object Mago {
         //val vn_1 = dw32(vn[n - 1])
         //val vn_2 = dw32(vn[n - 2])
         val vn1 = vnDw shr 32
-        val vn0 = vnDw and 0xFFFF_FFFFuL
+        val vn0 = vnDw and MASK32
 
         // -- main loop --
         for (j in m - 2 downTo 0) {
@@ -2466,7 +2550,7 @@ internal object Mago {
             run {
                 val prod = qhat * vn0
                 val prodHi = prod shr 32
-                val prodLo = prod and 0xFFFF_FFFFuL
+                val prodLo = prod and MASK32
                 val un0 = un_j
                 val t0 = un0 - prodLo - carry
                 un[j] = t0.toInt()
@@ -2477,7 +2561,7 @@ internal object Mago {
             run {
                 val prod = qhat * vn1
                 val prodHi = prod shr 32
-                val prodLo = prod and 0xFFFF_FFFFuL
+                val prodLo = prod and MASK32
                 val un1 = dw32(un[j1])
                 val t1 = un1 - prodLo - carry
                 un[j1] = t1.toInt()
