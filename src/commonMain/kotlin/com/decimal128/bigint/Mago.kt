@@ -5,6 +5,7 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.intrinsic.unsignedMulHi
+import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.min
 import kotlin.math.max
 
@@ -235,12 +236,12 @@ internal object Mago {
      * @return `true` if the limb sequence is normalized; `false` otherwise
      */
     fun isNormalized(x: Magia, xLen: Int): Boolean {
-        check (xLen >= 0 && xLen <= x.size)
+        verify (xLen >= 0 && xLen <= x.size)
         return xLen == 0 || x[xLen - 1] != 0
     }
 
     fun isNormalized(x: Magia, xOff: Int, xLen: Int): Boolean {
-        require (xOff >= 0 && xLen >= 0 && xOff + xLen <= x.size)
+        verify (xOff >= 0 && xLen >= 0 && xOff + xLen <= x.size)
         return xLen == 0 || x[xOff + xLen - 1] != 0
     }
 
@@ -373,7 +374,7 @@ internal object Mago {
      * The result is extended as needed to hold any carry or sign extension from the addition.
      */
     fun newAdd(x: Magia, xNormLen: Int, dw: ULong): Magia {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         val newBitLen = max(bitLen(x, xNormLen), (64 - dw.countLeadingZeroBits())) + 1
         val z = newWithBitLen(newBitLen)
         var carry = dw
@@ -395,8 +396,8 @@ internal object Mago {
      * The result will sometimes be not normalized.
      */
     fun newAdd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
         val newBitLen = max(bitLen(x, xNormLen), bitLen(y, yNormLen)) + 1
         val z = newWithBitLen(newBitLen)
         setAdd(z, x, xNormLen, y, yNormLen)
@@ -413,7 +414,7 @@ internal object Mago {
      * @return the normalized input [x] or a new normalized [Magia]
      */
     fun newOrMutateIncrement(x: Magia): Magia {
-        check (isNormalized(x, x.size))
+        verify (isNormalized(x, x.size))
         var carry = 1uL
         var i = 0
         while (carry != 0uL && i < x.size) {
@@ -426,7 +427,7 @@ internal object Mago {
             return x
         // the only way we can have a carry is if all limbs
         // have mutated to zero
-        check (normLen(x) == 0)
+        verify (normLen(x) == 0)
         val z = Magia(x.size + 1)
         z[x.size] = 1
         return z
@@ -476,8 +477,8 @@ internal object Mago {
      * @throws ArithmeticException if the result does not fit in [z]
      */
     fun setAdd(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
             val maxNormLen = max(xNormLen, yNormLen)
             val minNormLen = min(xNormLen, yNormLen)
@@ -488,7 +489,7 @@ internal object Mago {
                     val t = dw32(x[i]) + dw32(y[i]) + carry
                     z[i] = t.toInt()
                     carry = t shr 32
-                    check((carry shr 1) == 0uL)
+                    verify((carry shr 1) == 0uL)
                     ++i
                 }
                 val longer = if (xNormLen > yNormLen) x else y
@@ -504,7 +505,7 @@ internal object Mago {
                     z[i] = 1
                     ++i
                 }
-                check (isNormalized(z, i))
+                verify (isNormalized(z, i))
                 return i
             }
         }
@@ -518,7 +519,7 @@ internal object Mago {
      * If the result is zero or the subtraction underflows, returns [ZERO].
      */
     fun newSub(x: Magia, xNormLen: Int, dw: ULong): Magia {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         if (xNormLen >= 0 && xNormLen <= x.size) {
             val z = Magia(xNormLen)
             var orAccumulator = 0
@@ -588,9 +589,9 @@ internal object Mago {
                         (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
                     ++i
                 }
-                check (borrow == 0uL)
+                verify (borrow == 0uL)
                 val zNormLen = lastNonZeroIndex + 1
-                check (isNormalized(z, zNormLen))
+                verify (isNormalized(z, zNormLen))
                 return zNormLen
             }
         }
@@ -604,11 +605,11 @@ internal object Mago {
      * If the result is zero, returns [ZERO].
      */
     fun newSub(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
         val z = Magia(xNormLen)
         val zNormLen = setSub(z, x, xNormLen, y, yNormLen)
-        check (isNormalized(z, zNormLen))
+        verify (isNormalized(z, zNormLen))
         return if (zNormLen == 0) ZERO else z
     }
 
@@ -629,8 +630,8 @@ internal object Mago {
      */
     fun setSub(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
-            check (isNormalized(x, xNormLen))
-            check (isNormalized(y, yNormLen))
+            verify (isNormalized(x, xNormLen))
+            verify (isNormalized(y, yNormLen))
             if (z.size >= xNormLen) {
                 if (xNormLen >= yNormLen) {
                     var borrow = 0uL
@@ -656,7 +657,7 @@ internal object Mago {
                     }
                     if (borrow == 0uL) {
                         val zNormLen = lastNonZeroIndex + 1
-                        check(isNormalized(z, zNormLen))
+                        verify(isNormalized(z, zNormLen))
                         return zNormLen
                     }
                 }
@@ -683,14 +684,14 @@ internal object Mago {
      * @return [ZERO] or a (possibly non-normalized) [Magia] containing the product.
      */
     fun newMul(x: Magia, xNormLen: Int, w: UInt): Magia {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         if (xNormLen == 0 || w == 0u)
             return ZERO
         val xBitLen = bitLen(x, xNormLen)
         val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul32(z, x, xNormLen, w)
-        check (isNormalized(z, zNormLen))
+        verify (isNormalized(z, zNormLen))
         return z
     }
 
@@ -704,7 +705,7 @@ internal object Mago {
      */
     fun setMul32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size) {
-            check (isNormalized(x, xNormLen))
+            verify (isNormalized(x, xNormLen))
             if (xNormLen == 0 || w == 0u)
                 return 0
             val w64 = w.toULong()
@@ -722,7 +723,7 @@ internal object Mago {
                 z[i] = carry.toInt()
                 ++i
             }
-            check (isNormalized(z, i))
+            verify (isNormalized(z, i))
             return i
 
         }
@@ -752,7 +753,7 @@ internal object Mago {
         val zBitLen = xBitLen + 64 - dw.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul64(z, x, xNormLen, dw)
-        check (isNormalized(z, zNormLen))
+        verify (isNormalized(z, zNormLen))
         return z
     }
 
@@ -772,7 +773,7 @@ internal object Mago {
         if ((dw shr 32) == 0uL)
             return setMul32(z, x, xNormLen, dw.toUInt())
         if (xNormLen >= 0 && xNormLen <= x.size) {
-            check (isNormalized(x, xNormLen))
+            verify (isNormalized(x, xNormLen))
             val lo = dw and MASK32
             val hi = dw shr 32
 
@@ -799,7 +800,7 @@ internal object Mago {
                 ++i
             }
             if (ppPrevHi == 0uL) {
-                check (isNormalized(z, i))
+                verify (isNormalized(z, i))
                 return i
             }
             throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
@@ -830,7 +831,7 @@ internal object Mago {
         val yBitLen = bitLen(y, yNormLen)
         val z = newWithBitLen(xBitLen + yBitLen)
         val zNormLen = setMul(z, x, normLenFromBitLen(xBitLen), y, normLenFromBitLen(yBitLen))
-        check (isNormalized(z, zNormLen))
+        verify (isNormalized(z, zNormLen))
         return z
     }
 
@@ -851,8 +852,8 @@ internal object Mago {
         if (xNormLen >= 0 && xNormLen <= x.size &&
             yNormLen >= 0 && yNormLen <= y.size &&
             z.size >= xNormLen + yNormLen - 1) {
-            check (isNormalized(x, xNormLen))
-            check (isNormalized(y, yNormLen))
+            verify (isNormalized(x, xNormLen))
+            verify (isNormalized(y, yNormLen))
 
             if (xNormLen == 0 || yNormLen == 0)
                 return 0
@@ -884,7 +885,7 @@ internal object Mago {
             if (lastIndex >= z.size || z[lastIndex] == 0)
                 --lastIndex
             val zNormLen = lastIndex + 1
-            check (isNormalized(z, zNormLen))
+            verify (isNormalized(z, zNormLen))
             return zNormLen
         }
         throw IllegalArgumentException()
@@ -955,7 +956,7 @@ internal object Mago {
      * @return a non-normalized limb array representing `x²`
      */
     fun newSqr(x: Magia, xNormLen: Int): Magia {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         val z = IntArray(2 * xNormLen)
         val zNormLen = setSqr(z, x, xNormLen)
         return z
@@ -978,8 +979,8 @@ internal object Mago {
         val wNormLen = setSqrCombaSplit(w, x, xNormLen)
         val zNormLen = setSqrSchoolbook(z, x, xNormLen)
 
-        check (EQ(z, zNormLen, v, vNormLen))
-        check (EQ(z, zNormLen, w, wNormLen))
+        verify (EQ(z, zNormLen, v, vNormLen))
+        verify (EQ(z, zNormLen, w, wNormLen))
 
         return zNormLen
     }
@@ -1031,7 +1032,7 @@ internal object Mago {
             ++k
 
             if (k == z.size) {
-                check (carry == 0uL)
+                verify (carry == 0uL)
             } else {
                 // high limb + carry
                 t = dw32(z[k]) + (sq shr 32) + carry
@@ -1054,7 +1055,7 @@ internal object Mago {
         val lastIndex = 2 * xNormLen - 1
         val zNormLen = lastIndex +
                 if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
-        check (isNormalized(z, zNormLen))
+        verify (isNormalized(z, zNormLen))
         return zNormLen
     }
 
@@ -1107,13 +1108,13 @@ internal object Mago {
 
         // Final limb
         z[2 * n - 1] = c0.toInt()
-        check (c1 == 0L)
+        verify (c1 == 0L)
 
         // normalization
         val lastIndex = 2 * n - 1
         val zNormLen = lastIndex +
                 if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
-        check (isNormalized(z, zNormLen))
+        verify (isNormalized(z, zNormLen))
         return zNormLen
     }
 
@@ -1286,7 +1287,7 @@ internal object Mago {
         val lastIndex = 2 * n - 1
         val zNormLen = lastIndex +
                 if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
-        check (isNormalized(z, zNormLen))
+        verify (isNormalized(z, zNormLen))
         return zNormLen
     }
 
@@ -1381,7 +1382,7 @@ internal object Mago {
      */
     fun newShiftRight(x: Magia, xNormLen: Int, bitCount: Int): Magia {
         if (bitCount >= 0) {
-            check (isNormalized(x, xNormLen))
+            verify (isNormalized(x, xNormLen))
             require(bitCount >= 0)
             val newBitLen = bitLen(x, xNormLen) - bitCount
             if (newBitLen <= 0)
@@ -1389,7 +1390,7 @@ internal object Mago {
             val z = newWithBitLen(newBitLen)
             val zNormLen = setShiftRight(z, x, xNormLen, bitCount)
             check(zNormLen == z.size)
-            check (isNormalized(z, zNormLen))
+            verify (isNormalized(z, zNormLen))
             return z
         }
         throw IllegalArgumentException()
@@ -1408,7 +1409,7 @@ internal object Mago {
         require (bitCount >= 0 && xLen >= 0 && xLen <= x.size)
         if (xLen > 0 && bitCount > 0) {
             val shiftedLen = setShiftRight(x, x, xLen, bitCount)
-            check (shiftedLen <= xLen)
+            verify (shiftedLen <= xLen)
             for (i in shiftedLen..<xLen)
                 x[i] = 0
         }
@@ -1428,7 +1429,7 @@ internal object Mago {
      */
     fun setShiftRight(z: Magia, x: Magia, xNormLen: Int, bitCount: Int): Int {
         require(bitCount >= 0 && xNormLen >= 0 && xNormLen <= x.size)
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         if (xNormLen == 0)
             return 0
         require(x[xNormLen - 1] != 0)
@@ -1454,7 +1455,7 @@ internal object Mago {
             for (i in 0..<zNormLen)
                 z[i] = x[i + wordShift]
         }
-        check (isNormalized(z, zNormLen))
+        verify (isNormalized(z, zNormLen))
         return zNormLen
     }
 
@@ -1479,8 +1480,8 @@ internal object Mago {
         val zNormLen = normLenFromBitLen(zBitLen)
         val z = Magia(zNormLen)
         val zNormLen2 = setShiftLeft(z, x, xNormLen, bitCount)
-        check (zNormLen == zNormLen2)
-        check (isNormalized(z, zNormLen))
+        verify (zNormLen == zNormLen2)
+        verify (isNormalized(z, zNormLen))
         return z
     }
 
@@ -1573,7 +1574,7 @@ internal object Mago {
      * @return true if the value is a power of two; false otherwise.
      */
     fun isPowerOfTwo(x: Magia, xNormLen: Int): Boolean {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         if (xNormLen >= 0 && xNormLen <= x.size) {
             var bitSeen = false
             for (i in 0..<xNormLen) {
@@ -1654,7 +1655,7 @@ internal object Mago {
      * @return the bit length following BigInteger’s definition.
      */
     fun bitLengthBigIntegerStyle(sign: Boolean, x: Magia, xNormLen: Int): Int {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         if (xNormLen >= 0 && xNormLen <= x.size) {
             val bitLen = bitLen(x, xNormLen)
             val isNegPowerOfTwo = sign && isPowerOfTwo(x, xNormLen)
@@ -1718,8 +1719,8 @@ internal object Mago {
      */
     fun setAnd(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
-            check (isNormalized(x, xNormLen))
-            check (isNormalized(y, yNormLen))
+            verify (isNormalized(x, xNormLen))
+            verify (isNormalized(y, yNormLen))
             val minLen = min(xNormLen, yNormLen)
             if (minLen <= z.size) {
                 var i = minLen
@@ -1746,8 +1747,8 @@ internal object Mago {
      * @return the normalized [Magia] value or [ZERO]
      */
     fun newOr(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
         val maxLen = max(xNormLen, yNormLen)
         if (maxLen != 0) {
             val z = Magia(maxLen)
@@ -1767,8 +1768,8 @@ internal object Mago {
      */
     fun setOr(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
-            check (isNormalized(x, xNormLen))
-            check (isNormalized(y, yNormLen))
+            verify (isNormalized(x, xNormLen))
+            verify (isNormalized(y, yNormLen))
             val maxLen = max(xNormLen, yNormLen)
             if (maxLen <= z.size) {
                 val minLen = min(xNormLen, yNormLen)
@@ -1808,8 +1809,8 @@ internal object Mago {
      */
     fun setXor(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
-            check (isNormalized(x, xNormLen))
-            check (isNormalized(y, yNormLen))
+            verify (isNormalized(x, xNormLen))
+            verify (isNormalized(y, yNormLen))
             val maxLen = max(xNormLen, yNormLen)
             if (maxLen <= z.size) {
                 val minLen = min(xNormLen, yNormLen)
@@ -1961,10 +1962,10 @@ internal object Mago {
         val innerShift = bitIndex and 0x1F
         z[limbIndex] = (w shl innerShift).toInt()
         if (limbIndex + 1 < z.size) {
-            check (innerShift != 0)
+            verify (innerShift != 0)
             z[limbIndex + 1] = (w shr (32 - innerShift)).toInt()
         }
-        check (extractULongAtBitIndex(z, z.size, bitIndex) == w.toULong())
+        verify (extractULongAtBitIndex(z, z.size, bitIndex) == w.toULong())
         return z
     }
 
@@ -2008,8 +2009,8 @@ internal object Mago {
      * @throws IllegalArgumentException if [xNormLen] or [yNormLen] are out of bounds for the respective arrays.
      */
     fun compare(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
             if (xNormLen != yNormLen)
                 return if (xNormLen > yNormLen) 1 else -1
@@ -2032,7 +2033,7 @@ internal object Mago {
      * @return a negative value if `x < dw`, zero if `x == dw`, or a positive value if `x > dw`
      */
     fun compare(x: Magia, xNormLen: Int, dw: ULong): Int {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         if (xNormLen >= 0 && xNormLen <= x.size) {
             return if (xNormLen > 2) 1 else toRawULong(x, xNormLen).compareTo(dw)
         }
@@ -2050,7 +2051,7 @@ internal object Mago {
      */
     fun setDiv32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
-            check (isNormalized(x, xNormLen))
+            verify (isNormalized(x, xNormLen))
             when {
                 w == 0u -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
                 xNormLen == 0 -> return 0
@@ -2067,7 +2068,7 @@ internal object Mago {
                 carry = r
             }
             val zNormLen = xNormLen - if (z[xNormLen-1] == 0) 1 else 0
-            check (isNormalized(z, zNormLen))
+            verify (isNormalized(z, zNormLen))
             return zNormLen
         }
         throw IllegalArgumentException()
@@ -2083,7 +2084,7 @@ internal object Mago {
      */
     fun setDiv64(z: Magia, x: Magia, xNormLen: Int, unBuf: IntArray?, dw: ULong): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen - 2 + 1) {
-            check (isNormalized(x, xNormLen))
+            verify (isNormalized(x, xNormLen))
 
             val tryLen = trySetDivFastPath64(z, x, xNormLen, dw)
             if (tryLen >= 0)
@@ -2161,7 +2162,7 @@ internal object Mago {
      */
     fun calcRem32(x: Magia, xNormLen: Int, w: UInt): UInt {
         if (xNormLen >= 0 && xNormLen <= x.size) {
-            check (isNormalized(x, xNormLen))
+            verify (isNormalized(x, xNormLen))
             when {
                 w == 0u -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
                 xNormLen <= 2 -> return when {
@@ -2190,7 +2191,7 @@ internal object Mago {
 
     fun calcRem64(x: Magia, xNormLen: Int, unBuf: IntArray?, dw: ULong): ULong {
         if (xNormLen >= 0 && xNormLen <= x.size) {
-            check (isNormalized(x, xNormLen))
+            verify (isNormalized(x, xNormLen))
             when {
                 (dw shr 32) == 0uL -> return calcRem32(x, xNormLen, dw.toUInt()).toULong()
                 xNormLen <= 2 -> return when {
@@ -2224,7 +2225,7 @@ internal object Mago {
      * @throws ArithmeticException if [w] is zero.
      */
     fun newDiv(x: Magia, xNormLen: Int, w: UInt): Magia {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         if (xNormLen > 0) {
             val z = Magia(xNormLen)
             val zNormLen = setDiv32(z, x, xNormLen, w)
@@ -2274,8 +2275,8 @@ internal object Mago {
      * @return the non-normalized quotient, or [ZERO] if the quotient is zero.
      */
     fun newDiv(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
         when {
             yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
             yNormLen == 1 -> return newDiv(x, xNormLen, y[0].toUInt())
@@ -2319,10 +2320,10 @@ internal object Mago {
     fun setDiv(z: Magia,
                x: Magia, xNormLen: Int, xTmp: Magia?,
                y: Magia, yNormLen: Int, yTmp: Magia?): Int {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
-        check (xTmp == null || xTmp.size >= xNormLen + 1)
-        check (yTmp == null || yTmp.size >= yNormLen)
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
+        verify (xTmp == null || xTmp.size >= xNormLen + 1)
+        verify (yTmp == null || yTmp.size >= yNormLen)
         if (xNormLen < yNormLen || yNormLen < 2)
             throw IllegalArgumentException()
         val m = xNormLen
@@ -2378,7 +2379,7 @@ internal object Mago {
     }
 
     fun setRem64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
-        check (isNormalized(x, xNormLen))
+        verify (isNormalized(x, xNormLen))
         return when {
             (dw shr 32) == 0uL -> {
                 val rem = calcRem32(x, xNormLen, dw.toUInt())
@@ -2400,8 +2401,8 @@ internal object Mago {
      */
     fun newRemOrMod(x: Magia, xNormLen: Int,
                     applyModRingNormalization: Boolean, y: Magia, yNormLen: Int): Magia {
-        check(isNormalized(x, xNormLen))
-        check(isNormalized(y, yNormLen))
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
         when {
             yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
             xNormLen == 0 -> return ZERO
@@ -2459,8 +2460,8 @@ internal object Mago {
      * @throws IllegalArgumentException if `z` is too small to hold the remainder
      */
     fun setRem(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
         val rLen0 = trySetRemFastPath(z, x, xNormLen, y, yNormLen)
         if (rLen0 >= 0)
             return rLen0
@@ -2473,8 +2474,8 @@ internal object Mago {
             throw IllegalArgumentException()
         val r = z
         val rNormLen = knuthDivide(q, r, u, v, m, n)
-        check (rNormLen <= n)
-        check (isNormalized(r, rNormLen))
+        verify (rNormLen <= n)
+        verify (isNormalized(r, rNormLen))
         return rNormLen
     }
 
@@ -2516,10 +2517,10 @@ internal object Mago {
     fun setRem(z: Magia,
                x: Magia, xNormLen: Int, xTmp: Magia?,
                y: Magia, yNormLen: Int, yTmp: Magia?): Int {
-        check (isNormalized(x, xNormLen))
-        check (isNormalized(y, yNormLen))
-        check (xTmp == null || xTmp.size >= xNormLen + 1)
-        check (yTmp == null || yTmp.size >= yNormLen)
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
+        verify (xTmp == null || xTmp.size >= xNormLen + 1)
+        verify (yTmp == null || yTmp.size >= yNormLen)
         if (xNormLen < yNormLen || yNormLen < 2)
             throw IllegalArgumentException()
         val m = xNormLen
@@ -2562,7 +2563,7 @@ internal object Mago {
     ): Int {
         if (m < n || n < 2 || v[n - 1] == 0)
             throw IllegalArgumentException()
-        check (r !== q)
+        verify (r !== q)
 
         // Step D1: Normalize
         val un = when {

@@ -8,6 +8,7 @@ import com.decimal128.bigint.BigInt.Companion.NEG_ONE
 import com.decimal128.bigint.BigInt.Companion.ONE
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigInt.Companion.from
+import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -265,7 +266,7 @@ object BigIntAlgorithms {
                     //if (crossCheck > dw)
                     //    --isqrt
                     isqrt -= (dw - crossCheck) shr 63
-                    check(isqrt * isqrt <= dw && (isqrt + 1uL) * (isqrt + 1uL) > dw)
+                    verify (isqrt * isqrt <= dw && (isqrt + 1uL) * (isqrt + 1uL) > dw)
                     // we started with 53 bits, so the result will be <= 27 bits
                     from(isqrt.toUInt())
                 }

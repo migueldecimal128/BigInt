@@ -12,6 +12,7 @@ import com.decimal128.bigint.Mago.newCopyWithExactLimbLen
 import com.decimal128.bigint.Mago.newWithBitLen
 import com.decimal128.bigint.Mago.normLen
 import com.decimal128.bigint.intrinsic.unsignedMulHi
+import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.max
 import kotlin.math.min
 
@@ -87,7 +88,7 @@ object BigIntParsePrint {
             val t = newCopyWithExactLimbLen(x, xNormLen, limbLen)
             val len = destructiveToUtf8BeforeIndex(utf8, utf8.size, isNegative, t, limbLen)
             val startingIndex = utf8.size - len
-            check (startingIndex <= 1)
+            verify (startingIndex <= 1)
             return utf8.decodeToString(startingIndex, utf8.size)
         } else {
             throw IllegalArgumentException()
@@ -250,7 +251,7 @@ object BigIntParsePrint {
      * digits occupy the range `offMaxx - 9 .. offMaxx - 1`.
      */
     fun render9DigitsBeforeIndex(dw: ULong, utf8: ByteArray, offMaxx: Int) {
-        check (dw < 1_000_000_000uL)
+        verify (dw < 1_000_000_000uL)
         //val abcde = unsignedMulHi(dw, M_U64_DIV_1E4) shr S_U64_DIV_1E4
         val abcde = (dw * M_1E9_DIV_1E4) shr S_1E9_DIV_1E4
         val fghi  = dw - (abcde * 10000uL)
@@ -409,7 +410,7 @@ object BigIntParsePrint {
     }
 
     fun toHexUtf8(bi: BigIntNumber, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
-        check (bi.isNormalized())
+        verify (bi.isNormalized())
         val alfaBase = if (useUpperCase) 'A' else 'a'
         var ichMax = off + digitCount
         var limbIndex = 0
@@ -421,7 +422,7 @@ object BigIntParsePrint {
                     // if there are no limbs left then take as
                     // many zero nybbles as you want
                     nybblesRemaining = Int.MAX_VALUE
-                    check (w == 0)
+                    verify (w == 0)
                 } else {
                     w = bi.magia[limbIndex]
                     ++limbIndex

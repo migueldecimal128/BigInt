@@ -1,6 +1,7 @@
 package com.decimal128.bigint
 
 import kotlin.jvm.JvmInline
+import com.decimal128.bigint.intrinsic.verify
 
 /**
  * Compact metadata for a magnitude, packing both the sign and the bit-length
@@ -39,8 +40,8 @@ value class Meta internal constructor(val _meta: Int) {
          * @param normLen  non-negative normalizedLength stored in the lower 31 bits.
          */
         operator fun invoke(signBit: Int, normLen: Int): Meta {
-            check ((signBit shr 1) == 0)
-            check (normLen >= 0)
+            verify ((signBit shr 1) == 0)
+            verify (normLen >= 0)
             return Meta(((signBit shl 31) or normLen) and (-normLen shr 31))
         }
 
@@ -72,7 +73,7 @@ value class Meta internal constructor(val _meta: Int) {
         }
 
         operator fun invoke(signBit: Int, x: IntArray): Meta {
-            check ((signBit ushr 1) == 0)
+            verify ((signBit ushr 1) == 0)
             var normLen = x.size
             while (normLen > 0 && x[normLen-1] == 0)
                 --normLen

@@ -1,6 +1,7 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.Mago.normLen
+import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.absoluteValue
 
 /**
@@ -869,7 +870,7 @@ sealed class BigIntNumber(
      * @return a hash code consistent with numeric equality of magnitudes
      */
     fun magnitudeHashCode(): Int {
-        check (isNormalized())
+        verify (isNormalized())
         var h = 0
         var i = 0
         while (i + 3 < meta.normLen) {

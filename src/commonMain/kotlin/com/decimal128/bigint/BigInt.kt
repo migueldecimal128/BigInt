@@ -5,6 +5,7 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt.Companion.ZERO
+import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
@@ -82,8 +83,8 @@ class BigInt private constructor(
             fromNormalizedNonZero(false, magia)
 
         internal fun fromNormalizedNonZero(sign: Boolean, magia: Magia): BigInt {
-            check (magia.isNotEmpty())
-            check (magia[magia.lastIndex] != 0)
+            verify (magia.isNotEmpty())
+            verify (magia[magia.lastIndex] != 0)
             return BigInt(Meta(sign, magia.size), magia)
         }
 
@@ -92,11 +93,11 @@ class BigInt private constructor(
 
         internal fun fromNormalizedOrZero(sign: Boolean, magia: Magia): BigInt {
             if (magia.isEmpty()) {
-                check (magia === Mago.ZERO)
+                verify (magia === Mago.ZERO)
                 return ZERO
             }
-            check (magia.isNotEmpty())
-            check (magia[magia.lastIndex] != 0)
+            verify (magia.isNotEmpty())
+            verify (magia[magia.lastIndex] != 0)
             return BigInt(Meta(sign, magia.size), magia)
         }
 
@@ -105,7 +106,7 @@ class BigInt private constructor(
 
         internal fun fromNonNormalizedNonZero(sign: Boolean, magia: Magia): BigInt {
             val normLen = Mago.normLen(magia)
-            check (normLen > 0)
+            verify (normLen > 0)
             return BigInt(Meta(sign, normLen), magia)
         }
 
@@ -617,7 +618,7 @@ class BigInt private constructor(
                 }
                 val topBitIndex = bitLen - 1
                 val limbIndex = topBitIndex ushr 5
-                check (limbIndex == magia.size - 1)
+                verify (limbIndex == magia.size - 1)
                 magia[limbIndex] = magia[limbIndex] or (1 shl (topBitIndex and 0x1F))
                 magia[0] = magia[0] or if (ensureOdd) 1 else 0
                 val sign = withRandomSign && rng.nextBoolean()
@@ -1220,7 +1221,7 @@ class BigInt private constructor(
                 // if we were setting a power of 2 then that was just
                 // handled
                 // this is only for clearing
-                check (!isSetOp)
+                verify (!isSetOp)
                 return ZERO
             }
             val newBitLen = max(bitIndex + 1, Mago.bitLen(this.magia, this.meta.normLen))
@@ -1304,7 +1305,7 @@ class BigInt private constructor(
                     return if (meta.isNegative) NEG_ONE else ZERO
                 val willNeedIncrement = meta.isNegative && Mago.testAnyBitInLowerN(magia, bitCount)
                 var magia = Mago.newShiftRight(this.magia, this.meta.normLen, bitCount)
-                check (Mago.normLen(magia) > 0)
+                verify (Mago.normLen(magia) > 0)
                 if (willNeedIncrement)
                     magia = Mago.newOrMutateIncrement(magia)
                 return fromNormalizedNonZero(meta.signFlag, magia)

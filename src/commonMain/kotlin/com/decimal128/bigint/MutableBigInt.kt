@@ -6,6 +6,7 @@ package com.decimal128.bigint
 
 import com.decimal128.bigint.crypto.Karatsuba
 import com.decimal128.bigint.intrinsic.unsignedMulHi
+import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
@@ -174,7 +175,7 @@ class MutableBigInt private constructor (
      *        current capacity and the inline storage size.
      */
     private fun resizeDiscard(minLimbLen: Int) {
-        check (minLimbLen > 4 && minLimbLen > magia.size)
+        verify (minLimbLen > 4 && minLimbLen > magia.size)
         // if the existing magia.size == 4 then this is the first resizing.
         // if this is the first resizing then give them requested size.
         // otherwise, we are in a growth pattern, so give them 50% more.
@@ -200,7 +201,7 @@ class MutableBigInt private constructor (
      *        current capacity and the inline storage size.
      */
     private fun resizeCopy(minLimbLen: Int) {
-        check (minLimbLen > 4 && minLimbLen > magia.size)
+        verify (minLimbLen > 4 && minLimbLen > magia.size)
         val t = _magia
         val headRoom = (minLimbLen ushr 1) and ((4 - magia.size) shr 31)
         _magia = Mago.newWithFloorLen(minLimbLen + headRoom)
@@ -221,7 +222,7 @@ class MutableBigInt private constructor (
      *        current capacity of the temporary buffer.
      */
     private fun resizeTmp1(minLimbLen: Int) {
-        check (minLimbLen > tmp1.size)
+        verify (minLimbLen > tmp1.size)
         // tmp arrays start off with zero size
         // if this is the first resize then give them what they want
         // otherwise, give them 50% more
@@ -243,7 +244,7 @@ class MutableBigInt private constructor (
      *        current capacity of the temporary buffer.
      */
     private fun resizeTmp2(minLimbLen: Int) {
-        check (minLimbLen > tmp2.size)
+        verify (minLimbLen > tmp2.size)
         // tmp arrays start off with zero size
         // if this is the first resize then give them what they want
         // otherwise, give them 50% more
@@ -397,12 +398,12 @@ class MutableBigInt private constructor (
      * the previous contents of `tmp1` become the active backing storage.
      */
     private fun swapTmp1() {
-        check (tmp1.size >= 4)
+        verify (tmp1.size >= 4)
         val t = tmp1; tmp1 = _magia; _magia = t
     }
 
     private fun swapTmp2() {
-        check (tmp2.size >= 4)
+        verify (tmp2.size >= 4)
         val t = tmp2; tmp2 = _magia; _magia = t
     }
 
@@ -639,7 +640,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setAddImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
-        check (x.isNormalized())
+        verify (x.isNormalized())
         val xMagia = x.magia // use only xMagia in here because of aliasing
         when {
             yDw == 0uL -> set(x)
@@ -682,8 +683,8 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setAddImpl(x: BigIntNumber, yMeta: Meta, yMagia: Magia): MutableBigInt {
-        check (x.isNormalized())
-        check (Mago.isNormalized(yMagia, yMeta.normLen))
+        verify (x.isNormalized())
+        verify (Mago.isNormalized(yMagia, yMeta.normLen))
         val xMagia = x.magia // save for aliasing
         when {
             yMeta.isZero -> set(x)
@@ -881,7 +882,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setSqrImpl(xMeta: Meta, x: Magia): MutableBigInt {
-        check(Mago.isNormalized(x, xMeta.normLen))
+        verify (Mago.isNormalized(x, xMeta.normLen))
         val xNormLen = xMeta.normLen
         return when {
             xNormLen > 2 -> {
@@ -1490,7 +1491,7 @@ class MutableBigInt private constructor (
                 var normLen = Mago.setShiftRight(
                     magia, x.magia, x.meta.normLen, bitCount
                 )
-                check(normLen > 0)
+                verify (normLen > 0)
 
                 if (needsIncrement) {
                     ensureBitCapacityCopy(zBitLen + 1)
@@ -1565,7 +1566,7 @@ class MutableBigInt private constructor (
      * @throws IllegalArgumentException if either parameter is negative
      */
     fun applyBitMask(bitWidth: Int, bitIndex: Int = 0): MutableBigInt {
-        check(isNormalized())
+        verify (isNormalized())
         val myBitLen = magnitudeBitLen()
         when {
             bitIndex < 0 || bitWidth < 0 ->
@@ -1579,7 +1580,7 @@ class MutableBigInt private constructor (
                 magia.fill(0, 0, limbIndex)
                 magia[limbIndex] = 1 shl (bitIndex and 0x1F)
                 _meta = Meta(limbIndex + 1)
-                check(isNormalized())
+                verify (isNormalized())
                 return this
             }
         }
@@ -1594,7 +1595,7 @@ class MutableBigInt private constructor (
         magia[loIndex] = magia[loIndex] and (-1 shl ctz)
         val normLen = Mago.normLen(magia, normLen0)
         _meta = Meta(normLen)
-        check(isNormalized())
+        verify (isNormalized())
         return this
     }
 

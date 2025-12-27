@@ -11,3 +11,4 @@ import com.decimal128.unsignedmulhi.unsigned_mul_hi
 actual inline fun unsignedMulHi(x: ULong, y: ULong): ULong =
     unsigned_mul_hi(x, y)
 
+actual inline fun verify(state: Boolean) = check(state)

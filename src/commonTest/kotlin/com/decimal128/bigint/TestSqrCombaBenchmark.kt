@@ -11,11 +11,11 @@ import kotlin.time.TimeSource
 
 class TestSqrCombaBenchmark {
 
-    fun bench(label: String, runs: Int = 21, iters: Int = 10_000, block: () -> Int) {
+    fun bench(label: String, runs: Int = 21, iters: Int = 5_000, block: () -> Int) {
         val clock = TimeSource.Monotonic
 
         // warmup
-        repeat(10_000) { block() }
+        repeat(5_000) { block() }
 
         val samples = LongArray(runs)
         var sink = 0
@@ -34,7 +34,7 @@ class TestSqrCombaBenchmark {
     @Test
     fun testCompareSqr() {
 
-        val n = 128
+        val n = 16
         val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
         val z = IntArray(2 * n)
 

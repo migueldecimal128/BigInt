@@ -4,6 +4,7 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.max
 
 object BigIntSerde {
@@ -39,7 +40,7 @@ object BigIntSerde {
      * @throws IllegalArgumentException if the magnitude is not normalized.
      */
     fun toBinaryByteArray(bi: BigIntNumber, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
-        check (bi.isNormalized())
+        verify (bi.isNormalized())
         if (bi.meta.normLen >= 0 && bi.meta.normLen <= bi.magia.size) {
             val bitLen =
                 if (isTwosComplement)
@@ -79,7 +80,7 @@ object BigIntSerde {
                       isTwosComplement: Boolean, isBigEndian: Boolean,
                       bytes: ByteArray, offset: Int = 0, requestedLen: Int = -1
     ): Int {
-        check (bi.isNormalized())
+        verify (bi.isNormalized())
         if (bi.meta.normLen >= 0 && bi.meta.normLen <= bi.magia.size &&
             offset >= 0 && (requestedLen <= 0 || requestedLen <= bytes.size - offset)) {
 
@@ -139,8 +140,8 @@ object BigIntSerde {
                     w = w shr 8
                 } while (--remaining > 0)
             }
-            check (iw == bi.meta.normLen)
-            check(ib - step1LoToHi == ibMsb)
+            verify (iw == bi.meta.normLen)
+            verify (ib - step1LoToHi == ibMsb)
             return actualLen
         }
         throw IllegalStateException()
@@ -213,7 +214,7 @@ object BigIntSerde {
             carry += (w xor negativeMask).toLong() and 0xFFFF_FFFFL
             magia[iw++] = carry.toInt()
             carry = carry shr 32
-            check ((carry shr 1) == 0L)
+            verify ((carry shr 1) == 0L)
             ib += step4LoToHi
             remaining -= 4
         }
@@ -225,7 +226,7 @@ object BigIntSerde {
             val w = (b3 shl 24) or (b2 shl 16) or (b1 shl 8) or b0
             magia[iw++] = (w xor negativeMask) + carry.toInt()
         }
-        check(iw == magia.size)
+        verify (iw == magia.size)
         return magia
     }
 
