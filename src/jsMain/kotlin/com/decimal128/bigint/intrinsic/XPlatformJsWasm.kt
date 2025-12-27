@@ -28,4 +28,3 @@ actual inline fun unsignedMulHi(x: ULong, y: ULong): ULong {
     return hi
 }
 
-actual inline fun verify(state: Boolean) = check(state)

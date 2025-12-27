@@ -12,7 +12,6 @@ import com.decimal128.bigint.Mago.newCopyWithExactLimbLen
 import com.decimal128.bigint.Mago.newWithBitLen
 import com.decimal128.bigint.Mago.normLen
 import com.decimal128.bigint.intrinsic.unsignedMulHi
-import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.max
 import kotlin.math.min
 

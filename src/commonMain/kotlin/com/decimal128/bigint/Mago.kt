@@ -5,7 +5,6 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.intrinsic.unsignedMulHi
-import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.min
 import kotlin.math.max
 

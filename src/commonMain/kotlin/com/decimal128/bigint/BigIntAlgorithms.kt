@@ -8,7 +8,6 @@ import com.decimal128.bigint.BigInt.Companion.NEG_ONE
 import com.decimal128.bigint.BigInt.Companion.ONE
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigInt.Companion.from
-import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.sqrt

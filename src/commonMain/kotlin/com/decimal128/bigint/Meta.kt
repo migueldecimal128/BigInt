@@ -1,7 +1,6 @@
 package com.decimal128.bigint
 
 import kotlin.jvm.JvmInline
-import com.decimal128.bigint.intrinsic.verify
 
 /**
  * Compact metadata for a magnitude, packing both the sign and the bit-length

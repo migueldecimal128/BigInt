@@ -6,7 +6,6 @@ package com.decimal128.bigint
 
 import com.decimal128.bigint.crypto.Karatsuba
 import com.decimal128.bigint.intrinsic.unsignedMulHi
-import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min

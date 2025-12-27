@@ -4,7 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.intrinsic.verify
 import kotlin.math.max
 
 object BigIntSerde {
