@@ -4,6 +4,7 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.min
 import kotlin.math.max
 
@@ -1116,6 +1117,92 @@ internal object Mago {
         return zNormLen
     }
 
+    fun setSqrCombaG(z: IntArray, a: IntArray, n: Int): Int {
+        require(z.size >= 2 * n)
+        require(z !== a)
+
+        var c0 = 0L // Low 32 bits of accumulator
+        var c1 = 0L // Upper 64 bits of carry
+
+        // --- Phase 1: k from 0 to n-1 (start is always 0) ---
+        for (k in 0 until n) {
+            val end = (k - 1) ushr 1
+
+            // 1. Off-diagonals
+            if (k > 0) {
+                var i = 0
+                var j = k
+                while (i <= end) {
+                    val prod = (a[i].toLong() and MASK32L) * (a[j].toLong() and MASK32L)
+                    val low = (prod shl 1) and MASK32L
+                    val high = (prod ushr 31)
+
+                    c0 += low
+                    c1 += high + (c0 ushr 32)
+                    c0 = c0 and MASK32L
+                    i++
+                    j--
+                }
+            }
+
+            // 2. Pure Square
+            if ((k and 1) == 0) {
+                val i = k ushr 1
+                val ai = a[i].toLong() and MASK32L
+                val sq = ai * ai
+                c0 += sq and MASK32L
+                c1 += (sq ushr 32) + (c0 ushr 32)
+                c0 = c0 and MASK32L
+            }
+
+            z[k] = c0.toInt()
+            c0 = c1 and MASK32L
+            c1 = c1 ushr 32
+        }
+
+        // --- Phase 2: k from n to 2n-2 (start climbs, end is n-1 logic) ---
+        for (k in n until (2 * n - 1)) {
+            val start = k - (n - 1)
+            val end = (k - 1) ushr 1
+
+            // 1. Off-diagonals
+            var i = start
+            var j = k - start
+            while (i <= end) {
+                val prod = (a[i].toLong() and MASK32L) * (a[j].toLong() and MASK32L)
+                val low = (prod shl 1) and MASK32L
+                val high = (prod ushr 31)
+
+                c0 += low
+                c1 += high + (c0 ushr 32)
+                c0 = c0 and MASK32L
+                i++
+                j--
+            }
+
+            // 2. Pure Square (only if k is even)
+            if ((k and 1) == 0) {
+                val i = k ushr 1
+                val ai = a[i].toLong() and MASK32L
+                val sq = ai * ai
+                c0 += sq and MASK32L
+                c1 += (sq ushr 32) + (c0 ushr 32)
+                c0 = c0 and MASK32L
+            }
+
+            z[k] = c0.toInt()
+            c0 = c1 and MASK32L
+            c1 = c1 ushr 32
+        }
+
+        z[2 * n - 1] = c0.toInt()
+
+        // Normalization
+        val zNormLen = if (z[2 * n - 1] == 0) 2 * n - 1 else 2 * n
+        // Use your existing isNormalized check or return zNormLen
+        return zNormLen
+    }
+
     /**
      * Comba squaring with split diagonal:
      *  - Phase 1: off-diagonals only (2*a[i]*a[j]), i < j
@@ -1201,6 +1288,84 @@ internal object Mago {
                 if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
         check (isNormalized(z, zNormLen))
         return zNormLen
+    }
+
+    fun setSqrLE3Limbs(z: IntArray, a: IntArray, n: Int): Int {
+        when {
+            n == 0 -> return 0
+            n == 1 -> {
+                val dw = a[0].toUInt().toULong()
+                val sq = dw * dw
+                val hi = sq shr 32
+                z[0] = sq.toInt()
+                z[1] = hi.toInt()
+                return (-hi.toLong() ushr 63).toInt() + 1
+            }
+
+            n == 2 -> {
+                val dw = (a[1].toULong() shl 32) or a[0].toUInt().toULong()
+                val sqLo = dw * dw
+                val sqHi = unsignedMulHi(dw, dw)
+                z[0] = sqLo.toInt()
+                z[1] = (sqLo shr 32).toInt()
+                z[2] = sqHi.toInt()
+                z[3] = (sqHi shr 32).toInt()
+                return (-(sqHi shr 32).toLong() ushr 63).toInt() + 3
+            }
+            n == 3 -> {
+                val a0 = a[0].toUInt().toULong()
+                val a1 = a[1].toUInt().toULong()
+                val a2 = a[2].toUInt().toULong()
+
+                // Squares
+                val s0 = a0 * a0          // contributes to z0, z1
+                val s1 = a1 * a1          // contributes to z2, z3
+                val s2 = a2 * a2          // contributes to z4, z5
+
+                // Cross terms (doubled)
+                val c01 = a0 * a1         // *2, contributes to z1, z2
+                val c02 = a0 * a2         // *2, contributes to z2, z3
+                val c12 = a1 * a2         // *2, contributes to z3, z4
+
+                var carry: ULong
+                var t: ULong
+
+                // z[0]
+                z[0] = s0.toInt()
+                carry = s0 shr 32
+
+                // z[1]
+                t = carry + ((c01 shl 1) and 0xFFFF_FFFFuL)
+                z[1] = t.toInt()
+                carry = (t shr 32) + (c01 shr 31)
+
+                // z[2]
+                t = carry +
+                        (s1 and 0xFFFF_FFFFuL) +
+                        ((c02 shl 1) and 0xFFFF_FFFFuL)
+                z[2] = t.toInt()
+                carry = (t shr 32) + (s1 shr 32) + (c02 shr 31)
+
+                // z[3]
+                t = carry +
+                        ((c12 shl 1) and 0xFFFF_FFFFuL)
+                z[3] = t.toInt()
+                carry = (t shr 32) + (c12 shr 31)
+
+                // z[4]
+                t = carry + (s2 and 0xFFFF_FFFFuL)
+                z[4] = t.toInt()
+                carry = (t shr 32) + (s2 shr 32)
+
+                // z[5]
+                z[5] = carry.toInt()
+
+                // normalization
+                return (-(carry.toLong()) ushr 32).toInt() + 5
+            }
+
+            else -> throw IllegalArgumentException()
+        }
     }
 
     /**
