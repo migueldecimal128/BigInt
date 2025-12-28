@@ -41,7 +41,7 @@ class TestKaratsubaSqrBenchmark {
     @Test
     fun testSqrBenchmark() {
 
-        for (n in 64..256 step 16) {
+        for (n in 64..96 step 4) {
             if (verbose)
                 println("n=$n")
             val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }

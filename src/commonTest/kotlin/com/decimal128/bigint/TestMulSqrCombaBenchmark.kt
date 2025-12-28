@@ -6,9 +6,22 @@ import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.test.Test
 import kotlin.time.TimeSource
 
-
+/**
+ * These benchmarks were set up to determine crossover
+ * threshold for Comba-style multiplication and
+ * squaring where the entire column is accumulated
+ * and written once.
+ *
+ * On hardware of this generation (with larger L1 cache)
+ * Comba implementations started out slower than
+ * schoolbook (as expected), but never caught up with
+ * hundreds of limbs (unexpected). Perhaps one could
+ * come up with extreme cases (that overwhelm L1 cache?)
+ * but what would be the point ...
+ */
 class TestMulSqrCombaBenchmark {
 
+    // runBenchmark = true will spew data
     val runBenchmark = false
     val verbose = runBenchmark
 
@@ -35,7 +48,6 @@ class TestMulSqrCombaBenchmark {
         if (verbose)
             println("$label median = ${samples[runs / 2]/iters} ns  (sink0=$sink0 sink1=$sink1)")
     }
-
 
     @Test
     fun testSqrBenchmark() {

@@ -20,11 +20,13 @@ import com.decimal128.bigint.intrinsic.unsignedMulHi
  * Comba-style mul/sqr with reduced memory read/write proved
  * to be slower than schoolbook, presumably due to larger L1
  * cache. Schoolbook squaring proved faster than karatsuba
- * up to 88 limbs == 2816 bytes.
+ * up to approx 84 limbs == approx  2700 bits.
  */
 internal object MagoSqr {
 
-    const val KARATSUBA_SQR_THRESHOLD = 88
+    const val KARATSUBA_SQR_THRESHOLD = 84
+
+    const val SCHOOLBOOK_SQR_THRESHOLD = 19
 
     /**
      * Returns the 32-bit limb `n` zero-extended to a 64-bit `ULong`.
@@ -54,8 +56,13 @@ internal object MagoSqr {
             xNormLen == 2 -> setSqr2Limbs(z, x)
             xNormLen == 3 -> setSqr3Limbs(z, x)
             xNormLen == 4 -> setSqr4Limbs(z, x)
-            xNormLen < 16 -> setMulSchoolbook(z, x, xNormLen, x, xNormLen)
-            else -> setSqrSchoolbook(z, 0, x, 0, xNormLen)
+            xNormLen < SCHOOLBOOK_SQR_THRESHOLD ->
+                // overhead cost for squaring, including doubling
+                // of the cross terms, overwhelms simple
+                // multiplication for quite a while
+                setMulSchoolbook(z, x, xNormLen, x, xNormLen)
+            else ->
+                setSqrSchoolbook(z, 0, x, 0, xNormLen)
         }
     }
 
