@@ -1,5 +1,6 @@
 package com.decimal128.bigint.crypto
 
+import com.decimal128.bigint.Mago
 import com.decimal128.bigint.crypto.Karatsuba.setSqrKaratsuba
 import com.decimal128.bigint.crypto.Karatsuba.setSqrSchoolbookK
 import kotlin.test.Test
@@ -23,7 +24,7 @@ class TestKaratsubaSetSqr {
         setSqrKaratsuba(zKaratsuba, 0, a, 0, n, t)
 
         // 2. Run Schoolbook (Reference)
-        setSqrSchoolbookK(zSchoolbook, 0, a, 0, n)
+        Mago.setSqrSchoolbook(zSchoolbook, 0, a, 0, n)
 
         assertContentEquals(zSchoolbook, zKaratsuba, "Karatsuba squaring failed for size $n")
     }
@@ -99,7 +100,7 @@ class TestKaratsubaSetSqr {
         setSqrKaratsuba(z, 2, a, 2, 4, t)
 
         val expectedResult = IntArray(8)
-        setSqrSchoolbookK(expectedResult, 0, intArrayOf(1, 2, 3, 4), 0, 4)
+        Mago.setSqrSchoolbook(expectedResult, 0, intArrayOf(1, 2, 3, 4), 0, 4)
 
         // Verify z[2..9] matches the expected square
         for (i in 0 until 8) {

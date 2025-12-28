@@ -2,21 +2,25 @@ package com.decimal128.bigint
 
 import com.decimal128.bigint.Mago.setMulSchoolbook
 import com.decimal128.bigint.Mago.setSqrLE4Limbs
-import com.decimal128.bigint.Mago.setSqrSchoolbookG
+import com.decimal128.bigint.Mago.setSqrSchoolbook
 import kotlin.test.Test
 import kotlin.time.TimeSource
 
 
 class TestMulSqrCombaBenchmark {
 
-    val verbose = false
+    val runBenchmark = false
+    val verbose = runBenchmark
 
-    fun bench(label: String, runs: Int = 31, iters: Int = 10, block: () -> Int) {
+    val ITERS = if (runBenchmark) 10_000 else 10
+    val WARMUP = if (runBenchmark) 50_000 else 5
+
+    fun bench(label: String, runs: Int = 31, iters: Int = ITERS, block: () -> Int) {
         val clock = TimeSource.Monotonic
 
         // warmup
         var sink0 = 0
-        repeat(5) { sink0 += block() }
+        repeat(WARMUP) { sink0 += block() }
 
         val samples = LongArray(runs)
         var sink1 = 0
@@ -29,14 +33,14 @@ class TestMulSqrCombaBenchmark {
 
         samples.sort()
         if (verbose)
-            println("$label median = ${samples[runs / 2]/1000} micro sec  (sink0=$sink0 sink1=$sink1)")
+            println("$label median = ${samples[runs / 2]/iters} ns  (sink0=$sink0 sink1=$sink1)")
     }
 
 
     @Test
     fun testSqrBenchmark() {
 
-        for (n in 2..16) {
+        for (n in 2..24) {
             if (verbose)
                 println("n=$n")
             val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
@@ -52,8 +56,8 @@ class TestMulSqrCombaBenchmark {
             //    setSqrSchoolbook(z, a, n)
             //}
 
-            bench("setSqrSchoolbookG") {
-                setSqrSchoolbookG(z, a, n)
+            bench("setSqrSchoolbook") {
+                setSqrSchoolbook(z, a, n)
             }
 
             bench("setMulSchoolbook(a,a)") {
@@ -67,16 +71,14 @@ class TestMulSqrCombaBenchmark {
             //bench("setSqrCombaPhased") {
             //    setSqrCombaPhased(z, a, n)
             //}
-
         }
-
     }
 
     @Test
     fun testMulBenchmark() {
 
-        for (n in 5..25) {
-            for (m in 5..25) {
+        for (n in 5..10) {
+            for (m in 5..10) {
                 val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
                 val b = IntArray(m) { (it + 1) * 0x6A09E667.toInt() }
                 val z = IntArray(m + n)

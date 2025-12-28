@@ -4,12 +4,11 @@
 
 package com.decimal128.bigint.crypto
 
-import com.decimal128.bigint.Magia
 import com.decimal128.bigint.Mago
 
 object Karatsuba {
 
-    private const val DEFAULT_KARATSUBA_SQR_THRESHOLD = 64
+    private const val DEFAULT_KARATSUBA_SQR_THRESHOLD = 88
     val minLimbThreshold: Int = DEFAULT_KARATSUBA_SQR_THRESHOLD
 
     /**
@@ -41,7 +40,7 @@ object Karatsuba {
         t: IntArray
     ): Int {
         if (aLen < minLimbThreshold) {
-            setSqrSchoolbookKaratG(z, zOff, a, aOff, aLen)
+            Mago.setSqrSchoolbook(z, zOff, a, aOff, aLen)
             return -1
         }
 
@@ -58,7 +57,7 @@ object Karatsuba {
         ksetAdd(t, a, aOff, k0, k1)
 
         t.fill(0, k1 + 1, 3*(k1 + 1))
-        setSqrSchoolbookKaratG(t, k1 + 1, t, 0, k1 + 1)
+        Mago.setSqrSchoolbook(t, k1 + 1, t, 0, k1 + 1)
 
         val z1Off = k1 + 1
         kmutSub(t, z1Off, z, zOff       , 2*k0)
@@ -388,122 +387,6 @@ object Karatsuba {
             }
         }
         return -1
-    }
-
-    fun setSqrSchoolbookKaratG(z: Magia, zOff: Int, x: Magia, xOff: Int, xNormLen: Int): Int {
-        if (xNormLen == 0) return 0
-        val zLen = 2 * xNormLen
-        check (zOff >= 0 && zOff + zLen <= z.size)
-        z.fill(0, zOff, zOff + zLen)
-
-        check (xOff >= 0 && xOff + xNormLen <= x.size)
-        // 1) Cross terms: i < j
-        // We compute the sum of all a[i]*a[j] where i < j
-        for (i in 0 until xNormLen - 1) {
-            val ai = dw32(x[xOff + i])
-            var carry = 0uL
-            for (j in i + 1 until xNormLen) {
-                val k = i + j
-                // Standard row-multiply accumulation
-                val t = ai * dw32(x[xOff + j]) + dw32(z[zOff + k]) + carry
-                z[zOff + k] = t.toInt()
-                carry = t shr 32
-            }
-            z[zOff + i + xNormLen] = carry.toInt()
-        }
-
-        // 2) Double the cross terms: z = z * 2
-        // This is much faster than doubling inside the loop because it's a linear scan
-        var shiftCarry = 0uL
-        for (i in 0 until zLen) {
-            val zi = dw32(z[zOff + i])
-            val t = (zi shl 1) or shiftCarry
-            z[zOff + i] = t.toInt()
-            shiftCarry = t shr 32
-        }
-
-        // 3) Diagonals: add a[i]^2 into column 2*i
-        // We add these directly into the doubled cross-terms
-        for (i in 0 until xNormLen) {
-            var k = 2 * i
-            val zk = dw32(z[zOff + k])
-            val ai = dw32(x[xOff + i])
-            val sqa = ai * ai + zk
-
-            // Add low 32 bits
-            z[zOff + k] = sqa.toInt()
-            ++k
-            // Add high 32 bits + carry
-            var carry = dw32(z[zOff + k]) + (sqa shr 32)
-            z[zOff + k] = carry.toInt()
-            carry = carry shr 32
-            ++k
-
-            while (carry != 0uL && k < zLen) {
-                carry = dw32(z[zOff + k]) + carry
-                z[zOff + k] = carry.toInt()
-                carry = carry shr 32
-                ++k
-            }
-        }
-
-        // Normalization
-        var lastIndex = zLen - 1
-        if (lastIndex >= 0 && z[zOff + lastIndex] == 0) lastIndex--
-        val zNormLen = lastIndex + 1
-
-        return zNormLen
-    }
-
-    /**
-     * Squares a 2-limb unsigned magnitude starting at [aOff] and writes the
-     * 4-limb result starting at [zOff].
-     *
-     * Computes:
-     * `(a[aOff] + a[aOff+1]·2^32)²`
-     *
-     * No allocation; all arithmetic is performed using 64-bit intermediates
-     * with explicit carry propagation.
-     *
-     * @param z destination array for the 4-limb result
-     * @param zOff starting index in [z]; must allow `zOff + 4`
-     * @param a source array containing exactly two limbs to square
-     * @param aOff starting index in [a]; must allow `aOff + 2`
-     */
-    inline fun squareTwoLimbs(z: IntArray, zOff: Int, a: IntArray, aOff: Int) {
-        require (aOff >= 0 && aOff + 2 <= a.size)
-        require (zOff >= 0 && zOff + 4 <= z.size)
-        // 1. Calculate the base squares: a0^2 and a1^2
-        val a0 = a[aOff + 0].toUInt().toULong()
-        val a1 = a[aOff + 1].toUInt().toULong()
-
-        val p00 = a0 * a0
-        val p11 = a1 * a1
-
-        // Write z[0] immediately
-        z[zOff + 0] = p00.toInt()
-
-        // Intermediate parts of p00 and p11 for carry chain
-        val z1_base = p00 shr 32
-        val z2_base = p11 and 0xFFFF_FFFFuL
-        val z3_base = p11 shr 32
-
-        // 2. Calculate the middle term: 2 * (a0 * a1)
-        val p01 = a0 * a1
-        val mid = p01 shl 1        // Double the product
-        val midCarry = p01 shr 63  // Catch the overflow bit from doubling (bit 96)
-
-        // 3. Ripple carry addition
-        // Add low 32 bits of mid to the high part of p00
-        var sum = z1_base + (mid and 0xFFFF_FFFFuL)
-        z[zOff + 1] = sum.toInt()
-
-        // Add high 32 bits of mid + carry from z[1] to the low part of p11
-        sum = z2_base + (mid shr 32) + (sum shr 32)
-        z[zOff + 2] = sum.toInt()
-
-        // Add midCarry + carry from z[2] to the high part of p11
-        z[zOff + 3] = (z3_base + midCarry + (sum shr 32)).toInt()
     }
 
 }

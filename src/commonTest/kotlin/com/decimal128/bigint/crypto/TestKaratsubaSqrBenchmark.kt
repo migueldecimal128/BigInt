@@ -1,22 +1,26 @@
 package com.decimal128.bigint.crypto
 
-import com.decimal128.bigint.Mago.setMulSchoolbook
+import com.decimal128.bigint.Mago
 import com.decimal128.bigint.Mago.setSqrLE4Limbs
-import com.decimal128.bigint.Mago.setSqrSchoolbookG
 import kotlin.test.Test
 import kotlin.time.TimeSource
 
 class TestKaratsubaSqrBenchmark {
 
 
-    val verbose = true
+    val runBenchmark = false
+    val verbose = runBenchmark
 
-    fun bench(label: String, runs: Int = 31, iters: Int = 10_000, block: () -> Int) {
+    val ITERS = if (runBenchmark) 10_000 else 10
+    val WARMUP = if (runBenchmark) 50_000 else 5
+
+
+    fun bench(label: String, runs: Int = 31, iters: Int = ITERS, block: () -> Int) {
         val clock = TimeSource.Monotonic
 
         // warmup
         var sink0 = 0
-        repeat(50_000) { sink0 += block() }
+        repeat(WARMUP) { sink0 += block() }
 
         val samples = LongArray(runs)
         var sink1 = 0
@@ -54,10 +58,6 @@ class TestKaratsubaSqrBenchmark {
             //    setSqrSchoolbook(z, a, n)
             //}
 
-            bench("setSqrSchoolbookG") {
-                setSqrSchoolbookG(z, a, n)
-            }
-
             //bench("setMulSchoolbook(a,a)") {
             //    setMulSchoolbook(z, a, n, a, n)
             //}
@@ -72,9 +72,8 @@ class TestKaratsubaSqrBenchmark {
                 Karatsuba.setSqrKaratsuba(z, 0, a, 0, n, t)
             }
 
-            bench("Karatsuba.setSqrSchoolbookKaratG") {
-                z.fill(0)
-                Karatsuba.setSqrSchoolbookKaratG(z, 0, a, 0, n)
+            bench("Mago.setSqrSchoolbook") {
+                Mago.setSqrSchoolbook(z, a, n)
             }
 
             //bench("setSqrCombaFused") {

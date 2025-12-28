@@ -4,6 +4,7 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.crypto.Karatsuba
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.min
 import kotlin.math.max
@@ -976,41 +977,45 @@ internal object Mago {
      */
 
     fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
-
-        return if (xNormLen <= 4)
-            setSqrLE4Limbs(z, x, xNormLen)
-        else
-            setSqrSchoolbookG(z, x, xNormLen)
+        return when {
+            xNormLen <= 4 -> setSqrLE4Limbs(z, x, xNormLen)
+            xNormLen <= 16 -> setMulSchoolbook(z, x, xNormLen, x, xNormLen)
+            else -> setSqrSchoolbook(z, 0, x, 0, xNormLen)
+        }
     }
 
-    fun setSqrSchoolbookG(z: Magia, x: Magia, xNormLen: Int): Int {
+    inline fun setSqrSchoolbook(z: Magia, x: Magia, xNormLen: Int): Int =
+        setSqrSchoolbook(z, 0, x, 0, xNormLen)
+
+    fun setSqrSchoolbook(z: Magia, zOff: Int, x: Magia, xOff: Int, xNormLen: Int): Int {
         if (xNormLen == 0) return 0
         val zLen = 2 * xNormLen
-        check (z.size >= zLen)
-        z.fill(0, 0, zLen)
+        check (zOff >= 0 && zOff + zLen <= z.size)
+        z.fill(0, zOff, zOff + zLen)
 
+        check (xOff >= 0 && xOff + xNormLen <= x.size)
         // 1) Cross terms: i < j
         // We compute the sum of all a[i]*a[j] where i < j
         for (i in 0 until xNormLen - 1) {
-            val ai = dw32(x[i])
+            val ai = dw32(x[xOff + i])
             var carry = 0uL
             for (j in i + 1 until xNormLen) {
                 val k = i + j
                 // Standard row-multiply accumulation
-                val t = ai * dw32(x[j]) + dw32(z[k]) + carry
-                z[k] = t.toInt()
+                val t = ai * dw32(x[xOff + j]) + dw32(z[zOff + k]) + carry
+                z[zOff + k] = t.toInt()
                 carry = t shr 32
             }
-            z[i + xNormLen] = carry.toInt()
+            z[zOff + i + xNormLen] = carry.toInt()
         }
 
         // 2) Double the cross terms: z = z * 2
         // This is much faster than doubling inside the loop because it's a linear scan
         var shiftCarry = 0uL
         for (i in 0 until zLen) {
-            val zi = dw32(z[i])
+            val zi = dw32(z[zOff + i])
             val t = (zi shl 1) or shiftCarry
-            z[i] = t.toInt()
+            z[zOff + i] = t.toInt()
             shiftCarry = t shr 32
         }
 
@@ -1018,36 +1023,35 @@ internal object Mago {
         // We add these directly into the doubled cross-terms
         for (i in 0 until xNormLen) {
             var k = 2 * i
-            val zk = dw32(z[k])
-            val ai = dw32(x[i])
+            val zk = dw32(z[zOff + k])
+            val ai = dw32(x[xOff + i])
             val sqa = ai * ai + zk
 
             // Add low 32 bits
-            z[k] = sqa.toInt()
+            z[zOff + k] = sqa.toInt()
             ++k
             // Add high 32 bits + carry
-            var carry = dw32(z[k]) + (sqa shr 32)
-            z[k] = carry.toInt()
+            var carry = dw32(z[zOff + k]) + (sqa shr 32)
+            z[zOff + k] = carry.toInt()
             carry = carry shr 32
             ++k
 
             while (carry != 0uL && k < zLen) {
-                carry = dw32(z[k]) + carry
-                z[k] = carry.toInt()
+                carry = dw32(z[zOff + k]) + carry
+                z[zOff + k] = carry.toInt()
                 carry = carry shr 32
                 ++k
             }
         }
 
         // Normalization
-        var lastIndex = zLen - 1
-        if (lastIndex >= 0 && z[lastIndex] == 0) lastIndex--
-        val zNormLen = lastIndex + 1
-
+        val lastIndex = zLen - 1
+        val lastLimb = z[zOff + lastIndex]
+        val zNormLen = lastIndex + ((lastLimb or -lastLimb) ushr 31)
         return zNormLen
     }
 
-    fun setSqrLE4Limbs(z: IntArray, a: IntArray, n: Int): Int {
+    inline fun setSqrLE4Limbs(z: IntArray, a: IntArray, n: Int): Int {
         when {
             n == 0 -> return 0
             n == 1 -> {
