@@ -2,6 +2,7 @@ package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.Mago
+import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +14,7 @@ class TestKaratsubaSchoolbookSetSqr {
         val a = intArrayOf(0xFFFF_FFFF.toInt())
         val z = IntArray(4)
 
-        Mago.setSqrSchoolbook(z, 0, a, 0, 1)
+        setSqrSchoolbook(z, 0, a, 0, 1)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a).sqr()
         val got = BigInt.Companion.fromLittleEndianIntArray(false, z)
@@ -29,7 +30,7 @@ class TestKaratsubaSchoolbookSetSqr {
         )
         val z = IntArray(8)
 
-        Mago.setSqrSchoolbook(z, 1, a, 0, 2)
+        setSqrSchoolbook(z, 1, a, 0, 2)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a).sqr()
         val got = BigInt.Companion.fromLittleEndianIntArray(false, z, 1, a.size * 2)
@@ -46,7 +47,7 @@ class TestKaratsubaSchoolbookSetSqr {
 
         val z = IntArray(20)
 
-        Mago.setSqrSchoolbook(z, 7, a, 3, 3)
+        setSqrSchoolbook(z, 7, a, 3, 3)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a, 3, 3).sqr()
         val got = BigInt.Companion.fromLittleEndianIntArray(false, z, 7, 6)
@@ -60,7 +61,7 @@ class TestKaratsubaSchoolbookSetSqr {
         val a = IntArray(n) { 0xFFFF_FFFF.toInt() }
         val z = IntArray(16)
 
-        Mago.setSqrSchoolbook(z, 0, a, 0, a.size)
+        setSqrSchoolbook(z, 0, a, 0, a.size)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a)
         val ref2 = ref*ref
@@ -79,7 +80,7 @@ class TestKaratsubaSchoolbookSetSqr {
         )
         val z = IntArray(12)
 
-        Mago.setSqrSchoolbook(z, 2, a, 0, 4)
+        setSqrSchoolbook(z, 2, a, 0, 4)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a, 0, 4).sqr()
         val got = BigInt.Companion.fromLittleEndianIntArray(false, z, 2, 8)
@@ -104,7 +105,7 @@ class TestKaratsubaSchoolbookSetSqr {
             val zOff = Random.Default.nextInt(10)
 
             z.fill(0, zOff, zOff + zLen)
-            Mago.setSqrSchoolbook(z, zOff, a, aOff, aNormLen)
+            setSqrSchoolbook(z, zOff, a, aOff, aNormLen)
 
             val observed = BigInt.Companion.fromLittleEndianIntArray(false, z, zOff, zLen)
             val expected = bi.sqr()
@@ -119,7 +120,7 @@ class TestKaratsubaSchoolbookSetSqr {
 
         val z = IntArray(2*a.size)
 
-        Mago.setSqrSchoolbook(z, 0, a, 0, a.size)
+        setSqrSchoolbook(z, 0, a, 0, a.size)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a, 0, a.size)
         val ref2 = ref * ref

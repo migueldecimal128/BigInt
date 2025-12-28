@@ -1,8 +1,8 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.Mago.setMulSchoolbook
-import com.decimal128.bigint.Mago.setSqrLE4Limbs
-import com.decimal128.bigint.Mago.setSqrSchoolbook
+import com.decimal128.bigint.MagoSqr.setSqr
+import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.test.Test
 import kotlin.time.TimeSource
 
@@ -48,7 +48,7 @@ class TestMulSqrCombaBenchmark {
 
             if (n <= 4) {
                 bench("hand rolled") {
-                    setSqrLE4Limbs(z, a, n)
+                    setSqr(z, a, n)
                 }
             }
 

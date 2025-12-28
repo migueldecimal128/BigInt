@@ -5,6 +5,8 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.Mago
+import com.decimal128.bigint.MagoSqr
+import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 
 object Karatsuba {
 
@@ -40,7 +42,7 @@ object Karatsuba {
         t: IntArray
     ): Int {
         if (aLen < minLimbThreshold)
-            return Mago.setSqrSchoolbook(z, zOff, a, aOff, aLen)
+            return setSqrSchoolbook(z, zOff, a, aOff, aLen)
 
         val n = aLen
         val k0 = n / 2
@@ -55,7 +57,7 @@ object Karatsuba {
         ksetAdd(t, a, aOff, k0, k1)
 
         t.fill(0, k1 + 1, 3*(k1 + 1))
-        Mago.setSqrSchoolbook(t, k1 + 1, t, 0, k1 + 1)
+        setSqrSchoolbook(t, k1 + 1, t, 0, k1 + 1)
 
         val z1Off = k1 + 1
         kmutSub(t, z1Off, z, zOff       , 2*k0)

@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
-import com.decimal128.bigint.Mago
-import com.decimal128.bigint.Mago.setSqrLE4Limbs
+import com.decimal128.bigint.MagoSqr
+import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.test.Test
 import kotlin.time.TimeSource
 
@@ -50,7 +50,7 @@ class TestKaratsubaSqrBenchmark {
 
             if (n <= 4) {
                 bench("hand rolled") {
-                    setSqrLE4Limbs(z, a, n)
+                    MagoSqr.setSqr(z, a, n)
                 }
             }
 
@@ -73,7 +73,7 @@ class TestKaratsubaSqrBenchmark {
             }
 
             bench("Mago.setSqrSchoolbook") {
-                Mago.setSqrSchoolbook(z, a, n)
+                setSqrSchoolbook(z, a, n)
             }
 
             //bench("setSqrCombaFused") {
