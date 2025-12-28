@@ -3,10 +3,7 @@ package com.decimal128.bigint
 import com.decimal128.bigint.Mago.setMulCombaFused
 import com.decimal128.bigint.Mago.setMulCombaPhased
 import com.decimal128.bigint.Mago.setMulSchoolbook
-import com.decimal128.bigint.Mago.setSqrCombaFused
-import com.decimal128.bigint.Mago.setSqrCombaPhased
 import com.decimal128.bigint.Mago.setSqrLE4Limbs
-import com.decimal128.bigint.Mago.setSqrSchoolbook
 import com.decimal128.bigint.Mago.setSqrSchoolbookG
 import kotlin.test.Test
 import kotlin.time.TimeSource
@@ -61,9 +58,9 @@ class TestMulSqrCombaBenchmark {
             //    setSqrCombaFused(z, a, n)
             //}
 
-            bench("setSqrCombaPhased") {
-                setSqrCombaPhased(z, a, n)
-            }
+            //bench("setSqrCombaPhased") {
+            //    setSqrCombaPhased(z, a, n)
+            //}
 
         }
 
