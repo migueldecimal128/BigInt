@@ -14,6 +14,8 @@ class TestSqr {
     fun testSqr() {
         for (i in 0..<100000) {
             val hi = randomHi(257)
+            if (verbose)
+                println(hi)
             test1(hi)
         }
     }
@@ -22,6 +24,11 @@ class TestSqr {
     fun testProblemChild() {
         val hi = BigInt.from("489124697967574338029000324")
         test1(hi)
+    }
+
+    @Test
+    fun testProblemChild2() {
+        test1("11957251142550972315233578".toBigInt())
     }
 
     fun test1(hi: BigInt) {

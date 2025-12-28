@@ -847,7 +847,21 @@ internal object Mago {
      * @return the normalized number of limbs actually used in [z].
      * @throws IllegalArgumentException if preconditions on array sizes or lengths are violated.
      */
+
     fun setMul(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
+        val v = IntArray(z.size)
+        val vNormLen = setMulCombaFused(v, x, xNormLen, y, yNormLen)
+        val w = IntArray(z.size)
+        val wNormLen = setMulCombaPhased(w, x, xNormLen, y, yNormLen)
+        val zNormLen = setMulSchoolbook(z, x, xNormLen, y, yNormLen)
+
+        verify (EQ(z, zNormLen, v, vNormLen))
+        verify (EQ(z, zNormLen, w, wNormLen))
+
+        return zNormLen
+    }
+
+    fun setMulSchoolbook(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
         if (xNormLen >= 0 && xNormLen <= x.size &&
             yNormLen >= 0 && yNormLen <= y.size &&
             z.size >= xNormLen + yNormLen - 1) {
@@ -888,6 +902,143 @@ internal object Mago {
             return zNormLen
         }
         throw IllegalArgumentException()
+    }
+
+    fun setMulCombaFused(
+        z: Magia,
+        x: Magia, xNormLen: Int,
+        y: Magia, yNormLen: Int
+    ): Int {
+        require(xNormLen >= 0 && xNormLen <= x.size)
+        require(yNormLen >= 0 && yNormLen <= y.size)
+        require(z.size >= xNormLen + yNormLen - 1)
+
+        if (xNormLen == 0 || yNormLen == 0)
+            return 0
+
+        verify (isNormalized(x, xNormLen))
+        verify (isNormalized(y, yNormLen))
+
+        var c0 = 0uL
+        var c1 = 0uL
+
+        val lastK = xNormLen + yNormLen - 1
+
+        val corto = if (xNormLen < yNormLen) x else y
+        val largo = if (xNormLen < yNormLen) y else x
+        val cortoLen = if (xNormLen < yNormLen) xNormLen else yNormLen
+        val largoLen = if (xNormLen < yNormLen) yNormLen else xNormLen
+
+        for (k in 0 until lastK) {
+            val iStart = maxOf(0, k - (cortoLen - 1))
+            val iEnd   = minOf(largoLen - 1, k)
+
+            var i = iStart
+            while (i <= iEnd) {
+                val j = k - i
+                val prod = dw32(largo[i]) * dw32(corto[j])
+
+                c0 += prod
+                c1 += (c0 shr 32)
+                c0 = c0 and MASK32
+
+                i++
+            }
+
+            z[k] = c0.toInt()
+
+            // slide accumulator
+            c0 = c1 and MASK32
+            c1 = c1 shr 32
+        }
+
+        // final carry limb
+        if (c0 == 0uL)
+            return lastK
+        if (lastK < z.size) {
+            z[lastK] = c0.toInt()
+            return lastK + 1
+        }
+        throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
+    }
+
+    fun setMulCombaPhased(
+        z: Magia,
+        x: Magia, xNormLen: Int,
+        y: Magia, yNormLen: Int
+    ): Int {
+        if (xNormLen == 0 || yNormLen == 0) return 0
+
+        // 1. Identify short vs long (Free pointer swap)
+        val corto = if (xNormLen < yNormLen) x else y
+        val largo = if (xNormLen < yNormLen) y else x
+        val cortoLen = if (xNormLen < yNormLen) xNormLen else yNormLen
+        val largoLen = if (xNormLen < yNormLen) yNormLen else xNormLen
+
+        var c0 = 0uL
+        var c1 = 0uL
+
+        // --- PHASE 1: Growing ---
+        // k from 0 to cortoLen - 1. iStart is always 0.
+        for (k in 0 until cortoLen) {
+            var i = 0
+            var j = k
+            while (i <= k) {
+                val prod = dw32(largo[i]) * dw32(corto[j])
+                c0 += prod
+                c1 += (c0 shr 32)
+                c0 = c0 and MASK32
+                i++; j--
+            }
+            z[k] = c0.toInt()
+            c0 = c1 and MASK32; c1 = c1 shr 32
+        }
+
+        // --- PHASE 2: Sliding ---
+        // k from cortoLen to largoLen - 1.
+        // Number of products is constant (cortoLen).
+        for (k in cortoLen until largoLen) {
+            var i = k - (cortoLen - 1)
+            var j = cortoLen - 1
+            val iEnd = k
+            while (i <= iEnd) {
+                val prod = dw32(largo[i]) * dw32(corto[j])
+                c0 += prod
+                c1 += (c0 shr 32)
+                c0 = c0 and MASK32
+                i++; j--
+            }
+            z[k] = c0.toInt()
+            c0 = c1 and MASK32; c1 = c1 shr 32
+        }
+
+        // --- PHASE 3: Shrinking ---
+        // k from largoLen to largoLen + cortoLen - 2.
+        // iEnd is always largoLen - 1.
+        for (k in largoLen until (largoLen + cortoLen - 1)) {
+            val iStart = k - (cortoLen - 1)
+            var i = iStart
+            var j = cortoLen - 1
+            val iEnd = largoLen - 1
+            while (i <= iEnd) {
+                val prod = dw32(largo[i]) * dw32(corto[j])
+                c0 += prod
+                c1 += (c0 shr 32)
+                c0 = c0 and MASK32
+                i++; j--
+            }
+            z[k] = c0.toInt()
+            c0 = c1 and MASK32; c1 = c1 shr 32
+        }
+
+        // Final carry limb
+        val lastK = xNormLen + yNormLen - 1
+        if (c0 != 0uL) {
+            if (lastK >= z.size) throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
+            z[lastK] = c0.toInt()
+            return lastK + 1
+        }
+        return lastK
     }
 
     /**
@@ -973,10 +1124,16 @@ internal object Mago {
 
     fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
         val v = IntArray(z.size)
-        val vNormLen = setSqrComba(v, x, xNormLen)
+        val vNormLen = setSqrCombaFused(v, x, xNormLen)
         val w = IntArray(z.size)
-        val wNormLen = setSqrCombaSplit(w, x, xNormLen)
+        val wNormLen = setSqrCombaPhased(w, x, xNormLen)
         val zNormLen = setSqrSchoolbook(z, x, xNormLen)
+
+        if (xNormLen <= 4) {
+            val m = IntArray(z.size)
+            val mNormLen = setSqrLE4Limbs(m, x, xNormLen)
+            verify (EQ(z, zNormLen, m, mNormLen))
+        }
 
         verify (EQ(z, zNormLen, v, vNormLen))
         verify (EQ(z, zNormLen, w, wNormLen))
@@ -1058,7 +1215,72 @@ internal object Mago {
         return zNormLen
     }
 
-    fun setSqrComba(z: IntArray, a: IntArray, n: Int): Int {
+    fun setSqrSchoolbookG(z: Magia, x: Magia, xNormLen: Int): Int {
+        if (xNormLen == 0) return 0
+        val zLen = 2 * xNormLen
+        z.fill(0, 0, zLen)
+
+        // 1) Cross terms: i < j
+        // We compute the sum of all a[i]*a[j] where i < j
+        for (i in 0 until xNormLen - 1) {
+            val ai = dw32(x[i])
+            var carry = 0uL
+            for (j in i + 1 until xNormLen) {
+                val k = i + j
+                // Standard row-multiply accumulation
+                val t = ai * dw32(x[j]) + dw32(z[k]) + carry
+                z[k] = t.toInt()
+                carry = t shr 32
+            }
+            z[i + xNormLen] = carry.toInt()
+        }
+
+        // 2) Double the cross terms: z = z * 2
+        // This is much faster than doubling inside the loop because it's a linear scan
+        var shiftCarry = 0uL
+        for (i in 0 until zLen) {
+            val zi = dw32(z[i])
+            val t = (zi shl 1) or shiftCarry
+            z[i] = t.toInt()
+            shiftCarry = t shr 32
+        }
+
+        // 3) Diagonals: add a[i]^2 into column 2*i
+        // We add these directly into the doubled cross-terms
+        for (i in 0 until xNormLen) {
+            val ai = dw32(x[i])
+            val sq = ai * ai
+            val k = 2 * i
+
+            // Add low 32 bits
+            var t = dw32(z[k]) + (sq and MASK32)
+            z[k] = t.toInt()
+            var carry = t shr 32
+
+            // Add high 32 bits + carry
+            t = dw32(z[k + 1]) + (sq shr 32) + carry
+            z[k + 1] = t.toInt()
+            carry = t shr 32
+
+            // Ripple remaining carry (rarely goes far)
+            var kk = k + 2
+            while (carry != 0uL && kk < zLen) {
+                t = dw32(z[kk]) + carry
+                z[kk] = t.toInt()
+                carry = t shr 32
+                kk++
+            }
+        }
+
+        // Normalization
+        var lastIndex = zLen - 1
+        if (lastIndex >= 0 && z[lastIndex] == 0) lastIndex--
+        val zNormLen = lastIndex + 1
+
+        return zNormLen
+    }
+
+    fun setSqrCombaFused(z: IntArray, a: IntArray, n: Int): Int {
         require (z.size >= 2 * n)
         require (z !== a)
         var c0: Long = 0 // holds 32 bits
@@ -1117,7 +1339,7 @@ internal object Mago {
         return zNormLen
     }
 
-    fun setSqrCombaG(z: IntArray, a: IntArray, n: Int): Int {
+    fun setSqrCombaPhased(z: IntArray, a: IntArray, n: Int): Int {
         require(z.size >= 2 * n)
         require(z !== a)
 
@@ -1203,94 +1425,7 @@ internal object Mago {
         return zNormLen
     }
 
-    /**
-     * Comba squaring with split diagonal:
-     *  - Phase 1: off-diagonals only (2*a[i]*a[j]), i < j
-     *  - Phase 2: diagonals only (a[i]^2) added to column 2*i
-     *
-     * Accumulators:
-     *  - c0: current column low 32
-     *  - c1: carry stream (full 64), peeled by slide
-     */
-    fun setSqrCombaSplit(z: IntArray, a: IntArray, n: Int): Int {
-        require(z.size >= 2 * n)
-        require(z !== a)
-
-        // ---------- Phase 1: off-diagonals ----------
-        var c0 = 0L
-        var c1 = 0L
-
-        for (k in 0 until (2 * n - 1)) {
-            val start = maxOf(0, k - (n - 1))
-            val end   = minOf(n - 1, (k - 1) ushr 1)
-
-            if (k > 0 && start <= end) {
-                var i = start
-                while (i <= end) {
-                    val j = k - i
-                    val prod =
-                        (a[i].toLong() and MASK32L) *
-                                (a[j].toLong() and MASK32L)
-
-                    // add 2*prod
-                    c0 += (prod shl 1) and MASK32L
-                    c1 += (prod ushr 31) + (c0 ushr 32)
-                    c0 = c0 and MASK32L
-
-                    i++
-                }
-            }
-
-            // write column k (without diagonal)
-            z[k] = c0.toInt()
-
-            // slide: peel next carry limb
-            val t = c1
-            c0 = t and MASK32L
-            c1 = t ushr 32
-        }
-
-        // last limb from off-diagonals
-        z[2 * n - 1] = c0.toInt()
-        check(c1 == 0L)
-
-        // ---------- Phase 2: diagonals ----------
-        // add a[i]^2 into column 2*i
-        for (i in 0 until n) {
-            val ai = a[i].toLong() and MASK32L
-            val sq = ai * ai
-            val k = 2 * i
-
-            // add low 32
-            var t = (z[k].toLong() and MASK32L) + (sq and MASK32L)
-            z[k] = t.toInt()
-            var carry = t ushr 32
-
-            // add high 32 + carry
-            t = (z[k + 1].toLong() and MASK32L) + (sq ushr 32) + carry
-            z[k + 1] = t.toInt()
-            carry = t ushr 32
-
-            // ripple (rare; but correct)
-            var kk = k + 2
-            while (carry != 0L) {
-                if (kk >= z.size) throw ArithmeticException("mul overflow")
-                t = (z[kk].toLong() and MASK32L) + carry
-                z[kk] = t.toInt()
-                carry = t ushr 32
-                kk++
-            }
-        }
-
-        // normalization
-        val lastIndex = 2 * n - 1
-        val zNormLen = lastIndex +
-                if (lastIndex >= z.size || z[lastIndex] == 0) 0 else 1
-        verify (isNormalized(z, zNormLen))
-        return zNormLen
-    }
-
-    fun setSqrLE3Limbs(z: IntArray, a: IntArray, n: Int): Int {
+    fun setSqrLE4Limbs(z: IntArray, a: IntArray, n: Int): Int {
         when {
             n == 0 -> return 0
             n == 1 -> {
@@ -1306,66 +1441,175 @@ internal object Mago {
                 val dw = (a[1].toULong() shl 32) or a[0].toUInt().toULong()
                 val sqLo = dw * dw
                 val sqHi = unsignedMulHi(dw, dw)
-                z[0] = sqLo.toInt()
-                z[1] = (sqLo shr 32).toInt()
+                val hiLimb = (sqHi shr 32).toInt()
+                z[3] = hiLimb
                 z[2] = sqHi.toInt()
-                z[3] = (sqHi shr 32).toInt()
-                return (-(sqHi shr 32).toLong() ushr 63).toInt() + 3
+                z[1] = (sqLo shr 32).toInt()
+                z[0] = sqLo.toInt()
+                return if (hiLimb == 0) 3 else 4
             }
             n == 3 -> {
-                val a0 = a[0].toUInt().toULong()
-                val a1 = a[1].toUInt().toULong()
-                val a2 = a[2].toUInt().toULong()
+                val a0 = dw32(a[0])   // ULong, 0..2^32-1
+                val a1 = dw32(a[1])
+                val a2 = dw32(a[2])
 
-                // Squares
-                val s0 = a0 * a0          // contributes to z0, z1
-                val s1 = a1 * a1          // contributes to z2, z3
-                val s2 = a2 * a2          // contributes to z4, z5
+                val s0  = a0 * a0
+                val s1  = a1 * a1
+                val s2  = a2 * a2
+                val c01 = a0 * a1
+                val c02 = a0 * a2
+                val c12 = a1 * a2
 
-                // Cross terms (doubled)
-                val c01 = a0 * a1         // *2, contributes to z1, z2
-                val c02 = a0 * a2         // *2, contributes to z2, z3
-                val c12 = a1 * a2         // *2, contributes to z3, z4
-
-                var carry: ULong
-                var t: ULong
+                // carry is in "32-bit limbs" units: carry == next inbound value to add into column
+                var carry = s0 shr 32
 
                 // z[0]
                 z[0] = s0.toInt()
-                carry = s0 shr 32
 
-                // z[1]
-                t = carry + ((c01 shl 1) and 0xFFFF_FFFFuL)
-                z[1] = t.toInt()
-                carry = (t shr 32) + (c01 shr 31)
+                // ---- column 1: 2*c01 + carry ----
+                run {
+                    var lo = carry                      // fits in ULong
+                    var hi = 0uL                        // counts 2^64 units
 
-                // z[2]
-                t = carry +
-                        (s1 and 0xFFFF_FFFFuL) +
-                        ((c02 shl 1) and 0xFFFF_FFFFuL)
-                z[2] = t.toInt()
-                carry = (t shr 32) + (s1 shr 32) + (c02 shr 31)
+                    // add (c01 << 1) with overflow bit (c01 >>> 63)
+                    val dLo = c01 shl 1
+                    val dHi = c01 shr 63               // 0 or 1
 
-                // z[3]
-                t = carry +
-                        ((c12 shl 1) and 0xFFFF_FFFFuL)
-                z[3] = t.toInt()
-                carry = (t shr 32) + (c12 shr 31)
+                    val old = lo
+                    lo += dLo
+                    if (lo < old) hi++                  // 64-bit add overflow
+                    hi += dHi
 
-                // z[4]
-                t = carry + (s2 and 0xFFFF_FFFFuL)
-                z[4] = t.toInt()
-                carry = (t shr 32) + (s2 shr 32)
+                    z[1] = lo.toInt()
+                    carry = (lo shr 32) + (hi shl 32)
+                }
 
-                // z[5]
-                z[5] = carry.toInt()
+                // ---- column 2: s1 + 2*c02 + carry ----
+                run {
+                    var lo = carry
+                    var hi = 0uL
 
-                // normalization
-                return (-(carry.toLong()) ushr 32).toInt() + 5
+                    // + s1
+                    var old = lo
+                    lo += s1
+                    if (lo < old) hi++
+
+                    // + (c02 << 1) with overflow bit
+                    val dLo = c02 shl 1
+                    val dHi = c02 shr 63
+
+                    old = lo
+                    lo += dLo
+                    if (lo < old) hi++
+                    hi += dHi
+
+                    z[2] = lo.toInt()
+                    carry = (lo shr 32) + (hi shl 32)
+                }
+
+                // ---- column 3: 2*c12 + carry ----
+                run {
+                    var lo = carry
+                    var hi = 0uL
+
+                    val dLo = c12 shl 1
+                    val dHi = c12 shr 63
+
+                    val old = lo
+                    lo += dLo
+                    if (lo < old) hi++
+                    hi += dHi
+
+                    z[3] = lo.toInt()
+                    carry = (lo shr 32) + (hi shl 32)
+                }
+
+                // ---- column 4: s2 + carry ----
+                run {
+                    val t = carry + s2                  // this sum fits in <= 66 bits; still safe in ULong
+                    z[4] = t.toInt()
+                    z[5] = (t shr 32).toInt()
+                }
+
+                return if (z[5] == 0) 5 else 6
             }
 
-            else -> throw IllegalArgumentException()
+            n == 4 -> {
+                val a0 = dw32(a[0]); val a1 = dw32(a[1])
+                val a2 = dw32(a[2]); val a3 = dw32(a[3])
+
+                val s0 = a0 * a0; val s1 = a1 * a1; val s2 = a2 * a2; val s3 = a3 * a3
+                val c01 = a0 * a1; val c02 = a0 * a2; val c03 = a0 * a3
+                val c12 = a1 * a2; val c13 = a1 * a3; val c23 = a2 * a3
+
+                z[0] = s0.toInt()
+                var carry = s0 shr 32
+
+                // Column 1: 2*c01 + carry
+                run {
+                    var lo = carry; var hi = 0uL
+                    val dLo = c01 shl 1; val dHi = c01 shr 63
+                    val old = lo; lo += dLo
+                    if (lo < old) hi++; hi += dHi
+                    z[1] = lo.toInt(); carry = (lo shr 32) + (hi shl 32)
+                }
+
+                // Column 2: s1 + 2*c02 + carry
+                run {
+                    var lo = carry; var hi = 0uL
+                    var old = lo; lo += s1
+                    if (lo < old) hi++
+                    val dLo = c02 shl 1; val dHi = c02 shr 63
+                    old = lo; lo += dLo
+                    if (lo < old) hi++; hi += dHi
+                    z[2] = lo.toInt(); carry = (lo shr 32) + (hi shl 32)
+                }
+
+                // Column 3: 2*c03 + 2*c12 + carry (The n=4 Peak)
+                run {
+                    var lo = carry; var hi = 0uL
+                    // + 2*c03
+                    var dLo = c03 shl 1; var dHi = c03 shr 63
+                    var old = lo; lo += dLo
+                    if (lo < old) hi++; hi += dHi
+                    // + 2*c12
+                    dLo = c12 shl 1; dHi = c12 shr 63
+                    old = lo; lo += dLo
+                    if (lo < old) hi++; hi += dHi
+                    z[3] = lo.toInt(); carry = (lo shr 32) + (hi shl 32)
+                }
+
+                // Column 4: s2 + 2*c13 + carry
+                run {
+                    var lo = carry; var hi = 0uL
+                    var old = lo; lo += s2
+                    if (lo < old) hi++
+                    val dLo = c13 shl 1; val dHi = c13 shr 63
+                    old = lo; lo += dLo
+                    if (lo < old) hi++; hi += dHi
+                    z[4] = lo.toInt(); carry = (lo shr 32) + (hi shl 32)
+                }
+
+                // Column 5: 2*c23 + carry
+                run {
+                    var lo = carry; var hi = 0uL
+                    val dLo = c23 shl 1; val dHi = c23 shr 63
+                    val old = lo; lo += dLo
+                    if (lo < old) hi++; hi += dHi
+                    z[5] = lo.toInt(); carry = (lo shr 32) + (hi shl 32)
+                }
+
+                // Column 6 & 7: s3 + carry
+                run {
+                    val t = carry + s3
+                    z[6] = t.toInt()
+                    val z7 = (t shr 32).toInt()
+                    z[7] = z7
+                    return if (z7 == 0) 7 else 8
+                }
+            }
         }
+        throw IllegalArgumentException()
     }
 
     /**
