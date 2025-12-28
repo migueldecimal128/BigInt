@@ -4,7 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.min
 import kotlin.math.max
 
@@ -967,7 +966,7 @@ internal object Mago {
         }
         val z = IntArray(2*xNormLen + 1)
         val t = IntArray(3 * ((xNormLen + 1)/2) + 3)
-        val zNormLen = MagoSqr.setSqrKaratsuba(z, 0, x, 0, xNormLen, t)
+        val zNormLen = MagoSqr.karatsubaSqr(z, 0, x, 0, xNormLen, t)
         return z
     }
 

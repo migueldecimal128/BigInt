@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
-import com.decimal128.bigint.MagoSqr.setSqrKaratsuba
+import com.decimal128.bigint.MagoSqr.karatsubaSqr
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue
@@ -20,7 +20,7 @@ class TestKaratsubaSetSqr {
         val t = IntArray(3 * k1 + 3)
 
         // 1. Run Karatsuba
-        setSqrKaratsuba(zKaratsuba, 0, a, 0, n, t)
+        karatsubaSqr(zKaratsuba, 0, a, 0, n, t)
 
         // 2. Run Schoolbook (Reference)
         setSqrSchoolbook(zSchoolbook, 0, a, 0, n)
@@ -96,7 +96,7 @@ class TestKaratsubaSetSqr {
         val t = IntArray(3 * 2 + 3)
 
         // Square the middle 4 elements [1, 2, 3, 4] into z starting at index 2
-        setSqrKaratsuba(z, 2, a, 2, 4, t)
+        karatsubaSqr(z, 2, a, 2, 4, t)
 
         val expectedResult = IntArray(8)
         setSqrSchoolbook(expectedResult, 0, intArrayOf(1, 2, 3, 4), 0, 4)

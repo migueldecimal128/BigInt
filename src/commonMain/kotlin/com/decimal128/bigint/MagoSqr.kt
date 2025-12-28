@@ -7,6 +7,21 @@ package com.decimal128.bigint
 import com.decimal128.bigint.Mago.setMulSchoolbook
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 
+/**
+ * Squaring kernels for arbitrary-precision integers in
+ * [Magia] MAGnitude IntArray little endian format with
+ * accompanying `normLen` normalized length.
+ *
+ * Contains optimized implementations for multiple limb sizes,
+ * from small unrolled cases to generic schoolbook and Karatsuba.
+ *
+ * Current transition points for different techniques were
+ * determined on a circa-2019 8-Core Intel Core i9.
+ * Comba-style mul/sqr with reduced memory read/write proved
+ * to be slower than schoolbook, presumably due to larger L1
+ * cache. Schoolbook squaring proved faster than karatsuba
+ * up to 88 limbs == 2816 bytes.
+ */
 internal object MagoSqr {
 
     const val KARATSUBA_SQR_THRESHOLD = 88
@@ -18,15 +33,20 @@ internal object MagoSqr {
 
 
     /**
-     * Squares the first [xLen] limbs of [x], storing the result in [z].
+     * Squares `x[0 .. xNormLen)` and stores the result in `z`.
+     *
+     * Uses specialized unrolled implementations for small limb counts,
+     * falling back to schoolbook squaring for larger inputs.
+     *
+     * Karatsuba has a separate [setSqrKaratsuba] entry point because
+     * of its requirement for an additional intermediate `z` limb and
+     * its use of temp storage.
      *
      * Requirements:
-     * - [z.size] must be 2 * [xLen] ... allows higher performance
-     *   at very low cost
+     * - `z.size ≥ 2 * xNormLen`
      *
-     * @return the normalized limb length of the result.
+     * @return normalized limb length of the result
      */
-
     fun setSqr(z: Magia, x: Magia, xNormLen: Int): Int {
         return when {
             xNormLen == 0 -> 0
@@ -39,9 +59,25 @@ internal object MagoSqr {
         }
     }
 
+    /**
+     * Squares `x[0 .. xNormLen)` using schoolbook multiplication and
+     * writes the result into `z` starting at index 0.
+     *
+     * @return normalized limb length of the result
+     */
     inline fun setSqrSchoolbook(z: Magia, x: Magia, xNormLen: Int): Int =
         setSqrSchoolbook(z, 0, x, 0, xNormLen)
 
+    /**
+     * Squares `x[xOff .. xOff+xNormLen)` using schoolbook multiplication and
+     * writes the result into `z[zOff .. zOff+2*xNormLen)`.
+     *
+     * Cross terms `a[i]*a[j] (i<j)` are accumulated once, then doubled in a
+     * linear pass. Diagonal terms `a[i]^2` are added afterward into columns
+     * `2*i` with carry propagation.
+     *
+     * @return normalized limb length of the result
+     */
     fun setSqrSchoolbook(z: Magia, zOff: Int, x: Magia, xOff: Int, xNormLen: Int): Int {
         if (xNormLen == 0)
             return 0
@@ -107,6 +143,11 @@ internal object MagoSqr {
         return zNormLen
     }
 
+    /**
+     * Squares a single 32-bit unsigned limb `a[0]` into `z`.
+     *
+     * @return normalized limb length (1 or 2)
+     */
     private inline fun setSqr1Limb(z: Magia, a: Magia): Int {
         val dw = a[0].toUInt().toULong()
         val sq = dw * dw
@@ -116,6 +157,11 @@ internal object MagoSqr {
         return (-hi.toLong() ushr 63).toInt() + 1
     }
 
+    /**
+     * Squares a 2-limb unsigned magnitude `a` into `z` using 128-bit multiply.
+     *
+     * @return normalized limb length (3 or 4)
+     */
     private inline fun setSqr2Limbs(z: Magia, a: Magia): Int {
         val dw = (a[1].toULong() shl 32) or a[0].toUInt().toULong()
         val sqLo = dw * dw
@@ -128,6 +174,12 @@ internal object MagoSqr {
         return if (hiLimb == 0) 3 else 4
     }
 
+    /**
+     * Squares a 3-limb unsigned magnitude `a` into `z` using a fully unrolled,
+     * carry-safe schoolbook implementation.
+     *
+     * @return normalized limb length (5 or 6)
+     */
     private inline fun setSqr3Limbs(z: Magia, a: Magia): Int {
         val a0 = dw32(a[0])   // ULong, 0..2^32-1
         val a1 = dw32(a[1])
@@ -214,6 +266,12 @@ internal object MagoSqr {
         return if (z[5] == 0) 5 else 6
     }
 
+    /**
+     * Squares a 4-limb unsigned magnitude `a` into `z` using a fully unrolled,
+     * carry-safe schoolbook implementation.
+     *
+     * @return normalized limb length (7 or 8)
+     */
     private inline fun setSqr4Limbs(z: Magia, a: Magia): Int {
         val a0 = dw32(a[0]);
         val a1 = dw32(a[1])
@@ -308,19 +366,28 @@ internal object MagoSqr {
         }
     }
 
+    /**
+     * Squares `x[0..xNormLen)` using Karatsuba and writes the result into `z`.
+     *
+     * Requirements:
+     * - `z.size ≥ 2*xNormLen + 1` (extra headroom for intermediate carry/borrow propagation)
+     * - `tmp`, if provided, has size ≥ `3*((xNormLen+1)/2) + 3`
+     *
+     * @return normalized limb length of the result
+     */
     fun setSqrKaratsuba(z: Magia, x: Magia, xNormLen: Int, tmp: IntArray? = null): Int {
         val k1 = (xNormLen + 1) / 2
         val tmpSize = 3*k1 + 3
         verify (z.size >= 2*xNormLen + 1)
         verify (tmp == null || tmp.size >= tmpSize)
         val t = tmp ?: IntArray(tmpSize)
-        setSqrKaratsuba(z, 0, x, 0, xNormLen, t)
+        karatsubaSqr(z, 0, x, 0, xNormLen, t)
         val zLastIndex = 2*xNormLen - 1
         val zLastLimb = z[zLastIndex]
         val zNormLen = zLastIndex + ((zLastLimb or -zLastLimb) ushr 31)
         return zNormLen
-
     }
+
     /**
      * Computes the square of a multi-limb magnitude using the Karatsuba algorithm.
      *
@@ -343,7 +410,7 @@ internal object MagoSqr {
      * @param aLen number of active limbs in [a]
      * @param t scratch buffer used for Karatsuba temporaries
      */
-    fun setSqrKaratsuba(
+    fun karatsubaSqr(
         z: IntArray, zOff: Int,
         a: IntArray, aOff: Int, aLen: Int,
         t: IntArray
@@ -359,21 +426,23 @@ internal object MagoSqr {
         require (zOff >= 0 && zOff + 2*n <= z.size)
         require (t.size >= (3*k1 + 3))
 
-        setSqrKaratsuba(z, zOff,        a, aOff     , k0, t)
-        setSqrKaratsuba(z, zOff + 2*k0, a, aOff + k0, k1, t)
-        t.fill(0) // FIXME - not needed
-
+        // square lo half of a into z as z0
+        karatsubaSqr(z, zOff,        a, aOff     , k0, t)
+        // square hi half of a into z as z1
+        karatsubaSqr(z, zOff + 2*k0, a, aOff + k0, k1, t)
+        // add a0 and a1 as s into t
         ksetAdd(t, a, aOff, k0, k1)
-
-        t.fill(0, k1 + 1, 3*(k1 + 1))
+        // square s to s2 higher in t
         setSqrSchoolbook(t, k1 + 1, t, 0, k1 + 1)
-
+        // subtract z0 from s2
         val z1Off = k1 + 1
         kmutSub(t, z1Off, z, zOff, 2 * k0)
+        // subtract z2 from s2
         kmutSub(t, z1Off, z, zOff + 2 * k0, 2 * k1)
-
+        // add shifted s2 as z1 into z
         val z1FullLen = 2 * (k1 + 1)
         kmutAddShifted(z, zOff, t, z1Off, z1FullLen, k0)
+        // and we're done
     }
 
     /**
@@ -434,6 +503,12 @@ internal object MagoSqr {
         t[k1] = carry.toInt()
     }
 
+    /**
+     * In-place subtraction of `z[xOff .. xOff+xLen)` from `t[s2Off .. s2Off+xLen)`,
+     * with full borrow propagation into higher limbs of `t`.
+     *
+     * Throws if the borrow escapes `t`, indicating a violated Karatsuba invariant.
+     */
     fun kmutSub(t: IntArray, s2Off: Int,
                 z: IntArray, xOff: Int, xLen: Int) {
         val start = s2Off
