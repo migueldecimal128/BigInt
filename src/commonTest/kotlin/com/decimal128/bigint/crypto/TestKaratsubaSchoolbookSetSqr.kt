@@ -12,7 +12,7 @@ class TestKaratsubaSchoolbookSetSqr {
         val a = intArrayOf(0xFFFF_FFFF.toInt())
         val z = IntArray(4)
 
-        Karatsuba.schoolbookSetSqr(z, 0, a, 0, 1)
+        Karatsuba.setSqrSchoolbookK(z, 0, a, 0, 1)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a).sqr()
         val got = BigInt.Companion.fromLittleEndianIntArray(false, z)
@@ -28,7 +28,7 @@ class TestKaratsubaSchoolbookSetSqr {
         )
         val z = IntArray(8)
 
-        Karatsuba.schoolbookSetSqr(z, 1, a, 0, 2)
+        Karatsuba.setSqrSchoolbookK(z, 1, a, 0, 2)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a).sqr()
         val got = BigInt.Companion.fromLittleEndianIntArray(false, z, 1, a.size * 2)
@@ -45,7 +45,7 @@ class TestKaratsubaSchoolbookSetSqr {
 
         val z = IntArray(20)
 
-        Karatsuba.schoolbookSetSqr(z, 7, a, 3, 3)
+        Karatsuba.setSqrSchoolbookK(z, 7, a, 3, 3)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a, 3, 3).sqr()
         val got = BigInt.Companion.fromLittleEndianIntArray(false, z, 7, 6)
@@ -59,7 +59,7 @@ class TestKaratsubaSchoolbookSetSqr {
         val a = IntArray(n) { 0xFFFF_FFFF.toInt() }
         val z = IntArray(16)
 
-        Karatsuba.schoolbookSetSqr(z, 0, a, 0, a.size)
+        Karatsuba.setSqrSchoolbookK(z, 0, a, 0, a.size)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a)
         val ref2 = ref*ref
@@ -78,7 +78,7 @@ class TestKaratsubaSchoolbookSetSqr {
         )
         val z = IntArray(12)
 
-        Karatsuba.schoolbookSetSqr(z, 2, a, 0, 4)
+        Karatsuba.setSqrSchoolbookK(z, 2, a, 0, 4)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a, 0, 4).sqr()
         val got = BigInt.Companion.fromLittleEndianIntArray(false, z, 2, 8)
@@ -103,7 +103,7 @@ class TestKaratsubaSchoolbookSetSqr {
             val zOff = Random.Default.nextInt(10)
 
             z.fill(0, zOff, zOff + zLen)
-            Karatsuba.schoolbookSetSqr(z, zOff, a, aOff, aNormLen)
+            Karatsuba.setSqrSchoolbookK(z, zOff, a, aOff, aNormLen)
 
             val observed = BigInt.Companion.fromLittleEndianIntArray(false, z, zOff, zLen)
             val expected = bi.sqr()
@@ -118,7 +118,7 @@ class TestKaratsubaSchoolbookSetSqr {
 
         val z = IntArray(2*a.size)
 
-        Karatsuba.schoolbookSetSqr(z, 0, a, 0, a.size)
+        Karatsuba.setSqrSchoolbookK(z, 0, a, 0, a.size)
 
         val ref = BigInt.Companion.fromLittleEndianIntArray(false, a, 0, a.size)
         val ref2 = ref * ref

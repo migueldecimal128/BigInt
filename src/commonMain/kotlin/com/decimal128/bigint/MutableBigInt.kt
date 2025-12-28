@@ -1618,7 +1618,7 @@ class MutableBigInt private constructor (
         ensureTmp1CapacityZeroed(zLen + 1)
         val tmpSize = 3*k1 + 3
         ensureTmp2Capacity(tmpSize)
-        Karatsuba.karatsubaSetSqr(
+        Karatsuba.setSqrKaratsuba(
             tmp1, 0,
             a.magia, 0, a.meta.normLen,
             tmp2)

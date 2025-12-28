@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
-import com.decimal128.bigint.crypto.Karatsuba.karatsubaSetSqr
-import com.decimal128.bigint.crypto.Karatsuba.schoolbookSetSqr
+import com.decimal128.bigint.crypto.Karatsuba.setSqrKaratsuba
+import com.decimal128.bigint.crypto.Karatsuba.setSqrSchoolbookK
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue
@@ -20,10 +20,10 @@ class TestKaratsubaSetSqr {
         val t = IntArray(3 * k1 + 3)
 
         // 1. Run Karatsuba
-        karatsubaSetSqr(zKaratsuba, 0, a, 0, n, t)
+        setSqrKaratsuba(zKaratsuba, 0, a, 0, n, t)
 
         // 2. Run Schoolbook (Reference)
-        schoolbookSetSqr(zSchoolbook, 0, a, 0, n)
+        setSqrSchoolbookK(zSchoolbook, 0, a, 0, n)
 
         assertContentEquals(zSchoolbook, zKaratsuba, "Karatsuba squaring failed for size $n")
     }
@@ -96,10 +96,10 @@ class TestKaratsubaSetSqr {
         val t = IntArray(3 * 2 + 3)
 
         // Square the middle 4 elements [1, 2, 3, 4] into z starting at index 2
-        karatsubaSetSqr(z, 2, a, 2, 4, t)
+        setSqrKaratsuba(z, 2, a, 2, 4, t)
 
         val expectedResult = IntArray(8)
-        schoolbookSetSqr(expectedResult, 0, intArrayOf(1, 2, 3, 4), 0, 4)
+        setSqrSchoolbookK(expectedResult, 0, intArrayOf(1, 2, 3, 4), 0, 4)
 
         // Verify z[2..9] matches the expected square
         for (i in 0 until 8) {

@@ -4,9 +4,12 @@
 
 package com.decimal128.bigint.crypto
 
+import com.decimal128.bigint.Magia
+import com.decimal128.bigint.Mago
+
 object Karatsuba {
 
-    private const val DEFAULT_KARATSUBA_SQR_THRESHOLD = 2
+    private const val DEFAULT_KARATSUBA_SQR_THRESHOLD = 64
     val minLimbThreshold: Int = DEFAULT_KARATSUBA_SQR_THRESHOLD
 
     /**
@@ -32,14 +35,14 @@ object Karatsuba {
      * @param t scratch buffer used for Karatsuba temporaries
      */
 
-    fun karatsubaSetSqr(
+    fun setSqrKaratsuba(
         z: IntArray, zOff: Int,
         a: IntArray, aOff: Int, aLen: Int,
         t: IntArray
-    ) {
+    ): Int {
         if (aLen < minLimbThreshold) {
-            schoolbookSetSqr(z, zOff, a, aOff, aLen)
-            return
+            setSqrSchoolbookKaratG(z, zOff, a, aOff, aLen)
+            return -1
         }
 
         val n = aLen
@@ -48,14 +51,14 @@ object Karatsuba {
         require (zOff >= 0 && z.size >= zOff + 2*n)
         require (t.size >= (3*k1 + 3))
 
-        karatsubaSetSqr(z, zOff,        a, aOff     , k0, t)
-        karatsubaSetSqr(z, zOff + 2*k0, a, aOff + k0, k1, t)
+        setSqrKaratsuba(z, zOff,        a, aOff     , k0, t)
+        setSqrKaratsuba(z, zOff + 2*k0, a, aOff + k0, k1, t)
         t.fill(0) // FIXME - not needed
 
         ksetAdd(t, a, aOff, k0, k1)
 
         t.fill(0, k1 + 1, 3*(k1 + 1))
-        schoolbookSetSqr(t, k1 + 1, t, 0, k1 + 1)
+        setSqrSchoolbookKaratG(t, k1 + 1, t, 0, k1 + 1)
 
         val z1Off = k1 + 1
         kmutSub(t, z1Off, z, zOff       , 2*k0)
@@ -68,6 +71,7 @@ object Karatsuba {
         val z1FullLen = 2 * (k1 + 1)
         // z1 == 2 * a0 * a1
         kmutAddShifted(z, zOff, t, z1Off, z1FullLen, k0)
+        return -1
     }
 
     // <<<<<<<<<< PRIMITIVES >>>>>>>>>
@@ -322,14 +326,14 @@ object Karatsuba {
      */
     private const val MASK32 = 0xFFFF_FFFFuL
 
-    fun schoolbookSetSqr(
+    fun setSqrSchoolbookK(
         z: IntArray, zOff: Int,
         a: IntArray, aOff: Int, aLen: Int
-    ) {
+    ): Int {
         require(aOff >= 0 && aLen >= 0 && aOff + aLen <= a.size)
         require(zOff >= 0 && zOff + 2 * aLen <= z.size)
         require(isZeroed(z, zOff, 2 * aLen))
-        if (aLen == 0) return
+        if (aLen == 0) return -1
 
         // 1) Cross terms: for i<j, add 2*a[i]*a[j] into column (i+j)
         for (i in 0 until aLen) {
@@ -383,9 +387,73 @@ object Karatsuba {
                 kk++
             }
         }
+        return -1
     }
 
+    fun setSqrSchoolbookKaratG(z: Magia, zOff: Int, x: Magia, xOff: Int, xNormLen: Int): Int {
+        if (xNormLen == 0) return 0
+        val zLen = 2 * xNormLen
+        check (zOff >= 0 && zOff + zLen <= z.size)
+        z.fill(0, zOff, zOff + zLen)
 
+        check (xOff >= 0 && xOff + xNormLen <= x.size)
+        // 1) Cross terms: i < j
+        // We compute the sum of all a[i]*a[j] where i < j
+        for (i in 0 until xNormLen - 1) {
+            val ai = dw32(x[xOff + i])
+            var carry = 0uL
+            for (j in i + 1 until xNormLen) {
+                val k = i + j
+                // Standard row-multiply accumulation
+                val t = ai * dw32(x[xOff + j]) + dw32(z[zOff + k]) + carry
+                z[zOff + k] = t.toInt()
+                carry = t shr 32
+            }
+            z[zOff + i + xNormLen] = carry.toInt()
+        }
+
+        // 2) Double the cross terms: z = z * 2
+        // This is much faster than doubling inside the loop because it's a linear scan
+        var shiftCarry = 0uL
+        for (i in 0 until zLen) {
+            val zi = dw32(z[zOff + i])
+            val t = (zi shl 1) or shiftCarry
+            z[zOff + i] = t.toInt()
+            shiftCarry = t shr 32
+        }
+
+        // 3) Diagonals: add a[i]^2 into column 2*i
+        // We add these directly into the doubled cross-terms
+        for (i in 0 until xNormLen) {
+            var k = 2 * i
+            val zk = dw32(z[zOff + k])
+            val ai = dw32(x[xOff + i])
+            val sqa = ai * ai + zk
+
+            // Add low 32 bits
+            z[zOff + k] = sqa.toInt()
+            ++k
+            // Add high 32 bits + carry
+            var carry = dw32(z[zOff + k]) + (sqa shr 32)
+            z[zOff + k] = carry.toInt()
+            carry = carry shr 32
+            ++k
+
+            while (carry != 0uL && k < zLen) {
+                carry = dw32(z[zOff + k]) + carry
+                z[zOff + k] = carry.toInt()
+                carry = carry shr 32
+                ++k
+            }
+        }
+
+        // Normalization
+        var lastIndex = zLen - 1
+        if (lastIndex >= 0 && z[zOff + lastIndex] == 0) lastIndex--
+        val zNormLen = lastIndex + 1
+
+        return zNormLen
+    }
 
     /**
      * Squares a 2-limb unsigned magnitude starting at [aOff] and writes the
