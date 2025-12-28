@@ -1,7 +1,5 @@
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Mago.setMulCombaFused
-import com.decimal128.bigint.Mago.setMulCombaPhased
 import com.decimal128.bigint.Mago.setMulSchoolbook
 import com.decimal128.bigint.Mago.setSqrLE4Limbs
 import com.decimal128.bigint.Mago.setSqrSchoolbookG
@@ -11,12 +9,14 @@ import kotlin.time.TimeSource
 
 class TestMulSqrCombaBenchmark {
 
-    fun bench(label: String, runs: Int = 31, iters: Int = 10_000, block: () -> Int) {
+    val verbose = false
+
+    fun bench(label: String, runs: Int = 31, iters: Int = 10, block: () -> Int) {
         val clock = TimeSource.Monotonic
 
         // warmup
         var sink0 = 0
-        repeat(50_000) { sink0 += block() }
+        repeat(5) { sink0 += block() }
 
         val samples = LongArray(runs)
         var sink1 = 0
@@ -28,7 +28,8 @@ class TestMulSqrCombaBenchmark {
         }
 
         samples.sort()
-        println("$label median = ${samples[runs / 2]/1000} micro sec  (sink0=$sink0 sink1=$sink1)")
+        if (verbose)
+            println("$label median = ${samples[runs / 2]/1000} micro sec  (sink0=$sink0 sink1=$sink1)")
     }
 
 
@@ -36,7 +37,8 @@ class TestMulSqrCombaBenchmark {
     fun testSqrBenchmark() {
 
         for (n in 2..16) {
-            println("n=$n")
+            if (verbose)
+                println("n=$n")
             val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
             val z = IntArray(2 * n)
 
@@ -73,24 +75,25 @@ class TestMulSqrCombaBenchmark {
     @Test
     fun testMulBenchmark() {
 
-        for (n in 5..8) {
-            for (m in 5..8) {
+        for (n in 5..25) {
+            for (m in 5..25) {
                 val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
                 val b = IntArray(m) { (it + 1) * 0x6A09E667.toInt() }
                 val z = IntArray(m + n)
 
-                println("n=$n m=$m")
+                if (verbose)
+                    println("n=$n m=$m")
                 bench("setMulSchoolbook") {
                     setMulSchoolbook(z, a, n, b, m)
                 }
 
-                bench("setMulCombaFused") {
-                    setMulCombaFused(z, a, n, b, m)
-                }
+                //bench("setMulCombaFused") {
+                //    setMulCombaFused(z, a, n, b, m)
+                //}
 
-                bench("setMulCombaPhased") {
-                    setMulCombaPhased(z, a, n, b, m)
-                }
+                //bench("setMulCombaPhased") {
+                //    setMulCombaPhased(z, a, n, b, m)
+                //}
             }
         }
 
