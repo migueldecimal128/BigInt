@@ -866,40 +866,27 @@ class MutableBigInt private constructor (
      * @param x the value to square
      * @return this [MutableBigInt] for call chaining
      */
-    fun setSqr(x: BigIntNumber): MutableBigInt =
-        setSqrImpl(x.meta, x.magia)
-
-    /**
-     * Internal helper for arbitrary-precision squaring. Computes `x²` using
-     * the supplied metadata and limb array, writes the result into a zeroed
-     * temporary buffer, and updates this instance in place. Operand must be
-     * normalized.
-     *
-     * @param xMeta sign and length metadata for the operand
-     * @param x the operand’s limb array
-     * @return this [MutableBigInt] after mutation
-     */
-    private fun setSqrImpl(xMeta: Meta, x: Magia): MutableBigInt {
-        verify (Mago.isNormalized(x, xMeta.normLen))
-        val xNormLen = xMeta.normLen
+    fun setSqr(x: BigIntNumber): MutableBigInt {
+        verify (x.isNormalized())
+        val xNormLen = x.meta.normLen
         return when {
             xNormLen > 2 -> {
                 ensureTmp1CapacityZeroed(xNormLen + xNormLen)
                 _meta = Meta(
                     0,
-                    MagoSqr.setSqr(tmp1, x, xNormLen)
+                    MagoSqr.setSqr(tmp1, x.magia, xNormLen)
                 )
                 swapTmp1()
                 this
             }
             xNormLen == 2 -> {
-                val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
+                val xDw = (x.magia[1].toULong() shl 32) or x.magia[0].toUInt().toULong()
                 val lo = xDw * xDw
                 val hi = unsignedMulHi(xDw, xDw)
                 set(false, hi, lo)
             }
             xNormLen == 1 -> {
-                val x0 = x[0].toUInt().toULong()
+                val x0 = x.magia[0].toUInt().toULong()
                 set(false, x0 * x0)
             }
             else -> setZero()
