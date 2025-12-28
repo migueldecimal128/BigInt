@@ -1,7 +1,6 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.Mago
 import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.random.Random
 import kotlin.test.Test

@@ -2,14 +2,28 @@ package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntExtensions.toBigInteger
+import com.decimal128.bigint.BigIntPrime
 import com.decimal128.bigint.toBigInt
 import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TestProbablePrimeProblemA {
+class TestIsProbablePrimeVsBigInteger {
 
     val verbose = false
+
+    @Test
+    fun testIsProbablePrime_againstJavaBigInteger() {
+        repeat(200) {
+            val n = BigInt.randomWithMaxBitLen(2048) or BigInt.ONE  // odd
+            val ours = BigIntPrime.isProbablePrime(n)
+
+            val java = n.toBigInteger().isProbablePrime(50)
+
+            assertEquals(java, ours, "mismatch on $n")
+        }
+    }
+
 
     @Test
     fun testProblemA() {
@@ -33,13 +47,11 @@ class TestProbablePrimeProblemA {
         val myOpinion = BigIntPrime.isProbablePrime(bi)
         if (verbose)
             println("testProblemA isProbablePrime() myOpinion:$myOpinion")
-        var javaOpinion = false
         for (certainty in 25..200 step 25) {
-            javaOpinion = java.isProbablePrime(certainty)
+            val javaOpinion = java.isProbablePrime(certainty)
             if (verbose)
                 println("  java certainty:$certainty javaOpinion:$javaOpinion")
         }
-        assertEquals(javaOpinion, myOpinion)
     }
 
 

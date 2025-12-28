@@ -1,8 +1,5 @@
-package com.decimal128.bigint.crypto
+package com.decimal128.bigint
 
-import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.MutableBigInt
-import com.decimal128.bigint.toBigInt
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse

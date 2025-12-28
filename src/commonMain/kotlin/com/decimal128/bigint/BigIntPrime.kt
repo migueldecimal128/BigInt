@@ -1,9 +1,6 @@
-package com.decimal128.bigint.crypto
+package com.decimal128.bigint
 
-import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.MutableBigInt
-import com.decimal128.bigint.toBigInt
-import com.decimal128.bigint.toMutableBigInt
+import com.decimal128.bigint.crypto.ModContext
 
 /**
  * Primality-testing utilities for [BigInt].

@@ -4,7 +4,6 @@ import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntNumber
 import com.decimal128.bigint.MutableBigInt
 import kotlin.math.absoluteValue
-import kotlin.math.min
 
 /**
  * Provides a reusable modular–arithmetic context for a fixed modulus [m].
