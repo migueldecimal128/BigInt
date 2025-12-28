@@ -1218,6 +1218,7 @@ internal object Mago {
     fun setSqrSchoolbookG(z: Magia, x: Magia, xNormLen: Int): Int {
         if (xNormLen == 0) return 0
         val zLen = 2 * xNormLen
+        check (z.size >= zLen)
         z.fill(0, 0, zLen)
 
         // 1) Cross terms: i < j
@@ -1248,27 +1249,25 @@ internal object Mago {
         // 3) Diagonals: add a[i]^2 into column 2*i
         // We add these directly into the doubled cross-terms
         for (i in 0 until xNormLen) {
+            var k = 2 * i
+            val zk = dw32(z[k])
             val ai = dw32(x[i])
-            val sq = ai * ai
-            val k = 2 * i
+            val sqa = ai * ai + zk
 
             // Add low 32 bits
-            var t = dw32(z[k]) + (sq and MASK32)
-            z[k] = t.toInt()
-            var carry = t shr 32
-
+            z[k] = sqa.toInt()
+            ++k
             // Add high 32 bits + carry
-            t = dw32(z[k + 1]) + (sq shr 32) + carry
-            z[k + 1] = t.toInt()
-            carry = t shr 32
+            var carry = dw32(z[k]) + (sqa shr 32)
+            z[k] = carry.toInt()
+            carry = carry shr 32
+            ++k
 
-            // Ripple remaining carry (rarely goes far)
-            var kk = k + 2
-            while (carry != 0uL && kk < zLen) {
-                t = dw32(z[kk]) + carry
-                z[kk] = t.toInt()
-                carry = t shr 32
-                kk++
+            while (carry != 0uL && k < zLen) {
+                carry = dw32(z[k]) + carry
+                z[k] = carry.toInt()
+                carry = carry shr 32
+                ++k
             }
         }
 

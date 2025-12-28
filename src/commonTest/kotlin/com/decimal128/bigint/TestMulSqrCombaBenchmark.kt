@@ -14,55 +14,58 @@ import kotlin.time.TimeSource
 
 class TestMulSqrCombaBenchmark {
 
-    fun bench(label: String, runs: Int = 21, iters: Int = 5_000, block: () -> Int) {
+    fun bench(label: String, runs: Int = 31, iters: Int = 10_000, block: () -> Int) {
         val clock = TimeSource.Monotonic
 
         // warmup
-        repeat(100_000) { block() }
+        var sink0 = 0
+        repeat(50_000) { sink0 += block() }
 
         val samples = LongArray(runs)
-        var sink = 0
+        var sink1 = 0
 
         for (r in 0 until runs) {
             val t0 = clock.markNow()
-            repeat(iters) { sink += block() }
+            repeat(iters) { sink1 += block() }
             samples[r] = t0.elapsedNow().inWholeNanoseconds
         }
 
         samples.sort()
-        println("$label median = ${samples[runs / 2]/1000} micro sec  (sink=$sink)")
+        println("$label median = ${samples[runs / 2]/1000} micro sec  (sink0=$sink0 sink1=$sink1)")
     }
 
 
     @Test
     fun testSqrBenchmark() {
 
-        val n = 9
-        val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
-        val z = IntArray(2 * n)
+        for (n in 2..15) {
+            println("n=$n")
+            val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
+            val z = IntArray(2 * n)
 
-        if (n <= 4) {
-            bench("direct") {
-                setSqrLE4Limbs(z, a, n)
+            if (n <= 4) {
+                bench("hand rolled") {
+                    setSqrLE4Limbs(z, a, n)
+                }
             }
-        }
 
-        bench("setSqrSchoolbook") {
-            setSqrSchoolbook(z, a, n)
-        }
+            //bench("setSqrSchoolbook") {
+            //    setSqrSchoolbook(z, a, n)
+            //}
 
-        bench("setSqrSchoolbookG") {
-            setSqrSchoolbookG(z, a, n)
-        }
+            bench("setSqrSchoolbookG") {
+                setSqrSchoolbookG(z, a, n)
+            }
 
-        bench("setSqrCombaFused") {
-            setSqrCombaFused(z, a, n)
-        }
+            //bench("setSqrCombaFused") {
+            //    setSqrCombaFused(z, a, n)
+            //}
 
-        bench("setSqrCombaPhased") {
-            setSqrCombaPhased(z, a, n)
-        }
+            bench("setSqrCombaPhased") {
+                setSqrCombaPhased(z, a, n)
+            }
 
+        }
 
     }
 
