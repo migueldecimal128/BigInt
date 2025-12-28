@@ -39,15 +39,13 @@ object Karatsuba {
         a: IntArray, aOff: Int, aLen: Int,
         t: IntArray
     ): Int {
-        if (aLen < minLimbThreshold) {
-            Mago.setSqrSchoolbook(z, zOff, a, aOff, aLen)
-            return -1
-        }
+        if (aLen < minLimbThreshold)
+            return Mago.setSqrSchoolbook(z, zOff, a, aOff, aLen)
 
         val n = aLen
         val k0 = n / 2
         val k1 = n - k0
-        require (zOff >= 0 && z.size >= zOff + 2*n)
+        require (zOff >= 0 && zOff + 2*n <= z.size)
         require (t.size >= (3*k1 + 3))
 
         setSqrKaratsuba(z, zOff,        a, aOff     , k0, t)
@@ -63,14 +61,13 @@ object Karatsuba {
         kmutSub(t, z1Off, z, zOff       , 2*k0)
         kmutSub(t, z1Off, z, zOff + 2*k0, 2*k1)
 
-        val z1LenArithmetic = k0 + k1 + 1
-        val z1LenFull = 2 * (k1 + 1)
-
-        val z1Len = k0 + k1 + 1
         val z1FullLen = 2 * (k1 + 1)
-        // z1 == 2 * a0 * a1
         kmutAddShifted(z, zOff, t, z1Off, z1FullLen, k0)
-        return -1
+
+        val zLastIndex = 2*n - 1
+        val zLastLimb = z[zOff + zLastIndex]
+        val zNormLen = zLastIndex + (zLastLimb or -zLastLimb) ushr 31
+        return zNormLen
     }
 
     // <<<<<<<<<< PRIMITIVES >>>>>>>>>
@@ -136,55 +133,6 @@ object Karatsuba {
         // 5. Store final carry
         // tEnd >= t.size check above ensures t[i] is safe here.
         t[k1] = carry.toInt()
-    }
-
-    /**
-     * Subtracts a limb range from [z] out of [t] in place, starting at [s2Off].
-     *
-     * Computes:
-     * `t[s2Off ..< s2Off + xLen] -= z[xOff ..< xOff + xLen]`
-     *
-     * Borrow is propagated forward in [t] until it clears or the end of the array
-     * is reached.
-     *
-     * @param t destination array, mutated in place
-     * @param s2Off starting index in [t] for the subtraction
-     * @param z source array containing the subtrahend
-     * @param xOff starting index in [z]
-     * @param xLen number of limbs to subtract
-     */
-    fun kmutSubX(t: IntArray, s2Off: Int,
-                z: IntArray, xOff: Int, xLen: Int) {
-        val start = s2Off
-        val end = start + xLen
-
-        // 1. Dominating Check
-        // Proves to the JIT that t[s2Off...s2Off+xLen-1] and z[xOff...xOff+xLen-1] are safe.
-        if (start < 0 || end > t.size || xOff < 0 || xOff + xLen > z.size) {
-            throw IndexOutOfBoundsException()
-        }
-
-        var borrow = 0uL
-
-        // 2. Primary Subtraction Loop
-        // JIT eliminates bounds checks because i < xLen and we proved 'end' is safe.
-        for (i in 0 until xLen) {
-            val tIdx = start + i
-            val zIdx = xOff + i
-            val tmp = dw32(t[tIdx]) - dw32(z[zIdx]) - borrow
-            t[tIdx] = tmp.toInt()
-            borrow = tmp shr 63
-        }
-
-        // 3. Ripple Borrow Loop
-        // Continues from 'end' using the array's physical size for BCE.
-        var k = end
-        while (borrow != 0uL && k < t.size) {
-            val tmp = dw32(t[k]) - borrow
-            t[k] = tmp.toInt()
-            borrow = tmp shr 63
-            k++
-        }
     }
 
     fun kmutSub(t: IntArray, s2Off: Int,
@@ -276,117 +224,6 @@ object Karatsuba {
             carry = tmp shr 32
             k++
         }
-    }
-
-    fun isZeroed(x: IntArray, off: Int, len: Int): Boolean {
-        val limit = off + len
-        if (off >= 0 && limit <= x.size) {
-            for (i in off..<limit) {
-                if (x[i] != 0)
-                    return false
-            }
-            return true
-        }
-        return false
-    }
-
-    /**
-     * Computes the square of a multi-limb magnitude using the schoolbook algorithm.
-     *
-     * The input limbs `a[aOff ..< aOff + aLen]` are treated as an unsigned integer
-     * in base 2³². The full 2·aLen-limb result is written into
-     * `z[zOff ..< zOff + 2·aLen]`.
-     *
-     * The destination range must be zero-initialized before the call.
-     * No allocation occurs; all carries are propagated explicitly.
-     *
-     * @param z destination magnitude for the squared result
-     * @param zOff starting index in [z]; must allow `zOff + 2·aLen`
-     * @param a source magnitude to square
-     * @param aOff starting index in [a]
-     * @param aLen number of active limbs in [a]
-     */
-    /*
-            if (aLen < 2) when {
-            aLen == 2 -> {
-                squareTwoLimbs(z, zOff, a, aOff)
-                return
-            }
-            aLen == 1 -> {
-                val dw0     = dw32(a[aOff])
-                val sq0     = dw0 * dw0
-                z[zOff    ] = sq0.toInt()
-                z[zOff + 1] = (sq0 shr 32).toInt()
-                return
-            }
-            else -> throw IllegalStateException()
-        }
-
-     */
-    private const val MASK32 = 0xFFFF_FFFFuL
-
-    fun setSqrSchoolbookK(
-        z: IntArray, zOff: Int,
-        a: IntArray, aOff: Int, aLen: Int
-    ): Int {
-        require(aOff >= 0 && aLen >= 0 && aOff + aLen <= a.size)
-        require(zOff >= 0 && zOff + 2 * aLen <= z.size)
-        require(isZeroed(z, zOff, 2 * aLen))
-        if (aLen == 0) return -1
-
-        // 1) Cross terms: for i<j, add 2*a[i]*a[j] into column (i+j)
-        for (i in 0 until aLen) {
-            val ai = dw32(a[aOff + i])
-            for (j in i + 1 until aLen) {
-                val k = zOff + i + j
-                val prod = ai * dw32(a[aOff + j]) // 64-bit
-
-                // Compute 2*prod split into (lo32, hi32)
-                val lo = (prod shl 1) and MASK32
-                var carry = (prod shr 31)          // hi32 of (prod*2)
-
-                // Add lo into z[k]
-                var t = dw32(z[k]) + lo
-                z[k] = t.toInt()
-                carry += (t shr 32)
-
-                // Ripple carry into higher limbs
-                var kk = k + 1
-                while (carry != 0uL) {
-                    t = dw32(z[kk]) + (carry and MASK32)
-                    z[kk] = t.toInt()
-                    carry = (carry shr 32) + (t shr 32)
-                    kk++
-                }
-            }
-        }
-
-        // 2) Diagonals: add a[i]^2 into columns (2*i) and (2*i+1)
-        for (i in 0 until aLen) {
-            val ai = dw32(a[aOff + i])
-            val sq = ai * ai
-            val k = zOff + 2 * i
-
-            // low limb
-            var t = dw32(z[k]) + (sq and MASK32)
-            z[k] = t.toInt()
-            var carry = t shr 32
-
-            // high limb + carry
-            t = dw32(z[k + 1]) + (sq shr 32) + carry
-            z[k + 1] = t.toInt()
-            carry = t shr 32
-
-            // ripple remaining carry
-            var kk = k + 2
-            while (carry != 0uL) {
-                t = dw32(z[kk]) + carry
-                z[kk] = t.toInt()
-                carry = t shr 32
-                kk++
-            }
-        }
-        return -1
     }
 
 }
