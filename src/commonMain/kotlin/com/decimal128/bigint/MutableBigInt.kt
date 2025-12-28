@@ -867,29 +867,20 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] for call chaining
      */
     fun setSqr(x: BigIntNumber): MutableBigInt {
-        verify (x.isNormalized())
+        verify(x.isNormalized())
         val xNormLen = x.meta.normLen
-        return when {
-            xNormLen > 2 -> {
+        when {
+            xNormLen == 0 -> return setZero()
+            xNormLen < MagoSqr.KARATSUBA_SQR_THRESHOLD -> {
                 ensureTmp1CapacityZeroed(xNormLen + xNormLen)
                 _meta = Meta(
                     0,
                     MagoSqr.setSqr(tmp1, x.magia, xNormLen)
                 )
                 swapTmp1()
-                this
+                return this
             }
-            xNormLen == 2 -> {
-                val xDw = (x.magia[1].toULong() shl 32) or x.magia[0].toUInt().toULong()
-                val lo = xDw * xDw
-                val hi = unsignedMulHi(xDw, xDw)
-                set(false, hi, lo)
-            }
-            xNormLen == 1 -> {
-                val x0 = x.magia[0].toUInt().toULong()
-                set(false, x0 * x0)
-            }
-            else -> setZero()
+            else -> return karatsubaSetSqr(x)
         }
     }
 

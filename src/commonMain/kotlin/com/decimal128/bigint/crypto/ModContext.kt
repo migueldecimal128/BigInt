@@ -652,8 +652,7 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
             out.setMul(aR, bR).montgomeryRedc(modulus, np)
 
         fun montSqr(aR: BigIntNumber, out: MutableBigInt) =
-            //out.setSqr(aR).montgomeryRedc(modulus, np)
-            out.karatsubaSetSqr(aR).montgomeryRedc(modulus, np)
+            out.setSqr(aR).montgomeryRedc(modulus, np)
 
         val baseR = MutableBigInt()
         val xR = MutableBigInt()
