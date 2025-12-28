@@ -961,8 +961,14 @@ internal object Mago {
      */
     fun newSqr(x: Magia, xNormLen: Int): Magia {
         verify (isNormalized(x, xNormLen))
-        val z = IntArray(2 * xNormLen)
-        val zNormLen = MagoSqr.setSqr(z, x, xNormLen)
+        if (xNormLen < MagoSqr.KARATSUBA_SQR_THRESHOLD) {
+            val z = IntArray(2 * xNormLen)
+            val zNormLen = MagoSqr.setSqr(z, x, xNormLen)
+            return z
+        }
+        val z = IntArray(2*xNormLen + 1)
+        val t = IntArray(3 * ((xNormLen + 1)/2) + 3)
+        val zNormLen = MagoSqr.setSqrKaratsuba(z, 0, x, 0, xNormLen, t)
         return z
     }
 

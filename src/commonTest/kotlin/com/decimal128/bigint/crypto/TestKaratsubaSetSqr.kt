@@ -2,7 +2,7 @@ package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.Mago
 import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
-import com.decimal128.bigint.crypto.Karatsuba.setSqrKaratsuba
+import com.decimal128.bigint.MagoSqr.setSqrKaratsuba
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue

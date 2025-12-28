@@ -1,6 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.MagoSqr
+import com.decimal128.bigint.MagoSqr.setSqrKaratsuba
 import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.test.Test
 import kotlin.time.TimeSource
@@ -69,7 +70,7 @@ class TestKaratsubaSqrBenchmark {
 
             bench("Karatsuba.setSqrKaratsuba") {
                 z.fill(0)
-                Karatsuba.setSqrKaratsuba(z, 0, a, 0, n, t)
+                setSqrKaratsuba(z, a, n, t)
             }
 
             bench("Mago.setSqrSchoolbook") {

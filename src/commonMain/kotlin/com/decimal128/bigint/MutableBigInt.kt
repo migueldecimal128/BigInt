@@ -1612,17 +1612,12 @@ class MutableBigInt private constructor (
         val n = a.meta.normLen
         if (n <= 1)
             return setSqr(a)
-        val k0 = n / 2
-        val k1 = n - k0
+        val k1 = (n + 1) / 2
         val zLen = 2*n
         ensureTmp1CapacityZeroed(zLen + 1)
         val tmpSize = 3*k1 + 3
         ensureTmp2Capacity(tmpSize)
-        Karatsuba.setSqrKaratsuba(
-            tmp1, 0,
-            a.magia, 0, a.meta.normLen,
-            tmp2)
-        val zNormLen = zLen - if (tmp1[zLen - 1] == 0) 1 else 0
+        val zNormLen = MagoSqr.setSqrKaratsuba(tmp1, a.magia, a.meta.normLen, tmp2)
         swapTmp1()
         _meta = Meta(zNormLen)
         return this

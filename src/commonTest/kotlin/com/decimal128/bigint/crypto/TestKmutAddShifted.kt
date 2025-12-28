@@ -1,6 +1,6 @@
 package com.decimal128.bigint.crypto
 
-import com.decimal128.bigint.crypto.Karatsuba.kmutAddShifted
+import com.decimal128.bigint.MagoSqr.kmutAddShifted
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 

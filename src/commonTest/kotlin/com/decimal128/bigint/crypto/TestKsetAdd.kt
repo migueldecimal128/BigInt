@@ -1,7 +1,7 @@
 package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.crypto.Karatsuba.ksetAdd
+import com.decimal128.bigint.MagoSqr.ksetAdd
 
 import kotlin.random.Random
 import kotlin.test.*

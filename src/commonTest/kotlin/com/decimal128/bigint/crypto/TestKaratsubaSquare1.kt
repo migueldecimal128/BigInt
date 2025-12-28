@@ -2,7 +2,7 @@ package com.decimal128.bigint.crypto
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.Mago.normLen
-import com.decimal128.bigint.crypto.Karatsuba.setSqrKaratsuba
+import com.decimal128.bigint.MagoSqr.setSqrKaratsuba
 import kotlin.test.*
 
 class TestKaratsubaSquare1 {
