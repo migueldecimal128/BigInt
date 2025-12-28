@@ -35,7 +35,7 @@ class TestMulSqrCombaBenchmark {
     @Test
     fun testSqrBenchmark() {
 
-        for (n in 2..15) {
+        for (n in 2..16) {
             println("n=$n")
             val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
             val z = IntArray(2 * n)
@@ -54,6 +54,10 @@ class TestMulSqrCombaBenchmark {
                 setSqrSchoolbookG(z, a, n)
             }
 
+            bench("setMulSchoolbook(a,a)") {
+                setMulSchoolbook(z, a, n, a, n)
+            }
+
             //bench("setSqrCombaFused") {
             //    setSqrCombaFused(z, a, n)
             //}
@@ -69,22 +73,25 @@ class TestMulSqrCombaBenchmark {
     @Test
     fun testMulBenchmark() {
 
-        val n = 16
-        val m = 16
-        val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
-        val b = IntArray(m) { (it + 1) * 0x6A09E667.toInt() }
-        val z = IntArray(m + n)
+        for (n in 5..8) {
+            for (m in 5..8) {
+                val a = IntArray(n) { (it + 1) * 0x9E3779B9.toInt() }
+                val b = IntArray(m) { (it + 1) * 0x6A09E667.toInt() }
+                val z = IntArray(m + n)
 
-        bench("setMulSchoolbook") {
-            setMulSchoolbook(z, a, n, b, m)
-        }
+                println("n=$n m=$m")
+                bench("setMulSchoolbook") {
+                    setMulSchoolbook(z, a, n, b, m)
+                }
 
-        bench("setMulCombaFused") {
-            setMulCombaFused(z, a, n, b, m)
-        }
+                bench("setMulCombaFused") {
+                    setMulCombaFused(z, a, n, b, m)
+                }
 
-        bench("setMulCombaPhased") {
-            setMulCombaPhased(z, a, n, b, m)
+                bench("setMulCombaPhased") {
+                    setMulCombaPhased(z, a, n, b, m)
+                }
+            }
         }
 
     }

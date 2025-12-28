@@ -865,8 +865,6 @@ internal object Mago {
         if (xNormLen >= 0 && xNormLen <= x.size &&
             yNormLen >= 0 && yNormLen <= y.size &&
             z.size >= xNormLen + yNormLen - 1) {
-            verify (isNormalized(x, xNormLen))
-            verify (isNormalized(y, yNormLen))
 
             if (xNormLen == 0 || yNormLen == 0)
                 return 0
@@ -884,9 +882,9 @@ internal object Mago {
                 var carry = 0uL
                 for (j in 0..<largoLen) {
                     val largoLimb = dw32(largo[j])
-                    val t = cortoLimb * largoLimb + dw32(z[i + j]) + carry
-                    z[i + j] = t.toInt()
-                    carry = t shr 32
+                    carry = cortoLimb * largoLimb + dw32(z[i + j]) + carry
+                    z[i + j] = carry.toInt()
+                    carry = carry shr 32
                 }
                 if (i + largoLen < z.size)
                     z[i + largoLen] = carry.toInt()
