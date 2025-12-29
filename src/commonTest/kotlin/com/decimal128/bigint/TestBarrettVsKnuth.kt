@@ -6,7 +6,7 @@ import com.decimal128.bigint.toBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TestBarrett {
+class TestBarrettVsKnuth {
 
     fun checkRemainder(m: BigInt, x: BigInt) {
         val mod = MutableBigInt()

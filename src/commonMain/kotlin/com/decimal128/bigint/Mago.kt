@@ -181,8 +181,11 @@ internal object Mago {
     /**
      * Returns the normalized limb length of **x**—the index of the highest
      * non-zero limb plus one. If all limbs are zero, returns `0`.
+     *
+     * **WARNING** This call can be dangerous. It should *only* be used
+     * on magia returned by `new` functions because it will pick up
+     * garbage upper limbs in values and temps allocated by [MutableBigInt]
      */
-    // FIXME -- this is suspicious ... I don't think anyone should call this
     inline fun normLen(x: Magia): Int {
         for (i in x.size - 1 downTo 0)
             if (x[i] != 0)
@@ -1984,8 +1987,9 @@ internal object Mago {
         return when {
             (dw shr 32) == 0uL -> {
                 val rem = calcRem32(x, xNormLen, dw.toUInt())
-                z[0] = rem.toInt()
-                return -rem.toInt() ushr 31
+                val z0 = rem.toInt()
+                z[0] = z0
+                return (z0 or -z0) ushr 31
                }
             xNormLen == 0 -> 0
             xNormLen <= 2 -> setULong(z, toRawULong(x, xNormLen) % dw)
@@ -2192,7 +2196,7 @@ internal object Mago {
 
         var rNormLen = 0
         if (r != null)
-            rNormLen = setShiftRight(r, un, normLen(un), shift)
+            rNormLen = setShiftRight(r, un, normLen(un, m + 1), shift)
 
         return when {
             q != null -> normLen(q, m-n+1)
@@ -2338,7 +2342,7 @@ internal object Mago {
 
         var rNormLen = 0
         if (r != null)
-            rNormLen = setShiftRight(r, un, normLen(un), shift)
+            rNormLen = setShiftRight(r, un, normLen(un, m + 1), shift)
 
         if (q != null)
             return normLen(q, m-2+1).toULong()

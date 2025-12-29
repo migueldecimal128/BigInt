@@ -5,16 +5,16 @@ import com.decimal128.bigint.BigIntExtensions.toBigInt
 import org.junit.jupiter.api.Assertions.assertThrows
 import java.math.BigInteger
 import kotlin.random.Random
-import kotlin.random.nextULong
+import kotlin.random.nextUInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TestMod64 {
+class TestRem32 {
 
     val verbose = false
 
     @Test
-    fun testMod64() {
+    fun testRem32() {
         for (i in 0..<10000) {
             testUnsigned()
             testSigned()
@@ -22,131 +22,124 @@ class TestMod64 {
     }
 
     fun testUnsigned() {
-        val hi = randomHi(65)
+        val hi = BigInt.randomWithRandomBitLen(512)
         val bi = hi.toBigInteger()
-        val dw = rng.nextULong()
+        val w = Random.nextUInt()
         if (verbose)
-            println("hi:$hi dw:$dw")
-        if (dw != 0uL) {
-            val remBi = (bi % BigInteger("$dw")).toBigInt()
-            val rem1 = hi % BigInt.from(dw)
-            val rem2 = hi % dw
+            println("hi:$hi w:$w")
+        if (w != 0u) {
+            val remBi = (bi % BigInteger.valueOf(w.toLong())).toBigInt()
+            val rem1 = hi % BigInt.from(w)
+            val rem2 = hi % w
             assertEquals(remBi, rem1)
             assertEquals(rem1, rem2)
         } else {
             assertThrows(ArithmeticException::class.java) {
-                val remBi = (bi % BigInteger("$dw")).toBigInt()
+                val remBi = (bi % BigInteger.valueOf(w.toLong())).toBigInt()
             }
             assertThrows(ArithmeticException::class.java) {
-                val rem1 = hi % BigInt.from(dw)
+                val rem1 = hi % BigInt.from(w)
             }
             assertThrows(ArithmeticException::class.java) {
-                val rem2 = hi % dw
+                val rem2 = hi % w
             }
         }
 
         if (hi.isNotZero()) {
-            val inverseBi = (BigInteger("$dw") % bi).toBigInt()
-            val inverse1 = BigInt.from(dw) % hi
-            val inverse2 = dw % hi
+            val inverseBi = (BigInteger.valueOf(w.toLong()) % bi).toBigInt()
+            val inverse1 = BigInt.from(w) % hi
+            val inverse2 = w % hi
             assertEquals(inverseBi, inverse1)
             assertEquals(inverse1, inverse2)
         } else {
             assertThrows(ArithmeticException::class.java) {
-                val inverseBi = (BigInteger.valueOf(dw.toLong()) % bi).toBigInt()
+                val inverseBi = (BigInteger.valueOf(w.toLong()) % bi).toBigInt()
             }
             assertThrows(ArithmeticException::class.java) {
-                val inverse1 = BigInt.from(dw) % hi
+                val inverse1 = BigInt.from(w) % hi
             }
             assertThrows(ArithmeticException::class.java) {
-                val inverse2 = dw % hi
+                val inverse2 = w % hi
             }
 
         }
     }
 
     fun testSigned() {
-        val hi = randomHi(65)
-        val bi = hi.toBigInteger()
-        val l = rng.nextLong()
+        val bi = BigInt.randomWithRandomBitLen(66, withRandomSign = true)
+        val jbi = bi.toBigInteger()
+        val n = Random.nextInt()
         if (verbose)
-            println("hi:$hi l:$l")
-        if (l != 0L) {
-            val quotBi = (bi % BigInteger.valueOf(l.toLong())).toBigInt()
-            val quot1 = hi % BigInt.from(l)
-            val quot2 = hi % l
+            println("bi:$bi n:$n")
+        if (n != 0) {
+            val quotBi = (jbi % BigInteger.valueOf(n.toLong())).toBigInt()
+            val quot1 = bi % BigInt.from(n)
+            val quot2 = bi % n
             assertEquals(quotBi, quot1)
             assertEquals(quot1, quot2)
         } else {
             assertThrows(ArithmeticException::class.java) {
-                val quotBi = (bi % BigInteger.valueOf(l.toLong())).toBigInt()
+                val quotBi = (jbi % BigInteger.valueOf(n.toLong())).toBigInt()
             }
             assertThrows(ArithmeticException::class.java) {
-                val quot1 = hi % BigInt.from(l)
+                val quot1 = bi % BigInt.from(n)
             }
             assertThrows(ArithmeticException::class.java) {
-                val quot2 = hi % l
+                val quot2 = bi % n
             }
         }
 
-        if (hi.isNotZero()) {
-            val inverseBi = (BigInteger.valueOf(l.toLong()) % bi).toBigInt()
-            val inverse1 = BigInt.from(l) % hi
-            val inverse2 = l % hi
+        if (bi.isNotZero()) {
+            val inverseBi = (BigInteger.valueOf(n.toLong()) % jbi).toBigInt()
+            val inverse1 = BigInt.from(n) % bi
+            val inverse2 = n % bi
             assertEquals(inverseBi, inverse1)
             assertEquals(inverse1, inverse2)
         } else {
             assertThrows(ArithmeticException::class.java) {
-                val inverseBi = (BigInteger.valueOf(l.toLong()) % bi).toBigInt()
+                val inverseBi = (BigInteger.valueOf(n.toLong()) % jbi).toBigInt()
             }
             assertThrows(ArithmeticException::class.java) {
-                val inverse1 = BigInt.from(l) % hi
+                val inverse1 = BigInt.from(n) % bi
             }
             assertThrows(ArithmeticException::class.java) {
-                val inverse2 = l % hi
+                val inverse2 = n % bi
             }
 
         }
-    }
-
-    val rng = Random.Default
-
-    fun randomHi(hiBitLen: Int): BigInt {
-        val rand = BigInt.randomWithMaxBitLen(rng.nextInt(hiBitLen), rng)
-        return if (rng.nextBoolean()) rand.negate() else rand
     }
 
     @Test
     fun testProblemChild() {
         val hi = BigInt.from("-1021459206398")
-        val dw = 3967413780uL
-        val remBi = (hi.toBigInteger() % BigInteger("$dw")).toBigInt()
-        val rem = hi % dw
-        val rem2 = hi % BigInt.from(dw)
+        val w = 3967413780u
+        val remBi = (hi.toBigInteger() % BigInteger("$w")).toBigInt()
+        val rem = hi % w
+        val rem2 = hi % BigInt.from(w)
         assertEquals(remBi, rem)
         assertEquals(rem2, rem)
 
-        val biInv = BigInteger("$dw") % BigInteger("$hi")
+        val biInv = BigInteger("$w") % BigInteger("$hi")
         val inverseBi = biInv.toBigInt()
-        val inverse = dw % hi
+        val inverse = w % hi
         assertEquals(inverseBi, inverse)
-        val inverse2 = BigInt.from(dw) % hi
+        val inverse2 = BigInt.from(w) % hi
         assertEquals(inverse2, inverse)
     }
 
     @Test
     fun testProblemChild2() {
         val hi = BigInt.from("-374001150")
-        val l = -1716976294
-        val remBi = (BigInteger("$hi") % BigInteger("$l")).toBigInt()
-        val rem = hi % l
-        val rem2 = hi % BigInt.from(l)
+        val n = -1716976294
+        val remBi = (BigInteger("$hi") % BigInteger("$n")).toBigInt()
+        val rem = hi % n
+        val rem2 = hi % BigInt.from(n)
         assertEquals(remBi, rem)
         assertEquals(rem2, rem)
 
-        val invBi = (BigInteger("$l") % BigInteger("$hi")).toBigInt()
-        val inverse = l % hi
-        val inverse2 = BigInt.from(l) % hi
+        val invBi = (BigInteger("$n") % BigInteger("$hi")).toBigInt()
+        val inverse = n % hi
+        val inverse2 = BigInt.from(n) % hi
         assertEquals(invBi, inverse)
         assertEquals(inverse2, inverse)
     }

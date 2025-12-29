@@ -53,13 +53,13 @@ class TestMagia {
 
         if (verbose)
             println("testRoundTripStr($str)")
-        val car = MagiaTransducer.magiaFromString(str)
-        val str2 = MagiaTransducer.magiaToString(car)
+        val magia = MagiaTransducer.magiaFromString(str)
+        val str2 = MagiaTransducer.magiaToString(magia)
         Assertions.assertEquals(str, str2)
 
-        val car3 = BigIntParsePrint.from(str)
-        assert(Mago.EQ(car, Mago.normLen(car), car3, Mago.normLen(car3)))
-        val str3 = BigIntParsePrint.toString(car3)
+        val magia3 = BigIntParsePrint.from(str)
+        assert(Mago.EQ(magia, Mago.normLen(magia), magia3, Mago.normLen(magia3)))
+        val str3 = BigIntParsePrint.toString(magia3)
         Assertions.assertEquals(str, str3)
     }
 

@@ -8,6 +8,8 @@ import kotlin.time.TimeSource
 
 class TestBarrettVsMontgomery {
 
+    val WARMUP = 5 // 5000
+
     private inline fun measureNano(block: () -> Unit): Long {
         val mark = TimeSource.Monotonic.markNow()
         block()
@@ -48,7 +50,7 @@ class TestBarrettVsMontgomery {
         val outBarr = MutableBigInt()
 
         // Warmup
-        repeat(5_000) {
+        repeat(WARMUP) {
             ctxMont.modMul(a, b, outMont)
             ctxBarr.modMul(a, b, outBarr)
         }
@@ -76,8 +78,9 @@ class TestBarrettVsMontgomery {
         }
         val barrMedian = barrTimes.sorted()[barrTimes.size / 2]
 
-        println("Median Montgomery = $montMedian ns")
+        println("modMul (2kBits * 2kBits) mod 2kBits")
         println("Median Barrett    = $barrMedian ns")
+        println("Median Montgomery = $montMedian ns")
 
         val ratio = barrMedian.toDouble() / montMedian
         val ratioRounded = (ratio * 1000).toInt() / 1000.0
@@ -105,7 +108,7 @@ class TestBarrettVsMontgomery {
         val outBarr = MutableBigInt()
 
         // Warm up to trigger inlining & allocation flattening
-        repeat(1) {
+        repeat(WARMUP) {
             ctxMont.modPow(a, e, outMont)
             ctxBarr.modPow(a, e, outBarr)
         }
@@ -113,10 +116,12 @@ class TestBarrettVsMontgomery {
 
         // Compute reference using your existing int-exponent operator(s)
         // i.e., (a^e) % m computed naïvely through BigInt mul
-        var ref = BigInt.ONE
+        val refM = MutableBigInt().set(1)
         repeat(e) {
-            ref = (ref * a) % m
+            refM *= a
+            refM %= m
         }
+        val ref = refM.toBigInt()
 
         // Correctness check
         ctxMont.modPow(a, e, outMont)
@@ -142,8 +147,9 @@ class TestBarrettVsMontgomery {
         }
         val barrMedian = barrTimes.sorted()[barrTimes.size / 2]
 
-        println("Montgomery modPow median = $montMedian ns")
+        println("modPow 2kBits**65537 mod 2kBits")
         println("Barrett    modPow median = $barrMedian ns")
+        println("Montgomery modPow median = $montMedian ns")
 
         val ratio = barrMedian.toDouble() / montMedian
         val rounded = (ratio * 1000).toInt() / 1000.0
@@ -164,14 +170,14 @@ class TestBarrettVsMontgomery {
         // Base < m
         val a = BigInt.randomBelow(m)
 
-        val e = BigInt.randomWithMaxBitLen(2000)
+        val e = BigInt.randomWithMaxBitLen(2048)
 
         val outMont = MutableBigInt()
         val outBarr = MutableBigInt()
 
         // Warm up to trigger inlining & allocation flattening
         // repeat(5000) {
-        repeat(1) {
+        repeat(WARMUP) {
             ctxMont.modPow(a, e, outMont)
             ctxBarr.modPow(a, e, outBarr)
         }
@@ -205,8 +211,9 @@ class TestBarrettVsMontgomery {
         }
         val barrMedian = barrTimes.sorted()[barrTimes.size / 2]
 
-        println("Montgomery modPow median = $montMedian ns")
+        println("modPow 2kBits**2kBits mod 2kBits")
         println("Barrett    modPow median = $barrMedian ns")
+        println("Montgomery modPow median = $montMedian ns")
 
         val ratio = barrMedian.toDouble() / montMedian
         val rounded = (ratio * 1000).toInt() / 1000.0

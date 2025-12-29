@@ -884,6 +884,10 @@ class MutableBigInt private constructor (
         }
     }
 
+    fun setPow(x: BigIntNumber, exp: Int): MutableBigInt {
+        TODO()
+    }
+
     /**
      * Replaces this value with the quotient of `x / y`, storing the result
      * in place. Overloads support division by primitive integers, unsigned
@@ -1390,7 +1394,7 @@ class MutableBigInt private constructor (
             val xMagia = x.magia
             ensureBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
             _meta = Meta(
-                meta.signBit,
+                x.meta.signBit,
                 Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount)
             )
             this
