@@ -41,6 +41,7 @@ value class Meta internal constructor(val _meta: Int) {
         operator fun invoke(signBit: Int, normLen: Int): Meta {
             verify ((signBit shr 1) == 0)
             verify (normLen >= 0)
+            // mask `and (-normLen shr 31)` to prevent -0
             return Meta(((signBit shl 31) or normLen) and (-normLen shr 31))
         }
 
@@ -56,6 +57,7 @@ value class Meta internal constructor(val _meta: Int) {
          * @throws IllegalStateException if `normLen` is negative
          */
         operator fun invoke(signFlag: Boolean, normLen: Int): Meta {
+            // mask `and (-normLen shr 31)` to prevent -0
             if (normLen >= 0)
                 return Meta((normLen or (if (signFlag) Int.MIN_VALUE else 0)) and (-normLen shr 31))
             throw IllegalStateException()

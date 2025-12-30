@@ -781,7 +781,7 @@ internal object Mago {
             return setMul32(z, x, xNormLen, dw.toUInt())
         if (xNormLen >= 0 && xNormLen <= x.size) {
             verify (isNormalized(x, xNormLen))
-            if (dw.countOneBits() > 1) {
+            if (xNormLen > 0 && dw.countOneBits() > 1) {
                 val lo = dw and MASK32
                 val hi = dw shr 32
 
@@ -813,6 +813,8 @@ internal object Mago {
                 }
                 throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
             }
+            if (xNormLen == 0)
+                return 0
             verify (dw.countOneBits() == 1)
             return setShiftLeft(z, x, xNormLen, dw.countTrailingZeroBits())
         }

@@ -224,22 +224,25 @@ class MutableBigInt private constructor (
      * Resizes the `tmp1` temporary buffer.
      *
      * Temporary buffers start with zero capacity. On the first allocation,
-     * the buffer is grown to a capacity **at least** [minLimbLen]. On subsequent
+     * the buffer is grown to a capacity **at least** [requestedLimbLen]. On subsequent
      * resizes, additional headroom (~50%) is added to reduce reallocation.
      *
      * The final capacity is rounded up to the allocator’s heap quantum.
      * Existing contents, if any, are discarded.
      *
-     * @param minLimbLen the minimum number of limbs required; must exceed the
+     * @param requestedLimbLen the minimum number of limbs required; must exceed the
      *        current capacity of the temporary buffer.
      */
-    private fun resizeTmp1(minLimbLen: Int) {
-        verify (minLimbLen > tmp1.size)
+    private fun resizeTmp1(requestedLimbLen: Int) {
+        verify (requestedLimbLen > tmp1.size)
         // tmp arrays start off with zero size
-        // if this is the first resize then give them what they want
-        // otherwise, give them 50% more
-        val headRoom = (minLimbLen ushr 1) and (-tmp1.size shr 31)
-        tmp1 = Mago.newWithFloorLen(minLimbLen + headRoom)
+        // it might also have ended up with size == 4 because
+        // of a tmp1 swap.
+        // so a current size of <= 4 will be considered "untouched"
+        // if this is the first resize request then give them what
+        // they want ... otherwise, give them 50% more
+        val headRoom = (requestedLimbLen ushr 1) and ((5 - tmp1.size) shr 31)
+        tmp1 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
     }
 
     /**
@@ -354,17 +357,36 @@ class MutableBigInt private constructor (
 
     /**
      * Ensures that the temporary limb buffer `tmp1` has capacity **at least**
-     * [minLimbLen].
+     * [requestedLimbLen].
      *
-     * If `tmp1` is too small, it is replaced with a new zero-initialized array whose
-     * capacity is at least [minLimbLen] (rounded up to the allocator’s heap quantum).
-     * Any existing contents are discarded.
+     * If `tmp1` is too small, it is resized to the maximum of the requested
+     * capacity and any active capacity hint, rounded up to the allocator’s
+     * heap quantum. Existing contents are discarded.
      *
-     * @param minLimbLen the minimum number of limbs required.
+     * @param requestedLimbLen the minimum number of limbs required.
      */
-    private inline fun ensureTmp1Capacity(minLimbLen: Int) {
-        if (minLimbLen > tmp1.size)
-            resizeTmp1(minLimbLen)
+    private inline fun ensureTmp1Capacity(requestedLimbLen: Int) {
+        if (requestedLimbLen > tmp1.size) {
+            val required = max(limbCapacityHint, requestedLimbLen)
+            resizeTmp1(required)
+        }
+    }
+
+    /**
+     * Ensures that the temporary limb buffer `tmp1` can hold a
+     * `Knuth normalized` copy of the dividend for Knuth division.
+     *
+     * The buffer is sized to at least `dividend.normLen + 1`, taking into account
+     * any capacity hint associated with the dividend to avoid future reallocations.
+     * Existing contents of `tmp1` are discarded if a resize is required.
+     *
+     * @param x the dividend whose normalized representation will be staged in `tmp1`.
+     */
+    private inline fun ensureTmp1CapacityDividendPlus1(x: BigIntNumber) {
+        if (x.meta.normLen >= tmp1.size) {
+            val required = max(x.currentLimbCapacityHint(), x.meta.normLen) + 1
+            resizeTmp1(required)
+        }
     }
 
     /**
@@ -384,22 +406,21 @@ class MutableBigInt private constructor (
 
     /**
      * Ensures that the temporary limb buffer `tmp1` has capacity **at least**
-     * [newLimbLen], and that all limbs in the range `[0, newLimbLen)` are zero.
+     * [zeroedLimbLen], and that all limbs in the range `[0, zeroedLimbLen)` are zero.
      *
-     * If `tmp1` is already large enough, it is zero-cleared up to `newLimbLen`.
-     * If it is too small, it is replaced with a new zero-initialized array
-     * whose capacity is at least [newLimbLen] (rounded up to the allocator’s heap
-     * quantum).
+     * If `tmp1` is already large enough, the specified range is zero-cleared.
+     * Otherwise, `tmp1` is replaced with a new zero-initialized array whose
+     * capacity is the maximum of the requested length and any active capacity
+     * hint, rounded up to the allocator’s heap quantum. Existing contents are
+     * discarded.
      *
-     * Any existing contents are discarded.
-     *
-     * @param newLimbLen the required limb length to be zeroed.
+     * @param zeroedLimbLen the number of limbs to be zeroed.
      */
-    private inline fun ensureTmp1CapacityZeroed(newLimbLen: Int) {
-        if (newLimbLen <= tmp1.size)
-            tmp1.fill(0, 0, newLimbLen)
+    private inline fun ensureTmp1CapacityZeroed(zeroedLimbLen: Int) {
+        if (zeroedLimbLen <= tmp1.size)
+            tmp1.fill(0, 0, zeroedLimbLen)
         else
-            resizeTmp1(newLimbLen)
+            resizeTmp1(max(limbCapacityHint, zeroedLimbLen))
     }
 
     /**
@@ -457,6 +478,8 @@ class MutableBigInt private constructor (
         limbCapacityHint = Mago.calcHeapLimbQuantum((bitCapacityHint + 31) ushr 5)
         return this
     }
+
+    override fun currentLimbCapacityHint() = limbCapacityHint
 
     /**
      * Returns whether the backing storage has grown beyond the capacity implied
@@ -807,7 +830,6 @@ class MutableBigInt private constructor (
         val xNormLen = x.meta.normLen
         val yNormLen = y.meta.normLen
         when {
-            xNormLen == 0 || yNormLen == 0 -> return setZero()
             yNormLen <= 2 -> return setMulImpl(x, y.meta.signFlag, y.toULongMagnitude())
             y.isMagnitudePowerOfTwo() -> return setShl(x, y.countTrailingZeroBits())
         }
@@ -963,7 +985,7 @@ class MutableBigInt private constructor (
         ensureCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
         if (trySetDivFastPath(x, y))
             return this
-        ensureTmp1Capacity(x.meta.normLen + 1)
+        ensureTmp1CapacityDividendPlus1(x)
         ensureTmp2Capacity(y.meta.normLen)
         _meta = Meta(x.meta.signBit xor y.meta.signBit,
             Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2))
@@ -986,7 +1008,7 @@ class MutableBigInt private constructor (
         ensureCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
         if (trySetDivFastPath64(x, ySign, yDw))
             return this
-        ensureTmp1Capacity(x.meta.normLen + 1)
+        ensureTmp1CapacityDividendPlus1(x)
         val normLen = Mago.setDiv64(magia, x.magia, x.meta.normLen, tmp1, yDw)
         _meta = Meta(x.meta.signFlag xor ySign, normLen)
         return this
@@ -1076,7 +1098,7 @@ class MutableBigInt private constructor (
             return this
         if (y.meta.normLen == 2)
             return setRemImpl(x, (y.magia[1].toULong() shl 32) or (y.magia[0].toUInt().toULong()))
-        ensureTmp1Capacity(x.meta.normLen + 1)
+        ensureTmp1CapacityDividendPlus1(x)
         ensureTmp2Capacity(y.meta.normLen)
         val rNormLen = Mago.setRem(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
         _meta = Meta(x.meta.signBit, rNormLen)
@@ -1093,7 +1115,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setRemImpl(x: BigIntNumber, yDw: ULong): MutableBigInt {
-        ensureTmp1Capacity(x.meta.normLen + 1)
+        ensureTmp1CapacityDividendPlus1(x)
         val rem = Mago.calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
         return set(x.meta.signFlag, rem)
     }

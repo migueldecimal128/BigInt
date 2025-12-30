@@ -133,6 +133,8 @@ sealed class BigIntNumber(
     internal fun isSuperNormalized(): Boolean =
         isNormalized() && meta.normLen == magia.size
 
+    internal open fun currentLimbCapacityHint(): Int = 0
+
     /**
      * Returns `true` if this value is exactly representable as a 32-bit
      * signed integer (`Int.MIN_VALUE .. Int.MAX_VALUE`).
