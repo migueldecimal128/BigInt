@@ -808,9 +808,8 @@ class MutableBigInt private constructor (
         val yNormLen = y.meta.normLen
         when {
             xNormLen == 0 || yNormLen == 0 -> return setZero()
-            // FIXME
             yNormLen <= 2 -> return setMulImpl(x, y.meta.signFlag, y.toULongMagnitude())
-            //y.isMagnitudePowerOfTwo() -> return setShl(x, y.countTrailingZeroBits())
+            y.isMagnitudePowerOfTwo() -> return setShl(x, y.countTrailingZeroBits())
         }
         ensureTmp1Capacity(xNormLen + yNormLen)
         _meta = Meta(

@@ -710,26 +710,29 @@ internal object Mago {
     fun setMul32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             verify (isNormalized(x, xNormLen))
-            if (xNormLen == 0 || w == 0u)
-                return 0
-            val w64 = w.toULong()
-            var carry = 0uL
-            var i = 0
-            while (i < xNormLen) {
-                val t = dw32(x[i]) * w64 + carry
-                z[i] = t.toInt()
-                carry = t shr 32
-                ++i
+            return when {
+                xNormLen > 0 && w.countOneBits() > 1 -> {
+                    val w64 = w.toULong()
+                    var carry = 0uL
+                    var i = 0
+                    while (i < xNormLen) {
+                        val t = dw32(x[i]) * w64 + carry
+                        z[i] = t.toInt()
+                        carry = t shr 32
+                        ++i
+                    }
+                    if (carry != 0uL) {
+                        if (i == z.size)
+                            throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
+                        z[i] = carry.toInt()
+                        ++i
+                    }
+                    verify(isNormalized(z, i))
+                    i
+                }
+                xNormLen == 0 || w == 0u -> 0
+                else -> setShiftLeft(z, x, xNormLen, w.countTrailingZeroBits())
             }
-            if (carry != 0uL) {
-                if (i == z.size)
-                    throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
-                z[i] = carry.toInt()
-                ++i
-            }
-            verify (isNormalized(z, i))
-            return i
-
         }
         throw IllegalArgumentException()
     }
@@ -778,36 +781,40 @@ internal object Mago {
             return setMul32(z, x, xNormLen, dw.toUInt())
         if (xNormLen >= 0 && xNormLen <= x.size) {
             verify (isNormalized(x, xNormLen))
-            val lo = dw and MASK32
-            val hi = dw shr 32
+            if (dw.countOneBits() > 1) {
+                val lo = dw and MASK32
+                val hi = dw shr 32
 
-            var ppPrevHi = 0uL
+                var ppPrevHi = 0uL
 
-            var i = 0
-            while (i < xNormLen) {
-                val xi = dw32(x[i])
+                var i = 0
+                while (i < xNormLen) {
+                    val xi = dw32(x[i])
 
-                val pp = xi * lo + (ppPrevHi and MASK32)
-                z[i] = pp.toInt()
+                    val pp = xi * lo + (ppPrevHi and MASK32)
+                    z[i] = pp.toInt()
 
-                ppPrevHi = xi * hi + (ppPrevHi shr 32) + (pp shr 32)
-                ++i
+                    ppPrevHi = xi * hi + (ppPrevHi shr 32) + (pp shr 32)
+                    ++i
+                }
+                if (ppPrevHi != 0uL && i < z.size) {
+                    z[i] = ppPrevHi.toInt()
+                    ppPrevHi = ppPrevHi shr 32
+                    ++i
+                }
+                if (ppPrevHi != 0uL && i < z.size) {
+                    z[i] = ppPrevHi.toInt()
+                    ppPrevHi = ppPrevHi shr 32
+                    ++i
+                }
+                if (ppPrevHi == 0uL) {
+                    verify(isNormalized(z, i))
+                    return i
+                }
+                throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
             }
-            if (ppPrevHi != 0uL && i < z.size) {
-                z[i] = ppPrevHi.toInt()
-                ppPrevHi = ppPrevHi shr 32
-                ++i
-            }
-            if (ppPrevHi != 0uL && i < z.size) {
-                z[i] = ppPrevHi.toInt()
-                ppPrevHi = ppPrevHi shr 32
-                ++i
-            }
-            if (ppPrevHi == 0uL) {
-                verify (isNormalized(z, i))
-                return i
-            }
-            throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
+            verify (dw.countOneBits() == 1)
+            return setShiftLeft(z, x, xNormLen, dw.countTrailingZeroBits())
         }
         throw IllegalArgumentException()
     }
@@ -1100,10 +1107,9 @@ internal object Mago {
      * Returns the resulting normalized limb length, or throws
      * `ArithmeticException` if the result does not fit in `z`.
      */
-    fun setShiftLeft(z: Magia, x: Magia, xLen: Int, bitCount: Int): Int {
-        require(xLen in 0..x.size && bitCount >= 0)
+    fun setShiftLeft(z: Magia, x: Magia, xNormLen: Int, bitCount: Int): Int {
+        verify (isNormalized(x, xNormLen))
 
-        val xNormLen = normLen(x, xLen)
         if (xNormLen == 0)
             return 0
 
