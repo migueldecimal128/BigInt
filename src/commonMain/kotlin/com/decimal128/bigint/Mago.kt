@@ -283,13 +283,16 @@ internal object Mago {
      * @param floorLen minimum required limb count (0 ≤ floorLen ≤ MAX_ALLOC_SIZE)
      * @return an `Magia` of size ≥ floorLen, rounded up to a multiple of 4
      */
-    fun newWithFloorLen(floorLen: Int) : Magia {
+    fun newWithFloorLen(floorLen: Int): Magia =
+        Magia(calcHeapLimbQuantum(floorLen))
+
+    inline fun calcHeapLimbQuantum(floorLen: Int): Int {
         if (floorLen in 0..MAX_ALLOC_SIZE) {
             // if floorLen == 0 then add 1
             val t = floorLen + 1 - (-floorLen ushr 31)
             val allocSize = (t + 3) and 3.inv()
             if (allocSize <= MAX_ALLOC_SIZE)
-                return Magia(allocSize)
+                return allocSize
         }
         throw IllegalArgumentException(ERR_MSG_INVALID_ALLOCATION_LENGTH)
     }
@@ -856,6 +859,7 @@ internal object Mago {
     }
 
     fun setMulSchoolbook(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
+        verify (z !== x && z !== y)
         if (xNormLen >= 0 && xNormLen <= x.size &&
             yNormLen >= 0 && yNormLen <= y.size &&
             z.size >= xNormLen + yNormLen - 1) {

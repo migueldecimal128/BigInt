@@ -205,10 +205,10 @@ fun Random.nextBigInt(bitCount: Int, withRandomSign: Boolean = false) =
 /**
  * Computes `this**exp` using fast binary exponentiation.
  *
- * Delegates to [BigIntAlgorithms.pow].
+ * Delegates to [BigIntAlgorithms.powRightToLeft].
  *
  * @throws IllegalArgumentException if [exp] is negative
- * @see BigIntAlgorithms.pow
+ * @see BigIntAlgorithms.powRightToLeft
  */
 fun BigInt.pow(exp: Int): BigInt = BigIntAlgorithms.pow(this, exp)
 

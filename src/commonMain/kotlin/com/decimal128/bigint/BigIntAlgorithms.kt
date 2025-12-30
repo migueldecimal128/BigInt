@@ -192,7 +192,7 @@ object BigIntAlgorithms {
         return true
     }
 
-    fun pow(base: BigIntNumber, exp: Int, ret: MutableBigInt, tmp: MutableBigInt? = null) {
+    fun powRightToLeft(base: BigIntNumber, exp: Int, ret: MutableBigInt, tmp: MutableBigInt? = null) {
         verify (base !== ret)
         if (exp <= 2)
             throw IllegalStateException() // should have been fast-path
@@ -217,6 +217,19 @@ object BigIntAlgorithms {
         ret.mutWithSign(resultSign)
     }
 
+    fun powLeftToRight(base: BigIntNumber, exp: Int, ret: MutableBigInt) {
+        if (exp <= 2)
+            throw IllegalStateException() // should have been fast-path
+        val maxBitLen = base.magnitudeBitLen() * exp
+        ret.set(base)
+        var bitIndex = 31 - exp.countLeadingZeroBits() - 1
+        while (bitIndex >= 0) {
+            ret.setSqr(ret)
+            if ((exp shr bitIndex) and 1 != 0)
+                ret *= base
+            --bitIndex
+        }
+    }
     /**
      * Returns the **integer square root** of this value.
      *

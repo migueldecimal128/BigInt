@@ -99,6 +99,7 @@ class MutableBigInt private constructor (
 ) : BigIntNumber(meta, magia) {
     constructor() : this(Meta(0), Magia(4))
 
+    internal var limbCapacityHint = 0
     internal var tmp1: Magia = Mago.ZERO
     internal var tmp2: Magia = Mago.ZERO
 
@@ -161,48 +162,61 @@ class MutableBigInt private constructor (
      * Resizes the internal limb storage, discarding any existing value.
      *
      * Capacity policy:
-     * - If the current backing array is the initial fixed-size storage (4 limbs),
-     *   allocate a new array with capacity **at least** [minLimbLen].
-     * - Otherwise, allocate with additional headroom (~50%) to reduce the number
-     *   of future reallocations.
+     * - The target capacity is the maximum of the operation’s immediate requirement
+     *   ([requestedLimbLen]) and any user-provided capacity hint established via
+     *   [hintBitCapacity]. If a hint is present and larger than the requested size,
+     *   this resize will immediately grow to the hinted capacity.
+     * - If the current backing array is the initial fixed-size inline storage
+     *   (4 limbs), the resize allocates exactly to the target capacity
+     *   (no speculative growth).
+     * - Because the resize target is at least the hinted capacity, once a hint is
+     *   applied the backing array will not be resized again unless/until a later
+     *   operation requires more than the hinted capacity.
+     * - When a resize request exceeds the hinted capacity, the hint is considered
+     *   violated and heuristic growth resumes immediately by adding ~50% headroom
+     *   to the target capacity to reduce future reallocations.
      *
      * The final capacity is rounded up to the allocator’s heap quantum
      * (e.g., 16 bytes / 4 ints).
      *
-     * @param minLimbLen the minimum number of limbs required; must exceed the
-     *        current capacity and the inline storage size.
+     * @param requestedLimbLen the minimum number of limbs required; must exceed both
+     *        the current backing capacity and the inline storage size.
      */
-    private fun resizeDiscard(minLimbLen: Int) {
-        verify (minLimbLen > 4 && minLimbLen > magia.size)
-        // if the existing magia.size == 4 then this is the first resizing.
-        // if this is the first resizing then give them requested size.
-        // otherwise, we are in a growth pattern, so give them 50% more.
-        val headRoom = (minLimbLen ushr 1) and ((4 - magia.size) shr 31)
-        // newWithFloorLen rounds up to heap quantum, 16 bytes, 4 ints
-        _magia = Mago.newWithFloorLen(minLimbLen + headRoom)
+    private fun resizeDiscard(requestedLimbLen: Int) {
+        verify(requestedLimbLen > 4 && requestedLimbLen > magia.size)
+        val targetLimbLen = max(limbCapacityHint, requestedLimbLen)
+        val headroom =
+            if (magia.size == 4 || requestedLimbLen <= limbCapacityHint) 0
+            else targetLimbLen shr 1
+        _magia = Mago.newWithFloorLen(targetLimbLen + headroom)
     }
 
     /**
      * Resizes the internal limb storage while preserving the current value.
      *
      * Capacity policy:
-     * - If the current backing array is the initial fixed-size storage (4 limbs),
-     *   allocate a new array with capacity **at least** [minLimbLen].
-     * - Otherwise, allocate with additional headroom (~50%) to reduce the number
-     *   of future reallocations.
+     * - The target capacity is the maximum of the operation’s immediate requirement
+     *   ([requestedLimbLen]) and any user-provided capacity hint established via
+     *   [hintBitCapacity]. If a hint is present and larger than the requested size,
+     *   this resize will immediately grow to the hinted capacity.
+     * - If the current backing array is the initial fixed-size inline storage
+     *   (4 limbs), the resize allocates exactly to the target capacity
+     *   (no speculative growth).
+     * - Once the backing array has grown beyond the inline storage, and a resize
+     *   request exceeds the hinted capacity, heuristic growth resumes immediately
+     *   by adding ~50% headroom to the target capacity to reduce the likelihood of
+     *   further reallocations.
      *
      * The final capacity is rounded up to the allocator’s heap quantum.
-     * Only the normalized limbs ([meta.normLen]) are copied; any additional limbs
-     * in the new storage remain zero-initialized.
+     * Only the normalized limbs ([meta.normLen]) are copied into the new storage;
+     * any additional limbs remain zero-initialized.
      *
-     * @param minLimbLen the minimum number of limbs required; must exceed the
-     *        current capacity and the inline storage size.
+     * @param requestedLimbLen the minimum number of limbs required; must exceed both
+     *        the current backing capacity and the inline storage size.
      */
-    private fun resizeCopy(minLimbLen: Int) {
-        verify (minLimbLen > 4 && minLimbLen > magia.size)
+    private fun resizeCopy(requestedLimbLen: Int) {
         val t = _magia
-        val headRoom = (minLimbLen ushr 1) and ((4 - magia.size) shr 31)
-        _magia = Mago.newWithFloorLen(minLimbLen + headRoom)
+        resizeDiscard(requestedLimbLen)
         t.copyInto(magia, 0, 0, meta.normLen)
     }
 
@@ -265,12 +279,12 @@ class MutableBigInt private constructor (
      */
     private inline fun ensureCapacityDiscard(minLimbLen: Int) {
         if (magia.size < minLimbLen)
-            resizeDiscard(minLimbLen)
+            resizeDiscard(max(limbCapacityHint, minLimbLen))
     }
 
     private inline fun ensureCapacityDiscardZeroed(minLimbLen: Int) {
         if (magia.size < minLimbLen)
-            resizeDiscard(minLimbLen)
+            resizeDiscard(max(limbCapacityHint,minLimbLen))
         else
             magia.fill(0, 0, minLimbLen)
     }
@@ -287,7 +301,7 @@ class MutableBigInt private constructor (
      */
     private inline fun ensureCapacityCopy(minLimbLen: Int) {
         if (magia.size < minLimbLen)
-            resizeCopy(minLimbLen)
+            resizeCopy(max(limbCapacityHint, minLimbLen))
     }
 
     /**
@@ -310,7 +324,7 @@ class MutableBigInt private constructor (
                 magia.fill(0, meta.normLen, newLimbLen)
         } else {
             // resize allocates new clean zeroed storage
-            resizeCopy(newLimbLen)
+            resizeCopy(max(limbCapacityHint, newLimbLen))
         }
     }
 
@@ -422,17 +436,45 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Provides a hint for a maximum expected bit capacity.
+     * Provides a hint for the maximum expected bit capacity of this value.
      *
-     * Any existing value si preserved.
+     * The hint is used as a capacity contract for future resizes: when growth is
+     * required, the backing storage is expanded to at least the hinted capacity
+     * (rounded up to the allocator’s limb quantum), suppressing speculative growth
+     * while the hint remains valid. If a later resize exceeds the hinted capacity,
+     * normal heuristic growth resumes immediately.
+     *
+     * Calling this method does not modify the current value; any existing limbs
+     * are preserved. Repeated calls replace the previous hint.
+     *
+     * @param bitCapacityHint the maximum expected bit length; must be non-negative
+     * @return this instance, for call chaining
+     * @throws IllegalArgumentException if {@code bitCapacityHint < 0}
      */
-    fun hintBitCapacity(bitLen: Int): MutableBigInt {
-        // FIXME - go thru some examples (like pow) to see how tmp1
-        //  should be affected by this call.
-        if (bitLen > 256)
-            ensureBitCapacityCopy(bitLen)
+    fun hintBitCapacity(bitCapacityHint: Int): MutableBigInt {
+        if (bitCapacityHint < 0)
+            throw IllegalArgumentException()
+        limbCapacityHint = Mago.calcHeapLimbQuantum((bitCapacityHint + 31) ushr 5)
         return this
     }
+
+    /**
+     * Returns whether the backing storage has grown beyond the capacity implied
+     * by the most recent call to [hintBitCapacity].
+     *
+     * A return value of `true` indicates that the hinted capacity was
+     * insufficient and that heuristic growth has been applied.
+     */
+    fun didExceedHint(): Boolean = magia.size > limbCapacityHint
+
+    /**
+     * Returns the current hinted bit capacity, which has been
+     * rounded up to the allocator’s limb quantum.
+     *
+     * A return value of `0` indicates that no capacity hint
+     * was provided.
+     */
+    fun getHintBitCapacity(): Int = limbCapacityHint * 32
 
     // <<<<<<<<<<< END STORAGE MANAGEMENT FUNCTIONS >>>>>>>>>>>>
 
@@ -912,7 +954,7 @@ class MutableBigInt private constructor (
         if (BigIntAlgorithms.tryPowFastPath(x, exp, this))
             return this
         val base: BigIntNumber = if (x === this) x.toBigInt() else x
-        BigIntAlgorithms.pow(base, exp, this)
+        BigIntAlgorithms.powRightToLeft(base, exp, this)
         return this
     }
 

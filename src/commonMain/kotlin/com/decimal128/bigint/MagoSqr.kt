@@ -110,6 +110,7 @@ internal object MagoSqr {
 
         // 2) Double the cross terms: z = z * 2
         // This is much faster than doubling inside the loop because it's a linear scan
+
         var shiftCarry = 0uL
         for (i in 0 until zLen) {
             val zi = dw32(z[zOff + i])
