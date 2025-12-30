@@ -249,22 +249,24 @@ class MutableBigInt private constructor (
      * Resizes the `tmp2` temporary buffer.
      *
      * Temporary buffers start with zero capacity. On the first allocation,
-     * the buffer is grown to a capacity **at least** [minLimbLen]. On subsequent
-     * resizes, additional headroom (~50%) is added to reduce reallocation.
+     * the buffer is grown to a capacity **at least** [requestedLimbLen].
+     * On subsequent resizes, additional headroom (~50%) is added
+     * in anticipation of future reallocation.
      *
      * The final capacity is rounded up to the allocator’s heap quantum.
      * Existing contents, if any, are discarded.
      *
-     * @param minLimbLen the minimum number of limbs required; must exceed the
+     * @param requestedLimbLen the minimum number of limbs required; must exceed the
      *        current capacity of the temporary buffer.
      */
-    private fun resizeTmp2(minLimbLen: Int) {
-        verify (minLimbLen > tmp2.size)
-        // tmp arrays start off with zero size
+    private fun resizeTmp2(requestedLimbLen: Int) {
+        verify (requestedLimbLen > tmp2.size)
+        // tmp2 starts off with zero size
+        // there is no swapTmp2
         // if this is the first resize then give them what they want
         // otherwise, give them 50% more
-        val headRoom = (minLimbLen ushr 1) and (-tmp2.size shr 31)
-        tmp2 = Mago.newWithFloorLen(minLimbLen + headRoom)
+        val headRoom = (requestedLimbLen ushr 1) and (-tmp2.size shr 31)
+        tmp2 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
     }
 
     /**
@@ -390,18 +392,42 @@ class MutableBigInt private constructor (
     }
 
     /**
-     * Ensures that the temporary limb buffer `tmp2` has capacity **at least**
-     * [minLimbLen].
+     * Ensures that the temporary limb buffer `tmp2` has sufficient capacity
+     * to hold the divisor for Knuth division operations where the dividend
+     * and divisor must be `normalized` to have the MSB of the dividend set.
      *
-     * If `tmp2` is too small, it is replaced with a new zero-initialized array whose
-     * capacity is at least [minLimbLen] (rounded up to the allocator’s heap quantum).
-     * Any existing contents are discarded.
+     * `tmp2` is resized to at least the divisor’s normalized limb length,
+     * taking into account any capacity hint associated with the divisor to
+     * avoid future reallocations. Existing contents are discarded if a resize
+     * is required.
      *
-     * @param minLimbLen the minimum number of limbs required.
+     * @param divisor the divisor whose limbs will be staged in `tmp2`.
      */
-    private inline fun ensureTmp2Capacity(minLimbLen: Int) {
-        if (minLimbLen > tmp2.size)
-            resizeTmp2(minLimbLen)
+    private inline fun ensureTmp2CapacityDivisor(divisor: BigIntNumber) {
+        if (divisor.meta.normLen > tmp2.size) {
+            val required = max(divisor.currentLimbCapacityHint(), divisor.meta.normLen)
+            resizeTmp2(required)
+        }
+    }
+
+    /**
+     * Ensures that the temporary limb buffer `tmp2` has sufficient capacity for
+     * Karatsuba squaring.
+     *
+     * The required capacity is `3 * k1 + 3`, where `k1 = ceil(operand.normLen / 2)`.
+     * If a resize is needed, the `tmp2` is grown to the maximum of this immediate
+     * requirement and the capacity implied by the receiver’s hint, rounded up to
+     * the allocator’s heap quantum. Any existing contents are discarded.
+     *
+     * @param operandK1 `ceil(operand.normLen / 2)` for the value being squared.
+     */
+    private inline fun ensureTmp2CapacityKaratsubaSqr(operandK1: Int) {
+        val required = 3 * operandK1 + 3
+        if (required > tmp2.size) {
+            val hintK1 = (limbCapacityHint + 3) ushr 2
+            val hintSize = 3 * hintK1 + 3
+            resizeTmp2(max(hintSize, required))
+        }
     }
 
     /**
@@ -433,11 +459,6 @@ class MutableBigInt private constructor (
     private fun swapTmp1() {
         verify (tmp1.size >= 4)
         val t = tmp1; tmp1 = _magia; _magia = t
-    }
-
-    private fun swapTmp2() {
-        verify (tmp2.size >= 4)
-        val t = tmp2; tmp2 = _magia; _magia = t
     }
 
     /**
@@ -986,7 +1007,7 @@ class MutableBigInt private constructor (
         if (trySetDivFastPath(x, y))
             return this
         ensureTmp1CapacityDividendPlus1(x)
-        ensureTmp2Capacity(y.meta.normLen)
+        ensureTmp2CapacityDivisor(y)
         _meta = Meta(x.meta.signBit xor y.meta.signBit,
             Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2))
         return this
@@ -1099,7 +1120,7 @@ class MutableBigInt private constructor (
         if (y.meta.normLen == 2)
             return setRemImpl(x, (y.magia[1].toULong() shl 32) or (y.magia[0].toUInt().toULong()))
         ensureTmp1CapacityDividendPlus1(x)
-        ensureTmp2Capacity(y.meta.normLen)
+        ensureTmp2CapacityDivisor(y)
         val rNormLen = Mago.setRem(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
         _meta = Meta(x.meta.signBit, rNormLen)
         return this
@@ -1665,8 +1686,7 @@ class MutableBigInt private constructor (
         val k1 = (n + 1) / 2
         val zLen = 2*n
         ensureTmp1CapacityZeroed(zLen + 1)
-        val tmpSize = 3*k1 + 3
-        ensureTmp2Capacity(tmpSize)
+        ensureTmp2CapacityKaratsubaSqr(k1)
         val zNormLen = MagoSqr.setSqrKaratsuba(tmp1, a.magia, a.meta.normLen, tmp2)
         swapTmp1()
         _meta = Meta(zNormLen)
