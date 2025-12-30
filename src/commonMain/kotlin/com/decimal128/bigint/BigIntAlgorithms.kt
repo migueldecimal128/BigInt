@@ -177,6 +177,46 @@ object BigIntAlgorithms {
         }
     }
 
+    fun tryPowFastPath(base: BigIntNumber, exp: Int, mbi: MutableBigInt): Boolean {
+        val resultSign = base.isNegative() && ((exp and 1) != 0)
+        when {
+            exp < 0 -> throw IllegalArgumentException("cannot raise BigInt to negative power:$exp")
+            exp == 0 -> mbi.setOne()
+            exp == 1 -> mbi.set(base)
+            exp == 2 -> mbi.setSqr(base)
+            base.isZero() -> mbi.setZero()
+            base magEQ 1 -> mbi.set(if (resultSign) -1 else 1)
+            base magEQ 2 -> mbi.setBit(exp).mutWithSign(resultSign)
+            else -> return false
+        }
+        return true
+    }
+
+    fun pow(base: BigIntNumber, exp: Int, ret: MutableBigInt, tmp: MutableBigInt? = null) {
+        verify (base !== ret)
+        if (exp <= 2)
+            throw IllegalStateException() // should have been fast-path
+        val maxBitLen = base.magnitudeBitLen() * exp
+        val b = if (tmp != null) {
+            verify (tmp != this && tmp != base)
+            tmp.hintBitCapacity(maxBitLen)
+        } else
+            MutableBigInt.withInitialBitCapacity(maxBitLen)
+        b.set(base).mutAbs()
+        ret.set(1).hintBitCapacity(maxBitLen)
+        var e = exp
+        while (true) {
+            if ((e and 1) != 0)
+                ret *= b
+            e = e ushr 1
+            if (e == 0)
+                break
+            b.setSqr(b)
+        }
+        val resultSign = base.isNegative() && ((exp and 1) != 0)
+        ret.mutWithSign(resultSign)
+    }
+
     /**
      * Returns the **integer square root** of this value.
      *

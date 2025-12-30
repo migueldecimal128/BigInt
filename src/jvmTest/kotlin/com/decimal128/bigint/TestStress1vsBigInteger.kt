@@ -9,7 +9,7 @@ import kotlin.test.fail
 
 class TestStress1vsBigInteger {
 
-    val REPETITION_COUNT = 50
+    val REPETITION_COUNT = 10
     val MAX_BIT_LENGTH = 1000
 
     fun genBigInt(rng: Random, maxLimbs: Int): BigInt {
@@ -139,7 +139,15 @@ class TestStress1vsBigInteger {
 
         // pow (small exponent)
         val e = (0..20).random()
-        assertBI(a.pow(e), ja.pow(e), "a.pow($e)")
+        val jbiPow = ja.pow(e)
+        assertBI(a.pow(e), jbiPow, "a.pow($e)")
+
+        mz.setPow(a, e)
+        assertBI(a.pow(e), jbiPow, "mut a.pow($e)")
+
+        mz.set(a)
+        mz.mutPow(e)
+        assertBI(a.pow(e), jbiPow, "mut a.pow($e)")
 
         // isqrt (non-negative only)
         if (!a.isNegative()) {

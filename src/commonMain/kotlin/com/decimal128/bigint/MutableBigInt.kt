@@ -421,6 +421,18 @@ class MutableBigInt private constructor (
         tmp1.copyInto(magia, 0, 0, meta.normLen)
     }
 
+    /**
+     * Provides a hint for a maximum expected bit capacity.
+     *
+     * Any existing value si preserved.
+     */
+    fun hintBitCapacity(bitLen: Int): MutableBigInt {
+        // FIXME - go thru some examples (like pow) to see how tmp1
+        //  should be affected by this call.
+        if (bitLen > 256)
+            ensureBitCapacityCopy(bitLen)
+        return this
+    }
 
     // <<<<<<<<<<< END STORAGE MANAGEMENT FUNCTIONS >>>>>>>>>>>>
 
@@ -455,17 +467,29 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation.
      */
     fun mutAbs(): MutableBigInt {
-        _meta = _meta.abs()
+        _meta = meta.abs()
         return this
     }
 
     /**
      * Negates this value in place, flipping its sign.
+     * Does not allow -0
      *
      * @return this [MutableBigInt] after mutation.
      */
     fun mutNegate(): MutableBigInt {
-        _meta = _meta.negate()
+        _meta = meta.negate()
+        return this
+    }
+
+    /**
+     * Sets the sign of this [MutableBigInt] in place.
+     * Does not allow -0
+     *
+     * @return this [MutableBigInt] after mutation.
+     */
+    fun mutWithSign(sign: Boolean): MutableBigInt {
+        _meta = meta.withSign(sign)
         return this
     }
 
@@ -885,8 +909,14 @@ class MutableBigInt private constructor (
     }
 
     fun setPow(x: BigIntNumber, exp: Int): MutableBigInt {
-        TODO()
+        if (BigIntAlgorithms.tryPowFastPath(x, exp, this))
+            return this
+        val base: BigIntNumber = if (x === this) x.toBigInt() else x
+        BigIntAlgorithms.pow(base, exp, this)
+        return this
     }
+
+    fun mutPow(exp: Int): MutableBigInt = setPow(this, exp)
 
     /**
      * Replaces this value with the quotient of `x / y`, storing the result
