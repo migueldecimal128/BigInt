@@ -9,6 +9,8 @@ import kotlin.test.fail
 
 class TestStress1vsBigInteger {
 
+    val verbose = false
+
     val REPETITION_COUNT = 10
     val MAX_BIT_LENGTH = 1000
 
@@ -80,6 +82,9 @@ class TestStress1vsBigInteger {
 
         // mul
         assertBI(a * b, ja * jb, "a*b")
+
+        if (verbose)
+            println("ma:$ma mb:$mb")
         mz.setMul(ma, mb)
         assertBI(mz, jb * ja, "mutable a*b")
 

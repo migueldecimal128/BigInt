@@ -809,7 +809,7 @@ class MutableBigInt private constructor (
         when {
             xNormLen == 0 || yNormLen == 0 -> return setZero()
             // FIXME
-            //yNormLen <= 2 -> return setMulImpl(x, y.meta.signFlag, y.toULong())
+            yNormLen <= 2 -> return setMulImpl(x, y.meta.signFlag, y.toULongMagnitude())
             //y.isMagnitudePowerOfTwo() -> return setShl(x, y.countTrailingZeroBits())
         }
         ensureTmp1Capacity(xNormLen + yNormLen)
@@ -858,30 +858,6 @@ class MutableBigInt private constructor (
             x.meta.signFlag xor dwSign,
             Mago.setMul64(magia, xMagia, x.meta.normLen, dw)
         )
-        return this
-    }
-
-    /**
-     * Internal helper for full arbitrary-precision multiplication. Computes
-     * `x * y` using the limbs supplied by [x] and [y], writes the result into
-     * a temporary buffer, then swaps it into place. Result sign is derived
-     * from the XOR of the operand signs. Temporary storage is expanded if needed.
-     *
-     * @param xMeta sign and length metadata for the left operand
-     * @param x the left operand’s limb array
-     * @param yMeta sign and length metadata for the right operand
-     * @param y the right operand’s limb array
-     * @return this [MutableBigInt] after mutation
-     */
-    private fun setMulImpl(xMeta: Meta, x: Magia, yMeta: Meta, y: Magia): MutableBigInt {
-        val xNormLen = xMeta.normLen
-        val yNormLen = yMeta.normLen
-        ensureTmp1Capacity(xNormLen + yNormLen)
-        _meta = Meta(
-            xMeta.signBit xor yMeta.signBit,
-            Mago.setMul(tmp1, x, xNormLen, y, yNormLen)
-        )
-        swapTmp1()
         return this
     }
 

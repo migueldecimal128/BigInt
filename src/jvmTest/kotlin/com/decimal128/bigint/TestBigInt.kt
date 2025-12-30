@@ -287,11 +287,13 @@ class TestBigInt {
         assertEquals(hiSqr, hiSqrMul)
     }
 
-    fun testPow(bi: BigInteger) {
-        val hi = bi.toBigInt()
+    fun testPow(jbi: BigInteger) {
+        val bi = jbi.toBigInt()
         val n = random.nextInt(10)
-        val biPow = bi.pow(n)
-        val hiPow = hi.pow(n)
+        if (verbose)
+            println("bi:$bi pow n:$n")
+        val biPow = jbi.pow(n)
+        val hiPow = bi.pow(n)
         assertEquals(hiPow.toString(), biPow.toString())
     }
 
@@ -403,6 +405,7 @@ class TestBigInt {
     @Test
     fun testWithBitMask() {
         for (i in 0..<10000) {
+            // FIXME ... why are these nums so small?
             val bitIndex = random.nextInt(5)
             val bitWidth = random.nextInt(1)
             testWithIndexedBitMask(bitIndex, bitWidth)
@@ -465,4 +468,23 @@ class TestBigInt {
         assert(hi2 EQ bi)
     }
 
+    @Test
+    fun testProblemPow() {
+        val bi = (-9).toBigInt()
+        val jbi = bi.toBigInteger()
+        val exp = 9
+
+        val expected = jbi.pow(exp).toBigInt()
+        val observed = bi.pow(exp)
+        assertEquals(expected, observed)
+    }
+
+    @Test
+    fun testProblemMul() {
+        val prod = MutableBigInt().set("99999999999999999999999999999999".toBigInt())
+        prod *= prod
+        prod *= prod
+        prod.setMul(BigInt.NEG_ONE, BigInt.NEG_ONE)
+        assertEquals(BigInt.ONE, prod.toBigInt())
+    }
 }

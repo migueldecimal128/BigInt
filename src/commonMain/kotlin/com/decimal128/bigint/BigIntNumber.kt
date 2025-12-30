@@ -325,9 +325,9 @@ sealed class BigIntNumber(
      * (ignores the sign).
      */
     fun toULongMagnitude(): ULong {
-        return when {
-            magia.isEmpty() -> 0uL
-            magia.size == 1 -> magia[0].toUInt().toULong()
+        return when (meta.normLen) {
+            0 -> 0uL
+            1 -> magia[0].toUInt().toULong()
             else -> (magia[1].toULong() shl 32) or magia[0].toUInt().toULong()
         }
     }
