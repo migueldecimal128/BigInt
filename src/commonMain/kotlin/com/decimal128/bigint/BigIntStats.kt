@@ -44,6 +44,18 @@ object BigIntStats {
         MBI_SET_SQR_SCHOOLBOOK,
         MBI_SET_SQR_KARATSUBA,
         MBI_SET_POW,
+        MBI_SET_DIV_PRIMITIVE,
+        MBI_SET_DIV_BI_FASTPATH,
+        MBI_SET_DIV_BI_KNUTH,
+        MBI_SET_REM_PRIMITIVE,
+        MBI_SET_REM_BI_FASTPATH,
+        MBI_SET_REM_BI_KNUTH,
+        MBI_SET_MOD_PRIMITIVE,
+        MBI_SET_MOD_BI_FASTPATH,
+        MBI_SET_MOD_BI_KNUTH,
+        MBI_ADD_SQR_PRIMITIVE,
+        MBI_ADD_SQR_BI,
+        MBI_SET_BITWISE_OP,
         ;
 
         companion object {

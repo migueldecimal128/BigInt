@@ -1011,12 +1011,15 @@ class MutableBigInt private constructor (
         setDivImpl(x, false, dw)
     fun setDiv(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
         ensureMagiaCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
-        if (trySetDivFastPath(x, y))
-            return this
-        ensureTmp1Capacity(x.meta.normLen + 1, RESIZE_TMP1_KNUTH_DIVIDEND)
-        ensureTmp2Capacity(y.meta.normLen, RESIZE_TMP2_KNUTH_DIVISOR)
-        _meta = Meta(x.meta.signBit xor y.meta.signBit,
-            Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2))
+        if (! trySetDivFastPath(x, y)) {
+            ensureTmp1Capacity(x.meta.normLen + 1, RESIZE_TMP1_KNUTH_DIVIDEND)
+            ensureTmp2Capacity(y.meta.normLen, RESIZE_TMP2_KNUTH_DIVISOR)
+            _meta = Meta(
+                x.meta.signBit xor y.meta.signBit,
+                Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
+            )
+            ++BI_OP_COUNTS[MBI_SET_DIV_BI_KNUTH.ordinal]
+        }
         return this
     }
 
@@ -1033,6 +1036,7 @@ class MutableBigInt private constructor (
      * @throws ArithmeticException if division by zero is detected
      */
     private fun setDivImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
+        ++BI_OP_COUNTS[MBI_SET_DIV_PRIMITIVE.ordinal]
         ensureMagiaCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
         if (trySetDivFastPath64(x, ySign, yDw))
             return this
@@ -1057,6 +1061,7 @@ class MutableBigInt private constructor (
         if (qNormLen < 0)
             return false
         _meta = Meta(qSignFlag, qNormLen)
+        ++BI_OP_COUNTS[MBI_SET_DIV_BI_FASTPATH.ordinal]
         return true
     }
 
@@ -1094,6 +1099,7 @@ class MutableBigInt private constructor (
         if (rNormLen < 0)
             return false
         _meta = Meta(rSignFlag, rNormLen)
+        ++BI_OP_COUNTS[MBI_SET_REM_BI_FASTPATH.ordinal]
         return true
     }
 
@@ -1130,6 +1136,7 @@ class MutableBigInt private constructor (
         ensureTmp2Capacity(y.meta.normLen, RESIZE_TMP2_KNUTH_DIVISOR)
         val rNormLen = Mago.setRem(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
         _meta = Meta(x.meta.signBit, rNormLen)
+        ++BI_OP_COUNTS[MBI_SET_REM_BI_KNUTH.ordinal]
         return this
     }
 
@@ -1143,6 +1150,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setRemImpl(x: BigIntNumber, yDw: ULong): MutableBigInt {
+        ++BI_OP_COUNTS[MBI_SET_REM_PRIMITIVE.ordinal]
         ensureTmp1Capacity(x.meta.normLen + 1, RESIZE_TMP1_KNUTH_DIVIDEND)
         val rem = Mago.calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
         return set(x.meta.signFlag, rem)
@@ -1176,6 +1184,9 @@ class MutableBigInt private constructor (
         setRem(x, y)
         if (isNegative())
             setAdd(this, y)
+        // FIXME this is not correct ... I don't know which path was taken by REM
+        // --BI_OP_COUNTS[MBI_SET_REM_BI.ordinal]
+        ++BI_OP_COUNTS[MBI_SET_MOD_BI_KNUTH.ordinal]
         return this
     }
 
@@ -1196,6 +1207,8 @@ class MutableBigInt private constructor (
         setRem(x, yDw)
         if (isNegative())
             setAdd(this, yDw)
+        --BI_OP_COUNTS[MBI_SET_REM_PRIMITIVE.ordinal]
+        ++BI_OP_COUNTS[MBI_SET_MOD_PRIMITIVE.ordinal]
         return this
     }
 
@@ -1388,14 +1401,21 @@ class MutableBigInt private constructor (
      *
      * @param n the value to square and add
      */
-    fun addSquareOf(n: Int) = setAdd(this, n.toLong() * n.toLong())
+    fun addSquareOf(n: Int): MutableBigInt {
+        ++BI_OP_COUNTS[MBI_ADD_SQR_PRIMITIVE.ordinal]
+        return setAdd(this, (n.toLong() * n.toLong()).toULong())
+    }
 
     /**
      * Adds the square of an unsigned 32-bit integer to this value in place.
      *
      * @param w the value to square and add
      */
-    fun addSquareOf(w: UInt) = setAdd(this, w.toULong() * w.toULong())
+    fun addSquareOf(w: UInt): MutableBigInt {
+        --BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
+        ++BI_OP_COUNTS[MBI_ADD_SQR_PRIMITIVE.ordinal]
+        return setAdd(this, w.toULong() * w.toULong())
+    }
 
     /**
      * Adds the square of a signed 64-bit integer to this value in place.
@@ -1411,11 +1431,12 @@ class MutableBigInt private constructor (
      *
      * @param dw the value to square and add
      */
-    fun addSquareOf(dw: ULong) {
+    fun addSquareOf(dw: ULong): MutableBigInt {
+        ++BI_OP_COUNTS[MBI_ADD_SQR_PRIMITIVE.ordinal]
         val lo64 = dw * dw
         if ((dw shr 32) == 0uL) {
-            setAdd(this, lo64)
-            return
+            --BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
+            return setAdd(this, lo64)
         }
         val hi64 = unsignedMulHi(dw, dw)
         if (tmp1.size < 4)
@@ -1425,7 +1446,8 @@ class MutableBigInt private constructor (
         tmp1[2] = hi64.toInt()
         tmp1[3] = (hi64 shr 32).toInt()
         val normLen = Mago.normLen(tmp1, 4)
-        setAddImpl(this, Meta(0, normLen), tmp1)
+        --BI_OP_COUNTS[MBI_SET_ADD_SUB_BI.ordinal]
+        return setAddImpl(this, Meta(0, normLen), tmp1)
     }
 
     /**
@@ -1438,6 +1460,8 @@ class MutableBigInt private constructor (
         val normLenSqr = MagoSqr.setSqr(tmp1, bi.magia, bi.meta.normLen)
         setAddImpl(this, Meta(0, normLenSqr), tmp1)
         validate()
+        --BI_OP_COUNTS[MBI_SET_ADD_SUB_BI.ordinal]
+        ++BI_OP_COUNTS[MBI_ADD_SQR_BI.ordinal]
     }
 
     /**
@@ -1484,18 +1508,21 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      * @throws IllegalArgumentException if [bitCount] is negative
      */
-    fun setShl(x: BigIntNumber, bitCount: Int): MutableBigInt = when {
-        bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
-        bitCount == 0 || x.isZero() -> set(x)
-        else -> {
-            val xMagia = x.magia
-            ensureMagiaBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
-            _meta = Meta(
-                x.meta.signBit,
-                Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount)
-            )
-            this
+    fun setShl(x: BigIntNumber, bitCount: Int): MutableBigInt {
+        when {
+            bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
+            bitCount == 0 || x.isZero() -> set(x)
+            else -> {
+                val xMagia = x.magia
+                ensureMagiaBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
+                _meta = Meta(
+                    x.meta.signBit,
+                    Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount)
+                )
+            }
         }
+        ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
+        return this
     }
 
     /**
@@ -1519,7 +1546,7 @@ class MutableBigInt private constructor (
      */
     fun setUshr(x: BigIntNumber, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
-        return when {
+        when {
             bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
             bitCount == 0 -> set(x)
             zBitLen <= 0 -> setZero()
@@ -1529,9 +1556,10 @@ class MutableBigInt private constructor (
                     0,
                     Mago.setShiftRight(magia, x.magia, x.meta.normLen, bitCount)
                 )
-                this
             }
         }
+        ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
+        return this
     }
 
     /**
@@ -1577,6 +1605,7 @@ class MutableBigInt private constructor (
                 _meta = Meta(x.meta.signFlag, normLen)
             }
         }
+        ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
         return this
     }
 
@@ -1592,6 +1621,7 @@ class MutableBigInt private constructor (
      */
     fun setBit(bitIndex: Int): MutableBigInt {
         if (bitIndex >= 0) {
+            ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
             val wordIndex = bitIndex ushr 5
             val isolatedBit = (1 shl (bitIndex and 0x1F))
             if (wordIndex < meta.normLen) {
@@ -1618,6 +1648,7 @@ class MutableBigInt private constructor (
      */
     fun clearBit(bitIndex: Int): MutableBigInt {
         if (bitIndex >= 0) {
+            ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
             val wordIndex = bitIndex ushr 5
             if (wordIndex < meta.normLen) {
                 val isolatedBitMask = (1 shl (bitIndex and 0x1F)).inv()
@@ -1644,6 +1675,7 @@ class MutableBigInt private constructor (
      */
     fun applyBitMask(bitWidth: Int, bitIndex: Int = 0): MutableBigInt {
         verify (isNormalized())
+        ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
         val myBitLen = magnitudeBitLen()
         when {
             bitIndex < 0 || bitWidth < 0 ->
