@@ -736,7 +736,8 @@ class MutableBigInt private constructor (
             yDw == 0uL -> set(x)
             x.isZero() -> set(ySign, yDw)
             x.meta.signFlag == ySign -> {
-                ensureMagiaCapacityDiscard(max(x.meta.normLen, 2) + 1)
+                verify (this.magia.size >= 4)
+                ensureMagiaCapacityDiscard(x.meta.normLen + 1)
                 _meta = Meta(
                     x.meta.signBit,
                     Mago.setAdd64(magia, xMagia, x.meta.normLen, yDw)
@@ -757,6 +758,7 @@ class MutableBigInt private constructor (
                 }
             }
         }
+        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
         return this
     }
 
@@ -808,6 +810,7 @@ class MutableBigInt private constructor (
                 }
             }
         }
+        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_BI.ordinal]
         return this
     }
 
@@ -842,6 +845,7 @@ class MutableBigInt private constructor (
             Mago.setMul(tmp1, x.magia, xNormLen, y.magia, yNormLen)
         )
         swapTmp1()
+        ++BI_OP_COUNTS[MBI_SET_MUL_BI.ordinal]
         return this
     }
 
@@ -862,6 +866,7 @@ class MutableBigInt private constructor (
             x.meta.signFlag xor wSign,
             Mago.setMul32(magia, xMagia, x.meta.normLen, w)
         )
+        ++BI_OP_COUNTS[MBI_SET_MUL_PRIMITIVE.ordinal]
         return this
     }
 
@@ -882,6 +887,7 @@ class MutableBigInt private constructor (
             x.meta.signFlag xor dwSign,
             Mago.setMul64(magia, xMagia, x.meta.normLen, dw)
         )
+        ++BI_OP_COUNTS[MBI_SET_MUL_PRIMITIVE.ordinal]
         return this
     }
 
@@ -901,6 +907,7 @@ class MutableBigInt private constructor (
      */
     fun setSqr(w: UInt): MutableBigInt {
         val abs = w.toULong()
+        ++BI_OP_COUNTS[MBI_SET_SQR_PRIMITIVE.ordinal]
         return set(abs * abs)
     }
 
@@ -921,6 +928,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] for call chaining
      */
     fun setSqr(dw: ULong): MutableBigInt {
+        ++BI_OP_COUNTS[MBI_SET_SQR_PRIMITIVE.ordinal]
         val lo = dw * dw
         val hi = unsignedMulHi(dw, dw)
         return set(false, hi, lo)
@@ -944,10 +952,26 @@ class MutableBigInt private constructor (
                     MagoSqr.setSqr(tmp1, x.magia, xNormLen)
                 )
                 swapTmp1()
+                ++BI_OP_COUNTS[MBI_SET_SQR_SCHOOLBOOK.ordinal]
                 return this
             }
             else -> return karatsubaSetSqr(x)
         }
+    }
+
+    fun karatsubaSetSqr(a: BigIntNumber): MutableBigInt {
+        val n = a.meta.normLen
+        if (n <= 1)
+            return setSqr(a)
+        val k1 = (n + 1) / 2
+        val zLen = 2*n
+        ensureTmp1CapacityZeroed(zLen + 1, RESIZE_TMP1_KARATSUBA_SQR)
+        ensureTmp2Capacity(3 * k1 + 3, RESIZE_TMP2_KARATSUBA_Z1)
+        val zNormLen = MagoSqr.setSqrKaratsuba(tmp1, a.magia, a.meta.normLen, tmp2)
+        swapTmp1()
+        _meta = Meta(zNormLen)
+        ++BI_OP_COUNTS[MBI_SET_SQR_KARATSUBA.ordinal]
+        return this
     }
 
     fun setPow(x: BigIntNumber, exp: Int): MutableBigInt {
@@ -955,6 +979,7 @@ class MutableBigInt private constructor (
             return this
         val base: BigIntNumber = if (x === this) x.toBigInt() else x
         BigIntAlgorithms.powRightToLeft(base, exp, this)
+        ++BI_OP_COUNTS[MBI_SET_POW.ordinal]
         return this
     }
 
@@ -1658,20 +1683,6 @@ class MutableBigInt private constructor (
         ensureMagiaCapacityCopy(2 * k + 1)
         val normLen = BigIntAlgorithms.redc(magia, meta.normLen, modulus.magia, k, np)
         _meta = Meta(normLen)
-        return this
-    }
-
-    fun karatsubaSetSqr(a: BigIntNumber): MutableBigInt {
-        val n = a.meta.normLen
-        if (n <= 1)
-            return setSqr(a)
-        val k1 = (n + 1) / 2
-        val zLen = 2*n
-        ensureTmp1CapacityZeroed(zLen + 1, RESIZE_TMP1_KARATSUBA_SQR)
-        ensureTmp2Capacity(3 * k1 + 3, RESIZE_TMP2_KARATSUBA_Z1)
-        val zNormLen = MagoSqr.setSqrKaratsuba(tmp1, a.magia, a.meta.normLen, tmp2)
-        swapTmp1()
-        _meta = Meta(zNormLen)
         return this
     }
 

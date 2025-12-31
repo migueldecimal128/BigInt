@@ -35,6 +35,15 @@ object BigIntStats {
         MBI_CONSTRUCT_PRIMITIVE,
         MBI_CONSTRUCT_BI,
         MBI_CONSTRUCT_CAPACITY_HINT,
+
+        MBI_SET_ADD_SUB_PRIMITIVE,
+        MBI_SET_ADD_SUB_BI,
+        MBI_SET_MUL_PRIMITIVE,
+        MBI_SET_MUL_BI,
+        MBI_SET_SQR_PRIMITIVE,
+        MBI_SET_SQR_SCHOOLBOOK,
+        MBI_SET_SQR_KARATSUBA,
+        MBI_SET_POW,
         ;
 
         companion object {
