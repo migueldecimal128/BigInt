@@ -4,7 +4,9 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.BigIntStats.MUTABLE_RESIZE_COUNTS
+import com.decimal128.bigint.BigIntStats.MBI_RESIZE_COUNTS
+import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
+import com.decimal128.bigint.BigIntStats.BigIntOp.*
 import com.decimal128.bigint.BigIntStats.MutableResizeOperation
 import com.decimal128.bigint.BigIntStats.MutableResizeOperation.*
 import com.decimal128.bigint.intrinsic.unsignedMulHi
@@ -100,7 +102,6 @@ class MutableBigInt private constructor (
     meta: Meta,
     magia: Magia,
 ) : BigIntNumber(meta, magia) {
-    constructor() : this(Meta(0), Magia(4))
 
     internal var limbCapacityHint = 0
     internal var tmp1: Magia = Mago.ZERO
@@ -109,6 +110,31 @@ class MutableBigInt private constructor (
     companion object {
 
         private inline fun limbLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
+
+        operator fun invoke(): MutableBigInt {
+            ++BI_OP_COUNTS[MBI_CONSTRUCT_EMPTY.ordinal]
+            return MutableBigInt(Meta(0), Magia(4))
+        }
+
+        operator fun invoke(n: Int): MutableBigInt = invoke(n < 0, n.absoluteValue.toUInt().toULong())
+        operator fun invoke(w: UInt): MutableBigInt = invoke(false, w.toULong())
+        operator fun invoke(l: Long): MutableBigInt = invoke(l < 0, l.absoluteValue.toULong())
+        operator fun invoke(dw: ULong): MutableBigInt = invoke(false, dw)
+
+        operator fun invoke(sign: Boolean, dwMag: ULong): MutableBigInt {
+            ++BI_OP_COUNTS[MBI_CONSTRUCT_PRIMITIVE.ordinal]
+            val m = intArrayOf(dwMag.toInt(), (dwMag shr 32).toInt(), 0, 0)
+            val lMag = dwMag.toLong()
+            val normLen = (((-(lMag shr 32) ushr 63) + 1L) and ((lMag or -lMag) shr 63)).toInt()
+            return MutableBigInt(Meta(sign, normLen), m)
+        }
+
+        operator fun invoke(other: BigIntNumber): MutableBigInt {
+            ++BI_OP_COUNTS[MBI_CONSTRUCT_BI.ordinal]
+            val m = Mago.newWithFloorLen(other.meta.normLen)
+            other.magia.copyInto(m, 0, 0, other.meta.normLen)
+            return MutableBigInt(other.meta, m)
+        }
 
         /**
          * Creates a new zero-valued [MutableBigInt] with limb storage preallocated for at
@@ -119,43 +145,25 @@ class MutableBigInt private constructor (
          * @return a new zero [MutableBigInt] with preallocated limb space
          * @throws IllegalArgumentException if [initialBitCapacity] is negative
          */
-        fun withInitialBitCapacity(initialBitCapacity: Int): MutableBigInt {
+        fun withBitCapacityHint(initialBitCapacity: Int): MutableBigInt {
             if (initialBitCapacity >= 0) {
                 val initialLimbCapacity = max(4, limbLenFromBitLen(initialBitCapacity))
-                return MutableBigInt(
-                    Meta(0),
-                    Mago.newWithFloorLen(initialLimbCapacity)
-                )
+                val mbi = MutableBigInt(Meta(0),
+                    Mago.newWithFloorLen(initialLimbCapacity))
+                verify (mbi.magia.size >= 4)
+                mbi.limbCapacityHint = mbi.magia.size
+                ++BI_OP_COUNTS[MBI_CONSTRUCT_CAPACITY_HINT.ordinal]
+                return mbi
             }
             throw IllegalArgumentException()
         }
-
-        private fun from(meta: Meta, magia: Magia): MutableBigInt {
-            return MutableBigInt(
-                Meta(0),
-                Mago.newWithFloorLen(meta.normLen)
-            ).set(meta, magia)
-        }
-
-        fun from(bi: BigInt) = from(bi.meta, bi.magia)
-
      }
-
-    val normLen: Int
-        get() = meta.normLen
-
-    val signBit: Int
-        get() = meta.signBit
-
-    val signFlag: Boolean
-        get() = meta.signFlag
-
 
     private fun validate() {
         check(
-            normLen <= magia.size &&
+            meta.normLen <= magia.size &&
                     magia.size >= 4 &&
-                    (normLen == 0 || magia[normLen - 1] != 0)
+                    (meta.normLen == 0 || magia[meta.normLen - 1] != 0)
         )
     }
 
@@ -192,7 +200,7 @@ class MutableBigInt private constructor (
             val hintBit = (-limbCapacityHint ushr 30) and 2
             val repeatBit = (5 - magia.size) ushr 31
             val counterIndex = hintBit or repeatBit
-            MUTABLE_RESIZE_COUNTS[counterIndex] += 1
+            MBI_RESIZE_COUNTS[counterIndex] += 1
         }
         run { // allocation
             val targetLimbLen = max(limbCapacityHint, requestedLimbLen)
@@ -259,7 +267,7 @@ class MutableBigInt private constructor (
             val hintBit = (-limbCapacityHint ushr 30) and 2
             val repeatBit = (5 - magia.size) ushr 31
             val counterIndex = (resizeOp.ordinal shl 2) or hintBit or repeatBit
-            MUTABLE_RESIZE_COUNTS[counterIndex] += 1
+            MBI_RESIZE_COUNTS[counterIndex] += 1
         }
         val headRoom = (requestedLimbLen ushr 1) and ((5 - tmp1.size) shr 31)
         tmp1 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
@@ -290,7 +298,7 @@ class MutableBigInt private constructor (
             val hintBit = (-limbCapacityHint ushr 30) and 2
             val repeatBit = (5 - magia.size) ushr 31
             val counterIndex = (resizeOp.ordinal shl 2) or hintBit or repeatBit
-            ++MUTABLE_RESIZE_COUNTS[counterIndex]
+            ++MBI_RESIZE_COUNTS[counterIndex]
         }
         val headRoom = (requestedLimbLen ushr 1) and (-tmp2.size shr 31)
         tmp2 = Mago.newWithFloorLen(requestedLimbLen + headRoom)

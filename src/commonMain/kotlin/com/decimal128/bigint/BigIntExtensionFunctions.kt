@@ -220,7 +220,7 @@ fun BigInt.pow(exp: Int): BigInt = BigIntAlgorithms.pow(this, exp)
 fun BigInt.isqrt(): BigInt = BigIntAlgorithms.isqrt(this)
 
 
-fun BigInt.toMutableBigInt() = MutableBigInt.from(this)
+fun BigInt.toMutableBigInt() = MutableBigInt(this)
 
 fun Int.toMutableBigInt() = MutableBigInt().set(this)
 fun UInt.toMutableBigInt() = MutableBigInt().set(this)

@@ -29,7 +29,13 @@ object BigIntStats {
         BI_MOD_INVERSE_PRIMITIVE,
         BI_SQR,
         BI_POW,
-        BI_BITWISE_OP;
+        BI_BITWISE_OP,
+
+        MBI_CONSTRUCT_EMPTY,
+        MBI_CONSTRUCT_PRIMITIVE,
+        MBI_CONSTRUCT_BI,
+        MBI_CONSTRUCT_CAPACITY_HINT,
+        ;
 
         companion object {
             val values = BigIntOp.values()
@@ -40,7 +46,7 @@ object BigIntStats {
 
     }
 
-    internal val MUTABLE_RESIZE_COUNTS =
+    internal val MBI_RESIZE_COUNTS =
         IntArray(MutableResizeOperation.CARDINALITY * MutableResizeEvent.CARDINALITY)
 
     enum class MutableResizeOperation {

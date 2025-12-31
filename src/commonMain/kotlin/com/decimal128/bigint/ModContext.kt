@@ -319,16 +319,16 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
 
     // modInv scratch for EEA Extended Euclidean Algorithm
 
-    private var invR    = MutableBigInt.withInitialBitCapacity(kBits + 1)
-    private var invNewR = MutableBigInt.withInitialBitCapacity(kBits + 1)
-    private var invTmpR  = MutableBigInt.withInitialBitCapacity(kBits + 1)
-    private var invT    = MutableBigInt.withInitialBitCapacity(kBits + 1)
-    private var invNewT = MutableBigInt.withInitialBitCapacity(kBits + 1)
-    private var invTmpT  = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private var invR    = MutableBigInt.withBitCapacityHint(kBits + 1)
+    private var invNewR = MutableBigInt.withBitCapacityHint(kBits + 1)
+    private var invTmpR  = MutableBigInt.withBitCapacityHint(kBits + 1)
+    private var invT    = MutableBigInt.withBitCapacityHint(kBits + 1)
+    private var invNewT = MutableBigInt.withBitCapacityHint(kBits + 1)
+    private var invTmpT  = MutableBigInt.withBitCapacityHint(kBits + 1)
 
-    private val invQ     = MutableBigInt.withInitialBitCapacity(kBits + 1)
-    private val invQNewR = MutableBigInt.withInitialBitCapacity(kBits + 1)
-    private val invQNewT = MutableBigInt.withInitialBitCapacity(kBits + 1)
+    private val invQ     = MutableBigInt.withBitCapacityHint(kBits + 1)
+    private val invQNewR = MutableBigInt.withBitCapacityHint(kBits + 1)
+    private val invQNewT = MutableBigInt.withBitCapacityHint(kBits + 1)
 
     /**
      * Computes the multiplicative inverse of [a] modulo [m] and writes it into [out],
@@ -401,12 +401,12 @@ class ModContext(val m: BigInt, useBarrettOnly: Boolean = false) {
         val bPowKPlus1 = BigInt.Companion.withSetBit(shiftKPlus1Bits)
 
         // Initial capacities are sized by bitLen to avoid resizing in modPow hot paths
-        val q = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
-        val r1 = MutableBigInt.Companion.withInitialBitCapacity(kBits + 32)
-        val r2 = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
+        val q = MutableBigInt.Companion.withBitCapacityHint(2*kBits + 32)
+        val r1 = MutableBigInt.Companion.withBitCapacityHint(kBits + 32)
+        val r2 = MutableBigInt.Companion.withBitCapacityHint(2*kBits + 32)
 
-        val mulTmp = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
-        val baseTmp = MutableBigInt.Companion.withInitialBitCapacity(2*kBits + 32)
+        val mulTmp = MutableBigInt.Companion.withBitCapacityHint(2*kBits + 32)
+        val baseTmp = MutableBigInt.Companion.withBitCapacityHint(2*kBits + 32)
 
         companion object {
 

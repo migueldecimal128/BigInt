@@ -318,38 +318,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a copy of [x] extended to at least [floorLen] elements.
-     *
-     * The new array preserves the contents of [x] and zero-fills the remainder.
-     *
-     * @throws IllegalArgumentException if [floorLen] is not greater than [x.size].
-     */
-    fun newCopyWithFloorLen(x: Magia, floorLen: Int) : Magia {
-        if (floorLen > x.size) {
-            val z = newWithFloorLen(floorLen)
-            x.copyInto(z, 0, 0, x.size)
-            return z
-        }
-        throw IllegalArgumentException()
-    }
-
-    fun newCopyWithFloorLen(x: Magia, xLen: Int, floorLen: Int): Magia {
-        if (xLen <= x.size && xLen < floorLen) {
-            val z = newWithFloorLen(floorLen)
-            x.copyInto(z, 0, 0, xLen)
-            return z
-        }
-        throw IllegalArgumentException()
-    }
-
-    /**
-     * Returns a copy of [x] whose length is the minimum number of limbs required
-     * to hold [exactBitLen] bits. Leading limbs are preserved or truncated as needed.
-     */
-    fun newCopyWithExactBitLen(x: Magia, exactBitLen: Int): Magia =
-        newCopyWithExactLimbLen(x, x.size, (exactBitLen + 0x1F) ushr 5)
-
-    /**
      * Returns a copy of [x] whose length is the minimum number of limbs required
      * to hold [exactBitLen] bits. Leading limbs are preserved or truncated as needed.
      */

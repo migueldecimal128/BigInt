@@ -32,7 +32,7 @@ object BigIntAlgorithms {
             return from(f)
         }
         val bitCapacityRequired = estimateFactorialBitLen(n)
-        val f = MutableBigInt.withInitialBitCapacity(bitCapacityRequired)
+        val f = MutableBigInt.withBitCapacityHint(bitCapacityRequired)
         val twentyBang = 2_432_902_008_176_640_000L
         f.set(twentyBang)
         for (i in 21..n)
@@ -160,8 +160,8 @@ object BigIntAlgorithms {
             exp == 2 -> baseAbs.sqr()
             else -> {
                 val maxBitLen = base.magnitudeBitLen() * exp
-                val b = MutableBigInt.withInitialBitCapacity(maxBitLen).set(base)
-                val r = MutableBigInt.withInitialBitCapacity(maxBitLen).setOne()
+                val b = MutableBigInt.withBitCapacityHint(maxBitLen).set(base)
+                val r = MutableBigInt.withBitCapacityHint(maxBitLen).setOne()
 
                 var e = exp
                 while (true) {
@@ -201,7 +201,7 @@ object BigIntAlgorithms {
             verify (tmp != this && tmp != base)
             tmp.hintBitCapacity(maxBitLen)
         } else
-            MutableBigInt.withInitialBitCapacity(maxBitLen)
+            MutableBigInt.withBitCapacityHint(maxBitLen)
         b.set(base).mutAbs()
         ret.set(1).hintBitCapacity(maxBitLen)
         var e = exp
