@@ -5,6 +5,8 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt.Companion.ZERO
+import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
+import com.decimal128.bigint.BigIntStats.BigIntOp.*
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
@@ -150,12 +152,14 @@ class BigInt private constructor(
          * @param n the signed 32-bit integer to convert.
          * @return the corresponding [BigInt] representation.
          */
-        fun from(n: Int): BigInt = when {
+        fun from(n: Int): BigInt {
+            if (n == 0)
+                return ZERO
             // FIXME - consider a small cache of small values
             //  that is lazily filled in
-            n > 0 -> fromNormalizedNonZero(intArrayOf(n))
-            n < 0 -> fromNormalizedNonZero(sign=true, intArrayOf(-n))
-            else -> ZERO
+            ++BI_OP_COUNTS[BI_CONSTRUCT_32.ordinal]
+            return if (n > 0) BigInt(Meta(false, 1), intArrayOf(n))
+            else BigInt(Meta(true, 1), intArrayOf(-n))
         }
 
         /**
@@ -167,7 +171,10 @@ class BigInt private constructor(
          * @param w the unsigned integer to convert.
          * @return the corresponding non-negative [BigInt].
          */
-        fun from(w: UInt) = if (w != 0u) fromNormalizedNonZero(intArrayOf(w.toInt())) else ZERO
+        fun from(w: UInt) = if (w != 0u) {
+            ++BI_OP_COUNTS[BI_CONSTRUCT_32.ordinal]
+            BigInt(Meta(false, 1), intArrayOf(w.toInt()))
+        } else ZERO
 
         /**
          * Converts a 64-bit signed [Long] into a signed [BigInt].
@@ -192,10 +199,14 @@ class BigInt private constructor(
          */
         fun from(dw: ULong) = from(false, dw)
 
-        fun from(sign: Boolean, dwMagnitude: ULong) = when {
-            dwMagnitude == 0uL -> ZERO
-            (dwMagnitude shr 32) == 0uL -> fromNormalizedNonZero(sign, intArrayOf(dwMagnitude.toInt()))
-            else -> fromNormalizedNonZero(sign, intArrayOf(dwMagnitude.toInt(), (dwMagnitude shr 32).toInt()))
+        fun from(sign: Boolean, dwMagnitude: ULong): BigInt {
+            if (dwMagnitude != 0uL) {
+                ++BI_OP_COUNTS[BI_CONSTRUCT_64.ordinal]
+                if ((dwMagnitude shr 32) == 0uL)
+                    return BigInt(Meta(sign, 1), intArrayOf(dwMagnitude.toInt()))
+                return BigInt(Meta(sign, 2), intArrayOf(dwMagnitude.toInt(), (dwMagnitude shr 32).toInt()))
+            }
+            return ZERO
         }
 
         /**
@@ -222,24 +233,32 @@ class BigInt private constructor(
                 biasedExp == 0x7FF) // fractional values + NaN + Infinity ... sorry
                 return ZERO
             // we are left with finiteNonZero
+            ++BI_OP_COUNTS[BI_CONSTRUCT_DBL.ordinal]
             val significand53 = (longBits and ((1L shl 52) - 1L)) or (1L shl 52)
             val shift = exp - 52
             if (shift <= 0) {
                 val magnitude = significand53 ushr -shift
                 val l = (magnitude xor signMask) - signMask
+                --BI_OP_COUNTS[BI_CONSTRUCT_64.ordinal] // don't double-count
                 return from(l)
             }
+            --BI_OP_COUNTS[BI_CONSTRUCT_BITWISE.ordinal] // don't double-count
             return fromULongShiftLeft(significand53.toULong(), shift, sign)
         }
 
         /**
          * Constructs a new [BigInt] from a [MutableBigInt] or another [BigInt].
          */
-        fun from(other: BigIntNumber): BigInt = BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
+        fun from(other: BigIntNumber): BigInt {
+            ++BI_OP_COUNTS[BI_CONSTRUCT_COPY.ordinal]
+            return BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
+        }
 
-        internal fun from(sign: Boolean, biMagnitude: BigIntNumber): BigInt =
-            BigInt(Meta(sign, biMagnitude.meta.normLen),
+        internal fun from(sign: Boolean, biMagnitude: BigIntNumber): BigInt {
+            ++BI_OP_COUNTS[BI_CONSTRUCT_COPY.ordinal]
+            return BigInt(Meta(sign, biMagnitude.meta.normLen),
                 biMagnitude.magia.copyOf(biMagnitude.meta.normLen))
+        }
 
         /**
          * Parses a [String] representation of an integer into a [BigInt].
@@ -497,15 +516,19 @@ class BigInt private constructor(
          * Parse a BigInt thru a standard iterator for different text
          * representations.
          */
-        private fun from(src: Latin1Iterator): BigInt =
-            fromNonNormalizedOrZero(src.peek() == '-', BigIntParsePrint.from(src))
+        private fun from(src: Latin1Iterator): BigInt {
+            ++BI_OP_COUNTS[BI_CONSTRUCT_TEXT.ordinal]
+            return fromNonNormalizedOrZero(src.peek() == '-', BigIntParsePrint.from(src))
+        }
 
         /**
          * Parse a BigInt thru a standard iterator for different text
          * representations.
          */
-        private fun fromHex(src: Latin1Iterator): BigInt =
-            fromNormalizedOrZero(src.peek() == '-', BigIntParsePrint.fromHex(src))
+        private fun fromHex(src: Latin1Iterator): BigInt {
+            ++BI_OP_COUNTS[BI_CONSTRUCT_TEXT.ordinal]
+            return fromNormalizedOrZero(src.peek() == '-', BigIntParsePrint.fromHex(src))
+        }
 
         /**
          * Generates a random `BigInt` whose magnitude is uniformly sampled from
@@ -565,12 +588,15 @@ class BigInt private constructor(
                         mask = -1
                     }
                     val sign = withRandomSign && rng.nextBoolean()
-                    if (zeroTest == 0) ZERO else fromNonNormalizedNonZero(sign, magia)
+                    if (zeroTest != 0) {
+                        ++BI_OP_COUNTS[BI_CONSTRUCT_RANDOM.ordinal]
+                        return fromNonNormalizedNonZero(sign, magia)
+                    }
+                    return ZERO
                 }
                 maxBitLen == 0 -> ZERO
                 else -> throw IllegalArgumentException(ERR_MSG_BITLEN_LE_0)
             }
-
         }
 
         /**
@@ -624,6 +650,7 @@ class BigInt private constructor(
                 magia[limbIndex] = magia[limbIndex] or (1 shl (topBitIndex and 0x1F))
                 magia[0] = magia[0] or if (ensureOdd) 1 else 0
                 val sign = withRandomSign && rng.nextBoolean()
+                ++BI_OP_COUNTS[BI_CONSTRUCT_RANDOM.ordinal]
                 fromNormalizedNonZero(sign, magia)
             }
             bitLen == 0 -> ZERO
@@ -703,6 +730,7 @@ class BigInt private constructor(
             while (true) {
                 val x = randomWithMaxBitLen(bitLen, rnd)
                 if (x < max) return x
+                --BI_OP_COUNTS[BI_CONSTRUCT_RANDOM.ordinal] // don't double-count
             }
         }
 
@@ -799,8 +827,10 @@ class BigInt private constructor(
                     isNegative, isBigEndian, bytes, offset,
                     length
                 )
-                if (magia !== Mago.ZERO)
+                if (magia !== Mago.ZERO) {
+                    ++BI_OP_COUNTS[BI_CONSTRUCT_BINARY_ARRAY.ordinal]
                     return fromNormalizedNonZero(isNegative, magia)
+                }
             }
             return ZERO
         }
@@ -812,8 +842,10 @@ class BigInt private constructor(
                                      len: Int = littleEndianIntArray.size): BigInt {
             if (len >= 0 && len <= littleEndianIntArray.size) {
                 val normLen = Mago.normLen(littleEndianIntArray, len)
-                if (normLen > 0)
+                if (normLen > 0) {
+                    ++BI_OP_COUNTS[BI_CONSTRUCT_BINARY_ARRAY.ordinal]
                     return fromNormalizedNonZero(sign, littleEndianIntArray.copyOf(normLen))
+                }
                 return ZERO
             }
             throw IllegalArgumentException()
@@ -822,12 +854,16 @@ class BigInt private constructor(
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray,
                                      off: Int, len: Int): BigInt {
             require (off >= 0 && len >= 0 && off + len <= littleEndianIntArray.size)
+            // FIXME -- this is not correct since we are incrementing
+            //  but it might return ZERO
+            // FIXME - consolidate this with the other version
+            ++BI_OP_COUNTS[BI_CONSTRUCT_BINARY_ARRAY.ordinal]
             return fromNonNormalizedOrZero(false,
                 littleEndianIntArray.copyOfRange(off, off+len))
         }
 
 
-            /**
+        /**
          * Constructs a positive BigInt with a single bit turned on at the zero-based bitIndex.
          *
          * The returned BigInt value will be 2**bitIndex
@@ -841,6 +877,7 @@ class BigInt private constructor(
                 return ONE
             val magia = Mago.newWithBitLen(bitIndex + 1)
             magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
+            ++BI_OP_COUNTS[BI_CONSTRUCT_BITWISE.ordinal]
             return fromNormalizedNonZero(magia)
         }
 
@@ -876,6 +913,7 @@ class BigInt private constructor(
             magia[magia.lastIndex] = -1 ushr nlz
             val ctz = bitIndex and 0x1F
             magia[loIndex] = magia[loIndex] and (-1 shl ctz)
+            ++BI_OP_COUNTS[BI_CONSTRUCT_BITWISE.ordinal]
             return fromNormalizedNonZero(magia)
         }
 
@@ -934,6 +972,7 @@ class BigInt private constructor(
                                 else -> magia[magia.size - 1] = lo
                             }
                         }
+                        ++BI_OP_COUNTS[BI_CONSTRUCT_BITWISE.ordinal]
                         fromNormalizedNonZero(sign, magia)
                     }
                 }
@@ -1001,7 +1040,13 @@ class BigInt private constructor(
      *
      * Zero always returns the singleton `BigInt.ZERO`.
      */
-    fun negate() = if (isZero()) ZERO else BigInt(meta.negate(), magia)
+    fun negate(): BigInt {
+        if (! isZero()) {
+            ++BI_OP_COUNTS[BI_NEGATE.ordinal]
+            return BigInt(meta.negate(), magia)
+        }
+        return ZERO
+    }
 
     /**
      * Returns a value of this magnitude with the requested [sign].
@@ -1428,19 +1473,24 @@ class BigInt private constructor(
             dw == 0uL && signFlipThis -> return this.negate()
             dw == 0uL -> return this
             this.isZero() -> return from(otherSign, dw)
-            thisSign == otherSign ->
+            thisSign == otherSign -> {
+                ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
                 return fromNonNormalizedNonZero(thisSign, Mago.newAdd(this.magia, this.meta.normLen, dw))
+            }
         }
         val cmp = this.magnitudeCompareTo(dw)
-        return when {
-            cmp > 0 -> fromNonNormalizedNonZero(thisSign, Mago.newSub(this.magia, this.meta.normLen, dw))
-            cmp < 0 -> {
+        if (cmp != 0) {
+            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
+            return if (cmp > 0) {
+                fromNonNormalizedNonZero(thisSign, Mago.newSub(this.magia, this.meta.normLen, dw))
+            } else {
                 val thisMag = this.toULongMagnitude()
                 val diff = dw - thisMag
+                --BI_OP_COUNTS[BI_CONSTRUCT_64.ordinal] // do not double count
                 from(otherSign, diff)
             }
-            else -> BigInt.ZERO
         }
+        return ZERO
     }
 
     /**
@@ -1457,20 +1507,29 @@ class BigInt private constructor(
             other.isZero() -> return this
             this.isZero() && isSub -> return other.toBigInt().negate()
             this.isZero() -> other.toBigInt()
-            this.meta.signFlag == otherSign ->
-                return BigInt.fromNonNormalizedNonZero(this.meta.signFlag,
-                    Mago.newAdd(this.magia, this.meta.normLen,
-                        other.magia, other.meta.normLen))
+            this.meta.signFlag == otherSign -> {
+                ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
+                return BigInt.fromNonNormalizedNonZero(
+                    this.meta.signFlag,
+                    Mago.newAdd(
+                        this.magia, this.meta.normLen,
+                        other.magia, other.meta.normLen
+                    )
+                )
+            }
         }
         val cmp = this.magnitudeCompareTo(other)
-        val ret = when {
-            cmp > 0 -> BigInt.fromNonNormalizedNonZero(this.meta.signFlag,
-                Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
-            cmp < 0 -> BigInt.fromNonNormalizedNonZero(otherSign,
-                Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
-            else -> BigInt.ZERO
+        if (cmp != 0) {
+            return if (cmp > 0) {
+                ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
+                fromNonNormalizedNonZero(this.meta.signFlag,
+                    Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
+            } else {
+                fromNonNormalizedNonZero(otherSign,
+                    Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
+            }
         }
-        return ret
+        return ZERO
     }
 
     fun mulImpl(dwSign: Boolean, dw: ULong): BigInt =

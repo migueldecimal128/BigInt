@@ -1,9 +1,47 @@
 package com.decimal128.bigint
 
-internal object BigIntStats {
-    val MUTABLE_RESIZE_COUNTS =
-        IntArray(MutableResizeOperation.COUNT * MutableResizeEvent.COUNT)
+object BigIntStats {
 
+    internal val BI_OP_COUNTS = LongArray(BigIntOp.CARDINALITY)
+
+    enum class BigIntOp {
+        BI_CONSTRUCT_32,
+        BI_CONSTRUCT_64,
+        BI_CONSTRUCT_DBL,
+        BI_CONSTRUCT_TEXT,
+        BI_CONSTRUCT_RANDOM,
+        BI_CONSTRUCT_BINARY_ARRAY,
+        BI_CONSTRUCT_BITWISE,
+        BI_CONSTRUCT_COPY,
+        BI_NEGATE,
+        BI_ADD_SUB_BI,
+        BI_ADD_SUB_PRIMITIVE,
+        BI_MUL_BI,
+        BI_MUL_PRIMITIVE,
+        BI_DIV_BI,
+        BI_DIV_PRIMITIVE,
+        BI_REM_BI,
+        BI_REM_PRIMITIVE,
+        BI_MOD_BI,
+        BI_MOD_PRIMITIVE,
+        BI_DIV_INVERSE_PRIMITIVE,
+        BI_REM_INVERSE_PRIMITIVE,
+        BI_MOD_INVERSE_PRIMITIVE,
+        BI_SQR,
+        BI_POW,
+        BI_BITWISE_OP;
+
+        companion object {
+            val values = BigIntOp.values()
+            val CARDINALITY = values.size
+        }
+
+
+
+    }
+
+    internal val MUTABLE_RESIZE_COUNTS =
+        IntArray(MutableResizeOperation.CARDINALITY * MutableResizeEvent.CARDINALITY)
 
     enum class MutableResizeOperation {
         RESIZE_MAGIA,
@@ -16,7 +54,7 @@ internal object BigIntStats {
 
         companion object {
             val values = MutableResizeOperation.values()
-            val COUNT = values.size
+            val CARDINALITY = values.size
         }
     }
 
@@ -27,8 +65,8 @@ internal object BigIntStats {
         REPEAT_HINTED;
 
         companion object {
-            val values = values()
-            const val COUNT = 4
+            val values = MutableResizeEvent.values()
+            val CARDINALITY = values.size
         }
     }
 }
