@@ -136,6 +136,8 @@ class MutableBigInt private constructor (
 
         fun from(bi: BigInt) = from(bi.meta, bi.magia)
 
+        private val RESIZE_COUNTS =
+            IntArray(ResizeOperation.COUNT * ResizeEvent.COUNT)
     }
 
     val normLen: Int
@@ -182,13 +184,22 @@ class MutableBigInt private constructor (
      * @param requestedLimbLen the minimum number of limbs required; must exceed both
      *        the current backing capacity and the inline storage size.
      */
-    private fun resizeDiscard(requestedLimbLen: Int) {
-        verify(requestedLimbLen > 4 && requestedLimbLen > magia.size)
-        val targetLimbLen = max(limbCapacityHint, requestedLimbLen)
-        val headroom =
-            if (magia.size == 4 || requestedLimbLen <= limbCapacityHint) 0
-            else targetLimbLen shr 1
-        _magia = Mago.newWithFloorLen(targetLimbLen + headroom)
+    private fun resizeMagiaDiscard(requestedLimbLen: Int) {
+
+        verify (requestedLimbLen > 4 && requestedLimbLen > magia.size)
+        run { // accounting
+            val hintBit = (-limbCapacityHint ushr 30) and 2
+            val repeatBit = (5 - magia.size) ushr 31
+            val counterIndex = hintBit or repeatBit
+            ++RESIZE_COUNTS[counterIndex]
+        }
+        run { // allocation
+            val targetLimbLen = max(limbCapacityHint, requestedLimbLen)
+            val headroom =
+                if (magia.size <= 4 || requestedLimbLen <= limbCapacityHint) 0
+                else targetLimbLen shr 1
+            _magia = Mago.newWithFloorLen(targetLimbLen + headroom)
+        }
     }
 
     /**
@@ -214,9 +225,9 @@ class MutableBigInt private constructor (
      * @param requestedLimbLen the minimum number of limbs required; must exceed both
      *        the current backing capacity and the inline storage size.
      */
-    private fun resizeCopy(requestedLimbLen: Int) {
+    private fun resizeMagiaCopy(requestedLimbLen: Int) {
         val t = _magia
-        resizeDiscard(requestedLimbLen)
+        resizeMagiaDiscard(requestedLimbLen)
         t.copyInto(magia, 0, 0, meta.normLen)
     }
 
@@ -233,7 +244,8 @@ class MutableBigInt private constructor (
      * @param requestedLimbLen the minimum number of limbs required; must exceed the
      *        current capacity of the temporary buffer.
      */
-    private fun resizeTmp1(requestedLimbLen: Int) {
+    private fun resizeTmp1(requestedLimbLen: Int,
+                           resizeOp: ResizeOperation) {
         verify (requestedLimbLen > tmp1.size)
         // tmp arrays start off with zero size
         // it might also have ended up with size == 4 because
@@ -241,6 +253,12 @@ class MutableBigInt private constructor (
         // so a current size of <= 4 will be considered "untouched"
         // if this is the first resize request then give them what
         // they want ... otherwise, give them 50% more
+        run { // accounting
+            val hintBit = (-limbCapacityHint ushr 30) and 2
+            val repeatBit = (5 - magia.size) ushr 31
+            val counterIndex = (resizeOp.index shl 2) or hintBit or repeatBit
+            ++RESIZE_COUNTS[counterIndex]
+        }
         val headRoom = (requestedLimbLen ushr 1) and ((5 - tmp1.size) shr 31)
         tmp1 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
     }
@@ -259,39 +277,39 @@ class MutableBigInt private constructor (
      * @param requestedLimbLen the minimum number of limbs required; must exceed the
      *        current capacity of the temporary buffer.
      */
-    private fun resizeTmp2(requestedLimbLen: Int) {
+    private fun resizeTmp2(requestedLimbLen: Int,
+                           resizeOp: ResizeOperation) {
         verify (requestedLimbLen > tmp2.size)
         // tmp2 starts off with zero size
         // there is no swapTmp2
         // if this is the first resize then give them what they want
         // otherwise, give them 50% more
+        run { // accounting
+            val hintBit = (-limbCapacityHint ushr 30) and 2
+            val repeatBit = (5 - magia.size) ushr 31
+            val counterIndex = (resizeOp.index shl 2) or hintBit or repeatBit
+            ++RESIZE_COUNTS[counterIndex]
+        }
         val headRoom = (requestedLimbLen ushr 1) and (-tmp2.size shr 31)
         tmp2 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
     }
 
     /**
-     * Ensures that the backing limb array has capacity **at least** [minLimbLen].
+     * Ensures that the backing limb array has capacity **at least** [requestedLimbLen].
      *
      * If the current array is too small, it is replaced with a new zero-initialized
-     * array whose capacity is at least [minLimbLen] (rounded up to the allocator’s
+     * array whose capacity is at least [requestedLimbLen] (rounded up to the allocator’s
      * heap quantum). Any existing value is discarded.
      *
      * Note that discarding the contents can cause confusion in the debugger
      * because the remaining value in the debugger is not normalized ... triggering
      * issues with toString()
      *
-     * @param minLimbLen the minimum number of limbs required.
+     * @param requestedLimbLen the minimum number of limbs required.
      */
-    private inline fun ensureCapacityDiscard(minLimbLen: Int) {
-        if (magia.size < minLimbLen)
-            resizeDiscard(max(limbCapacityHint, minLimbLen))
-    }
-
-    private inline fun ensureCapacityDiscardZeroed(minLimbLen: Int) {
-        if (magia.size < minLimbLen)
-            resizeDiscard(max(limbCapacityHint,minLimbLen))
-        else
-            magia.fill(0, 0, minLimbLen)
+    private inline fun ensureMagiaCapacityDiscard(requestedLimbLen: Int) {
+        if (magia.size < requestedLimbLen)
+            resizeMagiaDiscard(requestedLimbLen)
     }
 
     /**
@@ -304,9 +322,9 @@ class MutableBigInt private constructor (
      *
      * @param minLimbLen the minimum number of limbs required.
      */
-    private inline fun ensureCapacityCopy(minLimbLen: Int) {
+    private inline fun ensureMagiaCapacityCopy(minLimbLen: Int) {
         if (magia.size < minLimbLen)
-            resizeCopy(max(limbCapacityHint, minLimbLen))
+            resizeMagiaCopy(max(limbCapacityHint, minLimbLen))
     }
 
     /**
@@ -323,13 +341,13 @@ class MutableBigInt private constructor (
      *
      * @param newLimbLen the required limb length to be zeroed.
      */
-    private inline fun ensureCapacityCopyZeroExtend(newLimbLen: Int) {
+    private inline fun ensureMagiaCapacityCopyZeroExtend(newLimbLen: Int) {
         if (newLimbLen <= magia.size) {
             if (newLimbLen > meta.normLen)
                 magia.fill(0, meta.normLen, newLimbLen)
         } else {
             // resize allocates new clean zeroed storage
-            resizeCopy(max(limbCapacityHint, newLimbLen))
+            resizeMagiaCopy(max(limbCapacityHint, newLimbLen))
         }
     }
 
@@ -338,24 +356,24 @@ class MutableBigInt private constructor (
      * existing value.
      *
      * The bit-length requirement is converted to a minimum limb count
-     * (`ceil(minBitLen / 32)`) and delegated to [ensureCapacityDiscard].
+     * (`ceil(minBitLen / 32)`) and delegated to [ensureMagiaCapacityDiscard].
      *
      * @param minBitLen the minimum number of bits required.
      */
-    private inline fun ensureBitCapacityDiscard(minBitLen: Int) =
-        ensureCapacityDiscard((minBitLen + 0x1F) ushr 5)
+    private inline fun ensureMagiaBitCapacityDiscard(minBitLen: Int) =
+        ensureMagiaCapacityDiscard((minBitLen + 0x1F) ushr 5)
 
     /**
      * Ensures capacity for representing at least [minBitLen] bits while preserving
      * the existing value.
      *
      * The bit-length requirement is converted to a minimum limb count
-     * (`ceil(minBitLen / 32)`) and delegated to [ensureCapacityCopy].
+     * (`ceil(minBitLen / 32)`) and delegated to [ensureMagiaCapacityCopy].
      *
      * @param minBitLen the minimum number of bits required.
      */
-    private inline fun ensureBitCapacityCopy(minBitLen: Int) =
-        ensureCapacityCopy((minBitLen + 0x1F) ushr 5)
+    private inline fun ensureMagiaBitCapacityCopy(minBitLen: Int) =
+        ensureMagiaCapacityCopy((minBitLen + 0x1F) ushr 5)
 
     /**
      * Ensures that the temporary limb buffer `tmp1` has capacity **at least**
@@ -367,66 +385,19 @@ class MutableBigInt private constructor (
      *
      * @param requestedLimbLen the minimum number of limbs required.
      */
-    private inline fun ensureTmp1Capacity(requestedLimbLen: Int) {
+    private inline fun ensureTmp1Capacity(requestedLimbLen: Int,
+                                          resizeOp: ResizeOperation) {
         if (requestedLimbLen > tmp1.size) {
             val required = max(limbCapacityHint, requestedLimbLen)
-            resizeTmp1(required)
+            resizeTmp1(required, resizeOp)
         }
     }
 
-    /**
-     * Ensures that the temporary limb buffer `tmp1` can hold a
-     * `Knuth normalized` copy of the dividend for Knuth division.
-     *
-     * The buffer is sized to at least `dividend.normLen + 1`, taking into account
-     * any capacity hint associated with the dividend to avoid future reallocations.
-     * Existing contents of `tmp1` are discarded if a resize is required.
-     *
-     * @param x the dividend whose normalized representation will be staged in `tmp1`.
-     */
-    private inline fun ensureTmp1CapacityDividendPlus1(x: BigIntNumber) {
-        if (x.meta.normLen >= tmp1.size) {
-            val required = max(x.currentLimbCapacityHint(), x.meta.normLen) + 1
-            resizeTmp1(required)
-        }
-    }
-
-    /**
-     * Ensures that the temporary limb buffer `tmp2` has sufficient capacity
-     * to hold the divisor for Knuth division operations where the dividend
-     * and divisor must be `normalized` to have the MSB of the dividend set.
-     *
-     * `tmp2` is resized to at least the divisor’s normalized limb length,
-     * taking into account any capacity hint associated with the divisor to
-     * avoid future reallocations. Existing contents are discarded if a resize
-     * is required.
-     *
-     * @param divisor the divisor whose limbs will be staged in `tmp2`.
-     */
-    private inline fun ensureTmp2CapacityDivisor(divisor: BigIntNumber) {
-        if (divisor.meta.normLen > tmp2.size) {
-            val required = max(divisor.currentLimbCapacityHint(), divisor.meta.normLen)
-            resizeTmp2(required)
-        }
-    }
-
-    /**
-     * Ensures that the temporary limb buffer `tmp2` has sufficient capacity for
-     * Karatsuba squaring.
-     *
-     * The required capacity is `3 * k1 + 3`, where `k1 = ceil(operand.normLen / 2)`.
-     * If a resize is needed, the `tmp2` is grown to the maximum of this immediate
-     * requirement and the capacity implied by the receiver’s hint, rounded up to
-     * the allocator’s heap quantum. Any existing contents are discarded.
-     *
-     * @param operandK1 `ceil(operand.normLen / 2)` for the value being squared.
-     */
-    private inline fun ensureTmp2CapacityKaratsubaSqr(operandK1: Int) {
-        val required = 3 * operandK1 + 3
-        if (required > tmp2.size) {
-            val hintK1 = (limbCapacityHint + 3) ushr 2
-            val hintSize = 3 * hintK1 + 3
-            resizeTmp2(max(hintSize, required))
+    private inline fun ensureTmp2Capacity(requestedLimbLen: Int,
+                                          resizeOp: ResizeOperation) {
+        if (requestedLimbLen > tmp2.size) {
+            val required = max(limbCapacityHint, requestedLimbLen)
+            resizeTmp2(required, resizeOp)
         }
     }
 
@@ -442,11 +413,12 @@ class MutableBigInt private constructor (
      *
      * @param zeroedLimbLen the number of limbs to be zeroed.
      */
-    private inline fun ensureTmp1CapacityZeroed(zeroedLimbLen: Int) {
+    private inline fun ensureTmp1CapacityZeroed(zeroedLimbLen: Int,
+                                                resizeOp: ResizeOperation) {
         if (zeroedLimbLen <= tmp1.size)
             tmp1.fill(0, 0, zeroedLimbLen)
         else
-            resizeTmp1(max(limbCapacityHint, zeroedLimbLen))
+            resizeTmp1(zeroedLimbLen, resizeOp)
     }
 
     /**
@@ -673,7 +645,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] for call chaining
      */
     private fun set(yMeta: Meta, y: Magia): MutableBigInt {
-        ensureCapacityDiscard(yMeta.normLen)
+        ensureMagiaCapacityDiscard(yMeta.normLen)
         _meta = yMeta
         y.copyInto(magia, 0, 0, yMeta.normLen)
         return this
@@ -754,7 +726,7 @@ class MutableBigInt private constructor (
             yDw == 0uL -> set(x)
             x.isZero() -> set(ySign, yDw)
             x.meta.signFlag == ySign -> {
-                ensureCapacityDiscard(max(x.meta.normLen, 2) + 1)
+                ensureMagiaCapacityDiscard(max(x.meta.normLen, 2) + 1)
                 _meta = Meta(
                     x.meta.signBit,
                     Mago.setAdd64(magia, xMagia, x.meta.normLen, yDw)
@@ -764,7 +736,7 @@ class MutableBigInt private constructor (
                 val cmp: Int = x.magnitudeCompareTo(yDw)
                 when {
                     cmp > 0 -> {
-                        ensureCapacityDiscard(x.meta.normLen)
+                        ensureMagiaCapacityDiscard(x.meta.normLen)
                         _meta = Meta(
                             x.meta.signBit,
                             Mago.setSub64(magia, xMagia, x.meta.normLen, yDw)
@@ -798,7 +770,7 @@ class MutableBigInt private constructor (
             yMeta.isZero -> set(x)
             x.isZero() -> set(yMeta, yMagia)
             x.meta.signFlag == yMeta.signFlag -> {
-                ensureCapacityDiscard(max(x.meta.normLen, yMeta.normLen) + 1)
+                ensureMagiaCapacityDiscard(max(x.meta.normLen, yMeta.normLen) + 1)
                 _meta = Meta(
                     x.meta.signBit,
                     Mago.setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
@@ -809,14 +781,14 @@ class MutableBigInt private constructor (
                 val cmp: Int = x.magnitudeCompareTo(yMeta, yMagia)
                 when {
                     cmp > 0 -> {
-                        ensureCapacityDiscard(x.meta.normLen)
+                        ensureMagiaCapacityDiscard(x.meta.normLen)
                         _meta = Meta(
                             x.meta.signBit,
                             Mago.setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen))
                     }
 
                     cmp < 0 -> {
-                        ensureCapacityDiscard(yMeta.normLen)
+                        ensureMagiaCapacityDiscard(yMeta.normLen)
                         _meta = Meta(
                             yMeta.signBit,
                             Mago.setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen))
@@ -854,7 +826,7 @@ class MutableBigInt private constructor (
             yNormLen <= 2 -> return setMulImpl(x, y.meta.signFlag, y.toULongMagnitude())
             y.isMagnitudePowerOfTwo() -> return setShl(x, y.countTrailingZeroBits())
         }
-        ensureTmp1Capacity(xNormLen + yNormLen)
+        ensureTmp1Capacity(xNormLen + yNormLen, ResizeOperation.TMP1_MUL)
         _meta = Meta(
             x.meta.signBit xor y.meta.signBit,
             Mago.setMul(tmp1, x.magia, xNormLen, y.magia, yNormLen)
@@ -875,7 +847,7 @@ class MutableBigInt private constructor (
      */
     private fun setMulImpl(x: BigIntNumber, wSign: Boolean, w: UInt): MutableBigInt {
         val xMagia = x.magia
-        ensureCapacityDiscard(x.meta.normLen + 1)
+        ensureMagiaCapacityDiscard(x.meta.normLen + 1)
         _meta = Meta(
             x.meta.signFlag xor wSign,
             Mago.setMul32(magia, xMagia, x.meta.normLen, w)
@@ -895,7 +867,7 @@ class MutableBigInt private constructor (
      */
     private fun setMulImpl(x: BigIntNumber, dwSign: Boolean, dw: ULong): MutableBigInt {
         val xMagia = x.magia
-        ensureCapacityDiscard(x.meta.normLen + 2)
+        ensureMagiaCapacityDiscard(x.meta.normLen + 2)
         _meta = Meta(
             x.meta.signFlag xor dwSign,
             Mago.setMul64(magia, xMagia, x.meta.normLen, dw)
@@ -956,7 +928,7 @@ class MutableBigInt private constructor (
         when {
             xNormLen == 0 -> return setZero()
             xNormLen < MagoSqr.KARATSUBA_SQR_THRESHOLD -> {
-                ensureTmp1CapacityZeroed(xNormLen + xNormLen)
+                ensureTmp1CapacityZeroed(xNormLen + xNormLen, ResizeOperation.TMP1_SQR)
                 _meta = Meta(
                     0,
                     MagoSqr.setSqr(tmp1, x.magia, xNormLen)
@@ -1003,11 +975,11 @@ class MutableBigInt private constructor (
     fun setDiv(x: MutableBigInt, dw: ULong): MutableBigInt =
         setDivImpl(x, false, dw)
     fun setDiv(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
-        ensureCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
+        ensureMagiaCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
         if (trySetDivFastPath(x, y))
             return this
-        ensureTmp1CapacityDividendPlus1(x)
-        ensureTmp2CapacityDivisor(y)
+        ensureTmp1Capacity(x.meta.normLen + 1, ResizeOperation.TMP1_KNUTH_DIVIDEND)
+        ensureTmp2Capacity(y.meta.normLen, ResizeOperation.TMP2_KNUTH_DIVISOR)
         _meta = Meta(x.meta.signBit xor y.meta.signBit,
             Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2))
         return this
@@ -1026,10 +998,10 @@ class MutableBigInt private constructor (
      * @throws ArithmeticException if division by zero is detected
      */
     private fun setDivImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
-        ensureCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
+        ensureMagiaCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
         if (trySetDivFastPath64(x, ySign, yDw))
             return this
-        ensureTmp1CapacityDividendPlus1(x)
+        ensureTmp1Capacity(x.meta.normLen + 1, ResizeOperation.TMP1_KNUTH_DIVIDEND)
         val normLen = Mago.setDiv64(magia, x.magia, x.meta.normLen, tmp1, yDw)
         _meta = Meta(x.meta.signFlag xor ySign, normLen)
         return this
@@ -1114,13 +1086,13 @@ class MutableBigInt private constructor (
     fun setRem(x: BigIntNumber, dw: ULong): MutableBigInt =
         setRemImpl(x, dw)
     fun setRem(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
-        ensureCapacityCopy(min(x.meta.normLen, y.meta.normLen))
+        ensureMagiaCapacityCopy(min(x.meta.normLen, y.meta.normLen))
         if (trySetRemFastPath(x, y))
             return this
         if (y.meta.normLen == 2)
             return setRemImpl(x, (y.magia[1].toULong() shl 32) or (y.magia[0].toUInt().toULong()))
-        ensureTmp1CapacityDividendPlus1(x)
-        ensureTmp2CapacityDivisor(y)
+        ensureTmp1Capacity(x.meta.normLen + 1, ResizeOperation.TMP1_KNUTH_DIVIDEND)
+        ensureTmp2Capacity(y.meta.normLen, ResizeOperation.TMP2_KNUTH_DIVISOR)
         val rNormLen = Mago.setRem(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
         _meta = Meta(x.meta.signBit, rNormLen)
         return this
@@ -1136,7 +1108,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setRemImpl(x: BigIntNumber, yDw: ULong): MutableBigInt {
-        ensureTmp1CapacityDividendPlus1(x)
+        ensureTmp1Capacity(x.meta.normLen + 1, ResizeOperation.TMP1_KNUTH_DIVIDEND)
         val rem = Mago.calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
         return set(x.meta.signFlag, rem)
     }
@@ -1427,7 +1399,7 @@ class MutableBigInt private constructor (
      * @param bi the value to square and add
      */
     fun addSquareOf(bi: BigIntNumber) {
-        ensureTmp1CapacityZeroed(bi.meta.normLen * 2)
+        ensureTmp1CapacityZeroed(bi.meta.normLen * 2, ResizeOperation.TMP1_SQR)
         val normLenSqr = MagoSqr.setSqr(tmp1, bi.magia, bi.meta.normLen)
         setAddImpl(this, Meta(0, normLenSqr), tmp1)
         validate()
@@ -1482,7 +1454,7 @@ class MutableBigInt private constructor (
         bitCount == 0 || x.isZero() -> set(x)
         else -> {
             val xMagia = x.magia
-            ensureBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
+            ensureMagiaBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
             _meta = Meta(
                 x.meta.signBit,
                 Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount)
@@ -1517,7 +1489,7 @@ class MutableBigInt private constructor (
             bitCount == 0 -> set(x)
             zBitLen <= 0 -> setZero()
             else -> {
-                ensureBitCapacityDiscard(zBitLen)
+                ensureMagiaBitCapacityDiscard(zBitLen)
                 _meta = Meta(
                     0,
                     Mago.setShiftRight(magia, x.magia, x.meta.normLen, bitCount)
@@ -1557,14 +1529,14 @@ class MutableBigInt private constructor (
                 val needsIncrement = x.meta.isNegative &&
                         Mago.testAnyBitInLowerN(x.magia, bitCount)
 
-                ensureBitCapacityDiscard(zBitLen)
+                ensureMagiaBitCapacityDiscard(zBitLen)
                 var normLen = Mago.setShiftRight(
                     magia, x.magia, x.meta.normLen, bitCount
                 )
                 verify (normLen > 0)
 
                 if (needsIncrement) {
-                    ensureBitCapacityCopy(zBitLen + 1)
+                    ensureMagiaBitCapacityCopy(zBitLen + 1)
                     normLen = Mago.setAdd64(magia, magia, normLen, 1u)
                 }
                 _meta = Meta(x.meta.signFlag, normLen)
@@ -1591,7 +1563,7 @@ class MutableBigInt private constructor (
                 magia[wordIndex] = magia[wordIndex] or isolatedBit
                 return this
             }
-            ensureCapacityCopyZeroExtend(wordIndex + 1)
+            ensureMagiaCapacityCopyZeroExtend(wordIndex + 1)
             magia[wordIndex] = isolatedBit
             _meta = Meta(meta.signBit, wordIndex + 1)
             return this
@@ -1673,7 +1645,7 @@ class MutableBigInt private constructor (
         require (modulus.isOdd())
         val k = modulus.meta.normLen
         require (meta.normLen <= 2 * k + 1)
-        ensureCapacityCopy(2 * k + 1)
+        ensureMagiaCapacityCopy(2 * k + 1)
         val normLen = BigIntAlgorithms.redc(magia, meta.normLen, modulus.magia, k, np)
         _meta = Meta(normLen)
         return this
@@ -1685,8 +1657,8 @@ class MutableBigInt private constructor (
             return setSqr(a)
         val k1 = (n + 1) / 2
         val zLen = 2*n
-        ensureTmp1CapacityZeroed(zLen + 1)
-        ensureTmp2CapacityKaratsubaSqr(k1)
+        ensureTmp1CapacityZeroed(zLen + 1, ResizeOperation.TMP1_KARATSUBA_SQ)
+        ensureTmp2Capacity(3 * k1 + 3, ResizeOperation.TMP2_KARATSUBA_Z1)
         val zNormLen = MagoSqr.setSqrKaratsuba(tmp1, a.magia, a.meta.normLen, tmp2)
         swapTmp1()
         _meta = Meta(zNormLen)
