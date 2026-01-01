@@ -4,9 +4,16 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.BigIntStats.MBI_RESIZE_COUNTS
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
+import com.decimal128.bigint.BigIntStats.BigIntOp
 import com.decimal128.bigint.BigIntStats.BigIntOp.*
+import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_MAGIA
+import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP1_KARATSUBA_SQR
+import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP1_KNUTH_DIVIDEND
+import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP1_MUL
+import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP1_SQR
+import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP2_KARATSUBA_Z1
+import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP2_KNUTH_DIVISOR
 import com.decimal128.bigint.BigIntStats.MutableResizeOperation
 import com.decimal128.bigint.BigIntStats.MutableResizeOperation.*
 import com.decimal128.bigint.intrinsic.unsignedMulHi
@@ -200,7 +207,7 @@ class MutableBigInt private constructor (
             val hintBit = (-limbCapacityHint ushr 30) and 2
             val repeatBit = (5 - magia.size) ushr 31
             val counterIndex = hintBit or repeatBit
-            MBI_RESIZE_COUNTS[counterIndex] += 1
+            ++BI_OP_COUNTS[MBI_RESIZE_MAGIA.ordinal + counterIndex]
         }
         run { // allocation
             val targetLimbLen = max(limbCapacityHint, requestedLimbLen)
@@ -254,7 +261,7 @@ class MutableBigInt private constructor (
      *        current capacity of the temporary buffer.
      */
     private fun resizeTmp1(requestedLimbLen: Int,
-                           resizeOp: MutableResizeOperation
+                           resizeOp: BigIntOp
     ) {
         verify (requestedLimbLen > tmp1.size)
         // tmp arrays start off with zero size
@@ -266,8 +273,9 @@ class MutableBigInt private constructor (
         run { // accounting
             val hintBit = (-limbCapacityHint ushr 30) and 2
             val repeatBit = (5 - magia.size) ushr 31
-            val counterIndex = (resizeOp.ordinal shl 2) or hintBit or repeatBit
-            MBI_RESIZE_COUNTS[counterIndex] += 1
+            val counterIndex = resizeOp.ordinal + hintBit + repeatBit
+            println("counterIndex:$counterIndex")
+            ++BI_OP_COUNTS[counterIndex]
         }
         val headRoom = (requestedLimbLen ushr 1) and ((5 - tmp1.size) shr 31)
         tmp1 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
@@ -288,7 +296,7 @@ class MutableBigInt private constructor (
      *        current capacity of the temporary buffer.
      */
     private fun resizeTmp2(requestedLimbLen: Int,
-                           resizeOp: MutableResizeOperation) {
+                           resizeOp: BigIntOp) {
         verify (requestedLimbLen > tmp2.size)
         // tmp2 starts off with zero size
         // there is no swapTmp2
@@ -297,8 +305,8 @@ class MutableBigInt private constructor (
         run { // accounting
             val hintBit = (-limbCapacityHint ushr 30) and 2
             val repeatBit = (5 - magia.size) ushr 31
-            val counterIndex = (resizeOp.ordinal shl 2) or hintBit or repeatBit
-            ++MBI_RESIZE_COUNTS[counterIndex]
+            val counterIndex = resizeOp.ordinal + hintBit + repeatBit
+            ++BI_OP_COUNTS[counterIndex]
         }
         val headRoom = (requestedLimbLen ushr 1) and (-tmp2.size shr 31)
         tmp2 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
@@ -396,7 +404,7 @@ class MutableBigInt private constructor (
      * @param requestedLimbLen the minimum number of limbs required.
      */
     private inline fun ensureTmp1Capacity(requestedLimbLen: Int,
-                                          resizeOp: MutableResizeOperation) {
+                                          resizeOp: BigIntOp) {
         if (requestedLimbLen > tmp1.size) {
             val required = max(limbCapacityHint, requestedLimbLen)
             resizeTmp1(required, resizeOp)
@@ -404,7 +412,7 @@ class MutableBigInt private constructor (
     }
 
     private inline fun ensureTmp2Capacity(requestedLimbLen: Int,
-                                          resizeOp: MutableResizeOperation) {
+                                          resizeOp: BigIntOp) {
         if (requestedLimbLen > tmp2.size) {
             val required = max(limbCapacityHint, requestedLimbLen)
             resizeTmp2(required, resizeOp)
@@ -424,7 +432,7 @@ class MutableBigInt private constructor (
      * @param zeroedLimbLen the number of limbs to be zeroed.
      */
     private inline fun ensureTmp1CapacityZeroed(zeroedLimbLen: Int,
-                                                resizeOp: MutableResizeOperation) {
+                                                resizeOp: BigIntOp) {
         if (zeroedLimbLen <= tmp1.size)
             tmp1.fill(0, 0, zeroedLimbLen)
         else
@@ -839,7 +847,7 @@ class MutableBigInt private constructor (
             yNormLen <= 2 -> return setMulImpl(x, y.meta.signFlag, y.toULongMagnitude())
             y.isMagnitudePowerOfTwo() -> return setShl(x, y.countTrailingZeroBits())
         }
-        ensureTmp1Capacity(xNormLen + yNormLen, RESIZE_TMP1_MUL)
+        ensureTmp1Capacity(xNormLen + yNormLen, MBI_RESIZE_TMP1_MUL)
         _meta = Meta(
             x.meta.signBit xor y.meta.signBit,
             Mago.setMul(tmp1, x.magia, xNormLen, y.magia, yNormLen)
@@ -946,7 +954,7 @@ class MutableBigInt private constructor (
         when {
             xNormLen == 0 -> return setZero()
             xNormLen < MagoSqr.KARATSUBA_SQR_THRESHOLD -> {
-                ensureTmp1CapacityZeroed(xNormLen + xNormLen, RESIZE_TMP1_SQR)
+                ensureTmp1CapacityZeroed(xNormLen + xNormLen, MBI_RESIZE_TMP1_SQR)
                 _meta = Meta(
                     0,
                     MagoSqr.setSqr(tmp1, x.magia, xNormLen)
@@ -965,8 +973,8 @@ class MutableBigInt private constructor (
             return setSqr(a)
         val k1 = (n + 1) / 2
         val zLen = 2*n
-        ensureTmp1CapacityZeroed(zLen + 1, RESIZE_TMP1_KARATSUBA_SQR)
-        ensureTmp2Capacity(3 * k1 + 3, RESIZE_TMP2_KARATSUBA_Z1)
+        ensureTmp1CapacityZeroed(zLen + 1, MBI_RESIZE_TMP1_KARATSUBA_SQR)
+        ensureTmp2Capacity(3 * k1 + 3, MBI_RESIZE_TMP2_KARATSUBA_Z1)
         val zNormLen = MagoSqr.setSqrKaratsuba(tmp1, a.magia, a.meta.normLen, tmp2)
         swapTmp1()
         _meta = Meta(zNormLen)
@@ -1012,8 +1020,8 @@ class MutableBigInt private constructor (
     fun setDiv(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
         ensureMagiaCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
         if (! trySetDivFastPath(x, y)) {
-            ensureTmp1Capacity(x.meta.normLen + 1, RESIZE_TMP1_KNUTH_DIVIDEND)
-            ensureTmp2Capacity(y.meta.normLen, RESIZE_TMP2_KNUTH_DIVISOR)
+            ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
+            ensureTmp2Capacity(y.meta.normLen, MBI_RESIZE_TMP2_KNUTH_DIVISOR)
             _meta = Meta(
                 x.meta.signBit xor y.meta.signBit,
                 Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
@@ -1040,7 +1048,7 @@ class MutableBigInt private constructor (
         ensureMagiaCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
         if (trySetDivFastPath64(x, ySign, yDw))
             return this
-        ensureTmp1Capacity(x.meta.normLen + 1, RESIZE_TMP1_KNUTH_DIVIDEND)
+        ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
         val normLen = Mago.setDiv64(magia, x.magia, x.meta.normLen, tmp1, yDw)
         _meta = Meta(x.meta.signFlag xor ySign, normLen)
         return this
@@ -1132,8 +1140,8 @@ class MutableBigInt private constructor (
             return this
         if (y.meta.normLen == 2)
             return setRemImpl(x, (y.magia[1].toULong() shl 32) or (y.magia[0].toUInt().toULong()))
-        ensureTmp1Capacity(x.meta.normLen + 1, RESIZE_TMP1_KNUTH_DIVIDEND)
-        ensureTmp2Capacity(y.meta.normLen, RESIZE_TMP2_KNUTH_DIVISOR)
+        ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
+        ensureTmp2Capacity(y.meta.normLen, MBI_RESIZE_TMP2_KNUTH_DIVISOR)
         val rNormLen = Mago.setRem(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
         _meta = Meta(x.meta.signBit, rNormLen)
         ++BI_OP_COUNTS[MBI_SET_REM_BI_KNUTH.ordinal]
@@ -1151,7 +1159,7 @@ class MutableBigInt private constructor (
      */
     private fun setRemImpl(x: BigIntNumber, yDw: ULong): MutableBigInt {
         ++BI_OP_COUNTS[MBI_SET_REM_PRIMITIVE.ordinal]
-        ensureTmp1Capacity(x.meta.normLen + 1, RESIZE_TMP1_KNUTH_DIVIDEND)
+        ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
         val rem = Mago.calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
         return set(x.meta.signFlag, rem)
     }
@@ -1401,9 +1409,10 @@ class MutableBigInt private constructor (
      *
      * @param n the value to square and add
      */
-    fun addSquareOf(n: Int): MutableBigInt {
+    fun addSquareOf(n: Int) {
         ++BI_OP_COUNTS[MBI_ADD_SQR_PRIMITIVE.ordinal]
-        return setAdd(this, (n.toLong() * n.toLong()).toULong())
+        --BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
+        setAdd(this, (n.toLong() * n.toLong()).toULong())
     }
 
     /**
@@ -1456,7 +1465,7 @@ class MutableBigInt private constructor (
      * @param bi the value to square and add
      */
     fun addSquareOf(bi: BigIntNumber) {
-        ensureTmp1CapacityZeroed(bi.meta.normLen * 2, RESIZE_TMP1_SQR)
+        ensureTmp1CapacityZeroed(bi.meta.normLen * 2, MBI_RESIZE_TMP1_SQR)
         val normLenSqr = MagoSqr.setSqr(tmp1, bi.magia, bi.meta.normLen)
         setAddImpl(this, Meta(0, normLenSqr), tmp1)
         validate()
@@ -1715,6 +1724,7 @@ class MutableBigInt private constructor (
         ensureMagiaCapacityCopy(2 * k + 1)
         val normLen = BigIntAlgorithms.redc(magia, meta.normLen, modulus.magia, k, np)
         _meta = Meta(normLen)
+        ++BI_OP_COUNTS[MBI_MONTGOMERY_REDC.ordinal]
         return this
     }
 
