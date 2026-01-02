@@ -125,24 +125,6 @@ class BigInt private constructor(
         }
 
         /**
-         * Inject `0xDEAD` poison into high, unused limbs of a BigInt.
-         *
-         * Used during development and debugging to help ensure correct
-         * normalization.
-         *
-         * Used with `assert (injectPoison(x, xNormLen)` so that it will
-         * go away when one is not debugging on JVM and the equiv for
-         * debug vs fast Native libraries.
-         *
-         * @return true so that this can be wrapped in an assert or equiv
-         */
-        fun injectPoison(magia: Magia, normLen: Int): Boolean {
-            for (i in normLen..<magia.size)
-                magia[i] = 0xDEAD
-            return true
-        }
-
-        /**
          * Converts a 32-bit signed [Int] into a signed [BigInt].
          *
          * Positive values produce a non-negative (positive) [BigInt],

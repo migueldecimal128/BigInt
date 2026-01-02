@@ -61,6 +61,25 @@ sealed class BigIntNumber(
         internal val ERR_MSG_BITLEN_LE_0 = "invalid bitLen <= 0"
         internal val ERR_MSG_INVALID_BITLEN_RANGE = "invalid bitLen range: 0 <= bitLenMin <= bitLenMax"
         internal val ERR_MSG_NEG_BITINDEX = "negative bitIndex"
+
+        /**
+         * Inject `0xDEAD` poison into high, unused limbs of a [BigInt]
+         * or [MutableBigInt].
+         *
+         * Used during development and debugging to help ensure correct
+         * normalization.
+         *
+         * Used with `assert (injectPoison(x, xNormLen)` so that it will
+         * go away when one is not debugging on JVM and the equiv for
+         * debug vs fast Native libraries.
+         *
+         * @return true so that this can be wrapped in an assert or equiv
+         */
+        fun injectPoison(magia: Magia, normLen: Int): Boolean {
+            for (i in normLen..<magia.size)
+                magia[i] = 0xDEAD
+            return true
+        }
     }
     /**
      * Returns `true` if this BigInt is zero.
