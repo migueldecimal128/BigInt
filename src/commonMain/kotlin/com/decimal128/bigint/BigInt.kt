@@ -108,7 +108,7 @@ class BigInt private constructor(
         internal fun fromNonNormalizedNonZero(sign: Boolean, magia: Magia): BigInt {
             val normLen = Mago.normLen(magia)
             verify (normLen > 0)
-            verify (injectPoison(magia, normLen))
+            verify (validateNormLenAndInjectPoison(magia, normLen))
             return BigInt(Meta(sign, normLen), magia)
         }
 
@@ -118,7 +118,7 @@ class BigInt private constructor(
         internal fun fromNonNormalizedOrZero(sign: Boolean, magia: Magia): BigInt {
             val normLen = Mago.normLen(magia)
             if (normLen > 0) {
-                verify (injectPoison(magia, normLen))
+                verify (validateNormLenAndInjectPoison(magia, normLen))
                 return BigInt(Meta(sign, normLen), magia)
             }
             return ZERO

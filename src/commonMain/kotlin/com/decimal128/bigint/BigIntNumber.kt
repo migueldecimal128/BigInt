@@ -63,8 +63,7 @@ sealed class BigIntNumber(
         internal val ERR_MSG_NEG_BITINDEX = "negative bitIndex"
 
         /**
-         * Inject `0xDEAD` poison into high, unused limbs of a [BigInt]
-         * or [MutableBigInt].
+         * Inject `0xDEAD` poison into high, unused limbs of a [BigInt].
          *
          * Used during development and debugging to help ensure correct
          * normalization.
@@ -75,11 +74,51 @@ sealed class BigIntNumber(
          *
          * @return true so that this can be wrapped in an assert or equiv
          */
-        fun injectPoison(magia: Magia, normLen: Int): Boolean {
-            for (i in normLen..<magia.size)
-                magia[i] = 0xDEAD
-            return true
+        fun validateNormLenAndInjectPoison(magia: Magia, normLen: Int): Boolean {
+            if (magia.size > 0) {
+                if (normLen > 0) {
+                    if (magia[normLen - 1] != 0) {
+                        magia.fill(0xDEAD, normLen)
+                        return true
+                    }
+                } else if (normLen == 0) {
+                    magia.fill(0)
+                    return true
+                }
+            } else if (normLen == 0) {
+                return true
+            }
+            return false
         }
+    }
+
+    /**
+     * Validates the representation invariant of a [MutableBigInt],
+     * checking for `magia.size >= 4` and normalized length while
+     * injecting `0xDEAD` poison into high, unused limbs.
+     *
+     * Used during development and debugging to help ensure correct
+     * normalization.
+     *
+     * Used with `verify(validateNormLenAndInjectPoison()` to
+     * ensure that operators so that it will go away when one is not
+     * debugging on JVM and the equiv for debug vs fast Native libraries.
+     *
+     * @return true so that this can be wrapped in an assert or equiv
+     */
+    protected fun validateNormLenAndInjectPoison(): Boolean {
+        if (magia.size >= 4) {
+            if (meta.normLen > 0) {
+                if (magia[meta.normLen - 1] != 0) {
+                    magia.fill(0xDEAD, meta.normLen)
+                    return true
+                }
+            } else {
+                magia.fill(0)
+                return true
+            }
+        }
+        return false
     }
     /**
      * Returns `true` if this BigInt is zero.
