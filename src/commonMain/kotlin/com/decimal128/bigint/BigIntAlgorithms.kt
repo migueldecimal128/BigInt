@@ -154,25 +154,15 @@ object BigIntAlgorithms {
             exp < 0 -> throw IllegalArgumentException("cannot raise BigInt to negative power:$exp")
             exp == 0 -> ONE
             exp == 1 -> base
+            exp == 2 -> baseAbs.sqr()
             base.isZero() -> ZERO
             baseAbs EQ 1 -> if (resultSign) NEG_ONE else ONE
             baseAbs EQ 2 -> BigInt.withSetBit(exp).withSign(resultSign)
-            exp == 2 -> baseAbs.sqr()
             else -> {
                 val maxBitLen = base.magnitudeBitLen() * exp
-                val b = MutableBigInt.withBitCapacityHint(maxBitLen).set(base)
                 val r = MutableBigInt.withBitCapacityHint(maxBitLen).setOne()
-
-                var e = exp
-                while (true) {
-                    if ((e and 1) != 0)
-                        r.setMul(r, b)
-                    e = e ushr 1
-                    if (e == 0)
-                        break
-                    b.setSqr(b)
-                }
-                BigInt.from(resultSign, r)
+                powLeftToRight(base, exp, r)
+                r.toBigInt()
             }
         }
     }
@@ -190,31 +180,6 @@ object BigIntAlgorithms {
             else -> return false
         }
         return true
-    }
-
-    fun powRightToLeft(base: BigIntNumber, exp: Int, ret: MutableBigInt, tmp: MutableBigInt? = null) {
-        verify (base !== ret)
-        if (exp <= 2)
-            throw IllegalStateException() // should have been fast-path
-        val maxBitLen = base.magnitudeBitLen() * exp
-        val b = if (tmp != null) {
-            verify (tmp != this && tmp != base)
-            tmp.hintBitCapacity(maxBitLen)
-        } else
-            MutableBigInt.withBitCapacityHint(maxBitLen)
-        b.set(base).mutAbs()
-        ret.set(1).hintBitCapacity(maxBitLen)
-        var e = exp
-        while (true) {
-            if ((e and 1) != 0)
-                ret *= b
-            e = e ushr 1
-            if (e == 0)
-                break
-            b.setSqr(b)
-        }
-        val resultSign = base.isNegative() && ((exp and 1) != 0)
-        ret.mutWithSign(resultSign)
     }
 
     /**
@@ -238,7 +203,7 @@ object BigIntAlgorithms {
         if (exp <= 2)
             throw IllegalStateException() // should have been fast-path
         val maxBitLen = base.magnitudeBitLen() * exp
-        ret.set(base)
+        ret.hintBitCapacity(maxBitLen).set(base)
         var bitIndex = 31 - exp.countLeadingZeroBits() - 1
         while (bitIndex >= 0) {
             ret.setSqr(ret)

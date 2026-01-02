@@ -469,21 +469,27 @@ class MutableBigInt private constructor (
      *
      * The hint is used as a capacity contract for future resizes: when growth is
      * required, the backing storage is expanded to at least the hinted capacity
-     * (rounded up to the allocator’s limb quantum), suppressing speculative growth
+     * (rounded up to the allocator's limb quantum), suppressing speculative growth
      * while the hint remains valid. If a later resize exceeds the hinted capacity,
      * normal heuristic growth resumes immediately.
      *
-     * Calling this method does not modify the current value; any existing limbs
-     * are preserved. Repeated calls replace the previous hint.
+     * Multiple hints may be provided; only the largest hint is retained. This allows
+     * different layers of computation to contribute capacity expectations without
+     * overriding larger hints from callers higher in the stack.
+     *
+     * Calling this method does not modify the current value or trigger reallocation;
+     * any existing limbs are preserved. The hint affects only future growth operations.
      *
      * @param bitCapacityHint the maximum expected bit length; must be non-negative
      * @return this instance, for call chaining
-     * @throws IllegalArgumentException if {@code bitCapacityHint < 0}
+     * @throws IllegalArgumentException if [bitCapacityHint] is negative
      */
     fun hintBitCapacity(bitCapacityHint: Int): MutableBigInt {
         if (bitCapacityHint < 0)
             throw IllegalArgumentException()
-        limbCapacityHint = Mago.calcHeapLimbQuantum((bitCapacityHint + 31) ushr 5)
+        limbCapacityHint =
+            max(limbCapacityHint,
+                Mago.calcHeapLimbQuantum((bitCapacityHint + 31) ushr 5))
         return this
     }
 
@@ -983,7 +989,7 @@ class MutableBigInt private constructor (
         if (BigIntAlgorithms.tryPowFastPath(x, exp, this))
             return this
         val base: BigIntNumber = if (x === this) x.toBigInt() else x
-        BigIntAlgorithms.powRightToLeft(base, exp, this)
+        BigIntAlgorithms.powLeftToRight(base, exp, this)
         ++BI_OP_COUNTS[MBI_SET_POW.ordinal]
         return this
     }

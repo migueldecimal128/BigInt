@@ -17,17 +17,15 @@ class TestPow {
     val rng = Random.Default
 
     fun test1() {
-        val hi = randomHi(10)
-        val bi = hi.toBigInteger()
+        val bi = BigInt.randomWithRandomBitLen(500)
+        val jbi = bi.toBigInteger()
 
-        val pow = rng.nextInt(10)
+        val pow = rng.nextInt(25)
 
-        val hiResult = hi.pow(pow)
         val biResult = bi.pow(pow)
+        val jbiResult = jbi.pow(pow)
 
-        assertTrue(hiResult.EQ(biResult))
+        assertTrue(biResult EQ jbiResult)
     }
 
-    fun randomHi(hiBitLen: Int) =
-        BigInt.randomWithMaxBitLen(rng.nextInt(hiBitLen), rng)
 }

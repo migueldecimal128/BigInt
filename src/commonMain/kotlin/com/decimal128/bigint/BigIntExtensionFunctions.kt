@@ -202,24 +202,6 @@ fun Random.nextBigInt(bitCount: Int, withRandomSign: Boolean = false) =
  * core extension functions
  */
 
-/**
- * Computes `this**exp` using fast binary exponentiation.
- *
- * Delegates to [BigIntAlgorithms.powRightToLeft].
- *
- * @throws IllegalArgumentException if [exp] is negative
- * @see BigIntAlgorithms.powRightToLeft
- */
-fun BigInt.pow(exp: Int): BigInt = BigIntAlgorithms.pow(this, exp)
-
-/**
- * Returns ⌊√this⌋, the integer square root.
- *
- * @see BigIntAlgorithms.isqrt
- */
-fun BigInt.isqrt(): BigInt = BigIntAlgorithms.isqrt(this)
-
-
 fun BigInt.toMutableBigInt() = MutableBigInt(this)
 
 fun Int.toMutableBigInt() = MutableBigInt().set(this)
