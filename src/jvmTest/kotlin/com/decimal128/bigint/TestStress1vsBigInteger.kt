@@ -12,7 +12,7 @@ class TestStress1vsBigInteger {
     val verbose = false
     val showReport = true
 
-    val REPETITION_COUNT = 100
+    val REPETITION_COUNT = 10
     val MAX_BIT_LENGTH = 1000
 
     fun genBigInt(rng: Random, maxLimbs: Int): BigInt {

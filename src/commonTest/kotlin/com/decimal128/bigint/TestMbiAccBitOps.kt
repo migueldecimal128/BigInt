@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class TestBigIntAccBitOps {
+class TestMbiAccBitOps {
 
     private fun accOf(i: Long) = MutableBigInt().set(i)
     private fun bi(i: Long) = BigInt.from(i)

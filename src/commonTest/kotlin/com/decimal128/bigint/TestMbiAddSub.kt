@@ -3,7 +3,7 @@ package com.decimal128.bigint
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TestBigIntAccAddSub {
+class TestMbiAddSub {
 
     @Test
     fun testAdd() {

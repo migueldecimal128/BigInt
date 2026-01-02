@@ -5,6 +5,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TestRandomBigInt {
+
+    val showReport = false
+
     @Test
     fun testRandomWithBitLen() {
 
@@ -58,8 +61,13 @@ class TestRandomBigInt {
             300, 511, 512, 513
         )
 
+        val start = BigIntStats.snapshot()
         for (k in sizes) {
             checkBitLen(k)
+        }
+        if (showReport) {
+            val report = BigIntStats.snapshot().delta(start).toString(null) { it > 0 }
+            println(report)
         }
     }
 

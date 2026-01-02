@@ -7,7 +7,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-class TestBigIntAccum {
+class TestMbi {
 
     val verbose = false
 
@@ -29,103 +29,108 @@ class TestBigIntAccum {
 
     @Test
     fun testAddSub() {
-        val hia = MutableBigInt()
-        var hi = BigInt.ZERO
+        val startStats = BigIntStats.snapshot()
+
+        val mbi = MutableBigInt()
+        var bi = BigInt.ZERO
 
         repeat(rng.nextInt(1000)) {
             val n = randomInt()
             if (verbose)
-                println("before: hi:$hi hia:$hia n:$n")
-            hi += n
-            hia += n
+                println("before: hi:$bi hia:$mbi n:$n")
+            bi += n
+            mbi += n
             if (verbose)
-                println(" after: hi:$hi hia:$hia n:$n")
-            assertTrue(hi EQ hia.toBigInt())
+                println(" after: hi:$bi hia:$mbi n:$n")
+            assertTrue(bi EQ mbi.toBigInt())
         }
-        assertTrue(hi EQ hia.toBigInt())
+        assertTrue(bi EQ mbi.toBigInt())
 
         repeat(rng.nextInt(1000)) {
             val w = randomUInt()
-            hia += w
-            hi += w
+            mbi += w
+            bi += w
         }
-        assertTrue(hi EQ hia.toBigInt())
+        assertTrue(bi EQ mbi.toBigInt())
 
         repeat(rng.nextInt(1000)) {
             val l = randomLong()
-            hia += l
-            hi += l
+            mbi += l
+            bi += l
         }
-        assertTrue(hi EQ hia.toBigInt())
+        assertTrue(bi EQ mbi.toBigInt())
 
         repeat(rng.nextInt(1000)) {
             val dw = randomULong()
-            hia += dw
-            hi += dw
+            mbi += dw
+            bi += dw
         }
-        assertTrue(hi EQ hia.toBigInt())
+        assertTrue(bi EQ mbi.toBigInt())
 
 
         repeat(rng.nextInt(100)) {
             val rand = BigInt.randomWithBitLen(31)
-            hia += rand
-            hi += rand
-            assertTrue(testEQ(hi, hia))
+            mbi += rand
+            bi += rand
+            assertTrue(testEQ(bi, mbi))
         }
-        assertTrue(testEQ(hi, hia))
+        assertTrue(testEQ(bi, mbi))
 
         for (i in 0..<5) {
-            hia += hia
-            hi += hi
-            assertTrue(testEQ(hi, hia))
+            mbi += mbi
+            bi += bi
+            assertTrue(testEQ(bi, mbi))
         }
-        assertTrue(testEQ(hi, hia))
+        assertTrue(testEQ(bi, mbi))
 
         // now start subtracting
 
         repeat(rng.nextInt(1000)) {
             val n = randomInt()
-            hia -= n
-            hi -= n
-            assertTrue(testEQ(hi, hia))
+            mbi -= n
+            bi -= n
+            assertTrue(testEQ(bi, mbi))
         }
-        assertTrue(testEQ(hi, hia))
+        assertTrue(testEQ(bi, mbi))
 
         repeat(rng.nextInt(1000)) {
             val w = randomUInt()
-            hia -= w
-            hi -= w
-            assertTrue(testEQ(hi, hia))
+            mbi -= w
+            bi -= w
+            assertTrue(testEQ(bi, mbi))
         }
 
         repeat(rng.nextInt(1000)) {
             val l = randomLong()
-            hia -= l
-            hi -= l
-            assertTrue(testEQ(hi, hia))
+            mbi -= l
+            bi -= l
+            assertTrue(testEQ(bi, mbi))
         }
 
         repeat(rng.nextInt(1000)) {
             val dw = randomULong()
-            hia -= dw
-            hi -= dw
-            assertTrue(testEQ(hi, hia))
+            mbi -= dw
+            bi -= dw
+            assertTrue(testEQ(bi, mbi))
         }
 
         repeat(rng.nextInt(100)) {
             val rand = randomBigInt(200)
             if (verbose)
-                println("before: hia:$hia hi:$hi rand:$rand")
-            hia -= rand
-            hi -= rand
+                println("before: hia:$mbi hi:$bi rand:$rand")
+            mbi -= rand
+            bi -= rand
             if (verbose)
-                println("after: hia:$hia hi:$hi")
-            assertTrue(testEQ(hi, hia))
+                println("after: hia:$mbi hi:$bi")
+            assertTrue(testEQ(bi, mbi))
         }
 
-        hia -= hia
-        hi -= hi
-        assertTrue(testEQ(hi, hia))
+        mbi -= mbi
+        bi -= bi
+        assertTrue(testEQ(bi, mbi))
+
+        val report = BigIntStats.snapshot().delta(startStats).toString(null) { it > 0}
+        println(report)
     }
 
     @Test

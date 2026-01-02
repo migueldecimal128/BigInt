@@ -7,6 +7,8 @@ import kotlin.test.assertTrue
 
 class TestIsProbablePrime {
 
+    val showReport = true
+
     private fun bi(i: Int) = i.toBigInt()
 
     @Test
@@ -24,6 +26,8 @@ class TestIsProbablePrime {
 
     @Test
     fun testSmallPrimesInTable() {
+        val start = BigIntStats.snapshot()
+
         val tmp = MutableBigInt()
 
         val primes = intArrayOf(
@@ -46,6 +50,10 @@ class TestIsProbablePrime {
                 BigIntPrime.isProbablePrime(bi(p), tmp),
                 "Prime $p incorrectly rejected"
             )
+        }
+
+        if (showReport) {
+            println(BigIntStats.snapshot().delta(start).toString(null) {it>0})
         }
     }
 
@@ -159,6 +167,7 @@ class TestIsProbablePrime {
 
     @Test
     fun testIsProbablePrime_knownLargePrimes() {
+        val start = BigIntStats.snapshot()
         val primes = listOf(
             // Mersenne primes
             "2305843009213693951",         // 2^61 − 1
@@ -179,6 +188,9 @@ class TestIsProbablePrime {
                 BigIntPrime.isProbablePrime(p),
                 "prime rejected: $p"
             )
+        }
+        if (showReport) {
+            println(BigIntStats.snapshot().delta(start).toString(null) {it>0})
         }
     }
 

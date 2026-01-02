@@ -4,7 +4,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TestBigIntAccApplyBitMask {
+class TestMbiApplyBitMask {
     @Test
     fun testApplyBitMaskMatchesBigInt() {
         val rnd = Random(12345)

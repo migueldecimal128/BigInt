@@ -3,7 +3,7 @@ package com.decimal128.bigint
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TestBigIntAccDivRem64 {
+class TestMbiDivRem64 {
 
     private fun newLargeAcc(bits: Int): MutableBigInt =
         MutableBigInt().setBit(bits)

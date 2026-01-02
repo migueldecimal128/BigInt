@@ -1,5 +1,6 @@
 package com.decimal128.bigint.crypto
 
+import com.decimal128.bigint.BigIntStats
 import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import com.decimal128.bigint.MagoSqr.karatsubaSqr
 import kotlin.test.Test

@@ -7,6 +7,8 @@ import kotlin.test.assertTrue
 
 class TestMbiMontgomeryRedc {
 
+    val showReport = false
+
     @Test
     fun testMontgomeryRedc_smallModulus() {
         // Modulus n = 3
@@ -62,6 +64,7 @@ class TestMbiMontgomeryRedc {
 
     @Test
     fun testMontgomeryRedc_twoLimbModulus() {
+        val start = BigIntStats.snapshot()
         val n  = 0xFFFF_FFFF_FFFF_FFC5uL.toBigInt()  // 2 limbs
         val np = ModContext.Montgomery.computeNp(n.toUInt())
         val k  = n.meta.normLen
@@ -76,6 +79,10 @@ class TestMbiMontgomeryRedc {
 
         assertEquals(x, T.toBigInt())
         assertTrue(T.isNormalized())
+
+        if (showReport) {
+            println(BigIntStats.snapshot().delta(start).toString(null) {it > 0})
+        }
     }
 
 
