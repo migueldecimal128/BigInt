@@ -515,6 +515,9 @@ class MutableBigInt private constructor (
 
     // <<<<<<<<<<< END STORAGE MANAGEMENT FUNCTIONS >>>>>>>>>>>>
 
+    private fun updateMeta(meta: Meta) {
+        _meta = meta
+    }
     /**
      * Sets this value to zero in place by clearing the normalized length and
      * resetting the sign. The underlying limb storage is retained for reuse.
@@ -523,7 +526,7 @@ class MutableBigInt private constructor (
      */
     fun setZero(): MutableBigInt {
         validate()
-        _meta = Meta(0)
+        updateMeta(Meta(0))
         return this
     }
 
@@ -534,8 +537,8 @@ class MutableBigInt private constructor (
      */
     fun setOne(): MutableBigInt {
         validate()
-        _meta = Meta(0, 1)
         magia[0] = 1
+        updateMeta(Meta(0, 1))
         validate()
         return this
     }
@@ -546,7 +549,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation.
      */
     fun mutAbs(): MutableBigInt {
-        _meta = meta.abs()
+        updateMeta(meta.abs())
         return this
     }
 
@@ -557,7 +560,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation.
      */
     fun mutNegate(): MutableBigInt {
-        _meta = meta.negate()
+        updateMeta(meta.negate())
         return this
     }
 
@@ -568,7 +571,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation.
      */
     fun mutWithSign(sign: Boolean): MutableBigInt {
-        _meta = meta.withSign(sign)
+        updateMeta(meta.withSign(sign))
         return this
     }
 
@@ -624,10 +627,9 @@ class MutableBigInt private constructor (
      */
     fun set(sign: Boolean, dw: ULong): MutableBigInt {
         val normLen = (64 - dw.countLeadingZeroBits() + 31) ushr 5
-        _meta = Meta(sign, normLen)
-        // limbLen = if (dw == 0uL) 0 else if ((dw shr 32) == 0uL) 1 else 2
         magia[0] = dw.toInt()
         magia[1] = (dw shr 32).toInt()
+        updateMeta(Meta(sign, normLen))
         return this
     }
 
@@ -647,12 +649,12 @@ class MutableBigInt private constructor (
         else
             128 - dwHi.countLeadingZeroBits()
         val normLen = (bitLen + 0x1F) ushr 5
-        _meta = Meta(sign, normLen)
         // limbLen = if (dw == 0uL) 0 else if ((dw shr 32) == 0uL) 1 else 2
         _magia[0] = dwLo.toInt()
         _magia[1] = (dwLo shr 32).toInt()
         _magia[2] = dwHi.toInt()
         _magia[3] = (dwHi shr 32).toInt()
+        updateMeta(Meta(sign, normLen))
         return this
     }
     /**
@@ -667,8 +669,8 @@ class MutableBigInt private constructor (
      */
     private fun set(yMeta: Meta, y: Magia): MutableBigInt {
         ensureMagiaCapacityDiscard(yMeta.normLen)
-        _meta = yMeta
         y.copyInto(magia, 0, 0, yMeta.normLen)
+        updateMeta(yMeta)
         return this
     }
 
@@ -749,20 +751,18 @@ class MutableBigInt private constructor (
             x.meta.signFlag == ySign -> {
                 verify (this.magia.size >= 4)
                 ensureMagiaCapacityDiscard(x.meta.normLen + 1)
-                _meta = Meta(
+                updateMeta(Meta(
                     x.meta.signBit,
-                    Mago.setAdd64(magia, xMagia, x.meta.normLen, yDw)
-                )
+                    Mago.setAdd64(magia, xMagia, x.meta.normLen, yDw)))
             }
             else -> {
                 val cmp: Int = x.magnitudeCompareTo(yDw)
                 when {
                     cmp > 0 -> {
                         ensureMagiaCapacityDiscard(x.meta.normLen)
-                        _meta = Meta(
+                        updateMeta(Meta(
                             x.meta.signBit,
-                            Mago.setSub64(magia, xMagia, x.meta.normLen, yDw)
-                        )
+                            Mago.setSub64(magia, xMagia, x.meta.normLen, yDw)))
                     }
                     cmp < 0 -> set(ySign, yDw - x.toULongMagnitude())
                     else -> setZero()
@@ -794,10 +794,9 @@ class MutableBigInt private constructor (
             x.isZero() -> set(yMeta, yMagia)
             x.meta.signFlag == yMeta.signFlag -> {
                 ensureMagiaCapacityDiscard(max(x.meta.normLen, yMeta.normLen) + 1)
-                _meta = Meta(
+                updateMeta(Meta(
                     x.meta.signBit,
-                    Mago.setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
-                )
+                    Mago.setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)))
             }
 
             else -> {
@@ -805,16 +804,16 @@ class MutableBigInt private constructor (
                 when {
                     cmp > 0 -> {
                         ensureMagiaCapacityDiscard(x.meta.normLen)
-                        _meta = Meta(
+                        updateMeta(Meta(
                             x.meta.signBit,
-                            Mago.setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen))
+                            Mago.setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)))
                     }
 
                     cmp < 0 -> {
                         ensureMagiaCapacityDiscard(yMeta.normLen)
-                        _meta = Meta(
+                        updateMeta(Meta(
                             yMeta.signBit,
-                            Mago.setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen))
+                            Mago.setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen)))
                     }
 
                     else -> setZero()
@@ -850,12 +849,13 @@ class MutableBigInt private constructor (
             yNormLen <= 2 -> return setMulImpl(x, y.meta.signFlag, y.toULongMagnitude())
             y.isMagnitudePowerOfTwo() -> return setShl(x, y.countTrailingZeroBits())
         }
+        val xMagia = x.magia
+        val yMagia = y.magia
         ensureTmp1Capacity(xNormLen + yNormLen, MBI_RESIZE_TMP1_MUL)
-        _meta = Meta(
-            x.meta.signBit xor y.meta.signBit,
-            Mago.setMul(tmp1, x.magia, xNormLen, y.magia, yNormLen)
-        )
         swapTmp1()
+        updateMeta(Meta(
+            x.meta.signBit xor y.meta.signBit,
+            Mago.setMul(magia, xMagia, xNormLen, yMagia, yNormLen)))
         ++BI_OP_COUNTS[MBI_SET_MUL_BI.ordinal]
         return this
     }
@@ -873,10 +873,9 @@ class MutableBigInt private constructor (
     private fun setMulImpl(x: BigIntNumber, wSign: Boolean, w: UInt): MutableBigInt {
         val xMagia = x.magia
         ensureMagiaCapacityDiscard(x.meta.normLen + 1)
-        _meta = Meta(
+        updateMeta(Meta(
             x.meta.signFlag xor wSign,
-            Mago.setMul32(magia, xMagia, x.meta.normLen, w)
-        )
+            Mago.setMul32(magia, xMagia, x.meta.normLen, w)))
         ++BI_OP_COUNTS[MBI_SET_MUL_PRIMITIVE.ordinal]
         return this
     }
@@ -894,10 +893,9 @@ class MutableBigInt private constructor (
     private fun setMulImpl(x: BigIntNumber, dwSign: Boolean, dw: ULong): MutableBigInt {
         val xMagia = x.magia
         ensureMagiaCapacityDiscard(x.meta.normLen + 2)
-        _meta = Meta(
+        updateMeta(Meta(
             x.meta.signFlag xor dwSign,
-            Mago.setMul64(magia, xMagia, x.meta.normLen, dw)
-        )
+            Mago.setMul64(magia, xMagia, x.meta.normLen, dw)))
         ++BI_OP_COUNTS[MBI_SET_MUL_PRIMITIVE.ordinal]
         return this
     }
