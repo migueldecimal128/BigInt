@@ -1,4 +1,4 @@
-package com.decimal128.bigint.crypto
+package com.decimal128.bigint
 
 import com.decimal128.bigint.MagoSqr.kmutSub
 import kotlin.test.Test

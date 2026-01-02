@@ -1,4 +1,4 @@
-package com.decimal128.bigint.crypto
+package com.decimal128.bigint
 
 import com.decimal128.bigint.BigIntPrime.jacobi
 import com.decimal128.bigint.toBigInt

@@ -1,4 +1,4 @@
-package com.decimal128.bigint.crypto
+package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigInt.Companion.ONE
