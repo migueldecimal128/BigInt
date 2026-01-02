@@ -217,6 +217,23 @@ object BigIntAlgorithms {
         ret.mutWithSign(resultSign)
     }
 
+    /**
+     * Computes [base]^[exp] using left-to-right binary exponentiation.
+     *
+     * Scans the exponent from MSB to LSB, building the result through repeated
+     * squaring and conditional multiplication. Sign handling is implicit: negative
+     * bases with odd exponents naturally produce negative results through the
+     * multiplication operations.
+     *
+     * This algorithm uses one working buffer instead of two (as required by
+     * right-to-left), reducing memory allocation and pressure. The original base
+     * value remains small and cache-resident throughout the computation.
+     *
+     * @param base the base value (may be negative)
+     * @param exp the non-negative exponent (must be > 2)
+     * @param ret destination for the result; must not alias [base]
+     * @throws IllegalStateException if exp ≤ 2 (caller should use [tryPowFastPath])
+     */
     fun powLeftToRight(base: BigIntNumber, exp: Int, ret: MutableBigInt) {
         if (exp <= 2)
             throw IllegalStateException() // should have been fast-path
@@ -230,6 +247,7 @@ object BigIntAlgorithms {
             --bitIndex
         }
     }
+
     /**
      * Returns the **integer square root** of this value.
      *

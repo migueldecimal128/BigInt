@@ -868,7 +868,7 @@ class BigInt private constructor(
          *
          * The returned BigInt value will be 2**bitIndex
          *
-         * @throws kotlin.IllegalArgumentException for a negative bitIndex
+         * @throws [IllegalArgumentException] for bitIndex < 0
          */
         fun withSetBit(bitIndex: Int): BigInt {
             if (bitIndex < 0)
@@ -985,6 +985,8 @@ class BigInt private constructor(
          *
          * `n` must be non-negative. Uses an optimized multiplication tree and
          * fast paths for small `n`, and returns `ONE` for `n == 0` or `1`.
+         *
+         * @throws [IllegalArgumentException] for n < 0
          */
         fun factorial(n: Int): BigInt = BigIntAlgorithms.factorial(n)
 
@@ -1234,9 +1236,27 @@ class BigInt private constructor(
     }
 
     /**
-     * Computes the square of this BigInt (i.e., this * this).
+     * Computes the square of this BigInt (i.e., this × this).
      *
-     * @return a non-negative BigInt representing the square, or `ZERO` if this is zero.
+     * The implementation automatically selects the most efficient algorithm based on
+     * the magnitude size:
+     * - **1-4 limbs** (≤128 bits): Specialized unrolled implementations with direct
+     *   64-bit or 128-bit arithmetic
+     * - **5-18 limbs** (≤576 bits): Standard schoolbook multiplication (cross-product
+     *   formation) which proves faster than specialized squaring for this range
+     * - **19-83 limbs** (≤2656 bits): Optimized schoolbook squaring with cross-term
+     *   doubling. Computes diagonal terms a[i]² and cross terms a[i]×a[j] (i<j) once,
+     *   then doubles the cross terms in a single linear pass
+     * - **84+ limbs** (≥2688 bits): Karatsuba divide-and-conquer algorithm with
+     *   O(n^1.585) complexity vs O(n²) for schoolbook
+     *
+     * Thresholds were determined empirically on Intel Core i9 (circa 2019) hardware
+     * on JVM. Performance curves are very flat near crossover points, so adjusting
+     * these thresholds would have minor performance impact. Other platforms (Native,
+     * JS) may have different optimal crossover points but are expected to perform
+     * reasonably well with these values.
+     *
+     * @return a non-negative BigInt representing the square, or [ZERO] if this is zero
      */
     fun sqr(): BigInt {
         if (this.isNotZero())
@@ -1255,9 +1275,35 @@ class BigInt private constructor(
      */
     fun pow(exp: Int) = BigIntAlgorithms.pow(this, exp)
 
-
+    /**
+     * Returns a new BigInt with the bit at [bitIndex] set to 1.
+     *
+     * If the bit is already set, returns `this`. Otherwise returns a new BigInt
+     * with the same sign and the specified bit turned on in the magnitude.
+     *
+     * The bit index is zero-based, where bit 0 is the least significant bit.
+     *
+     * @param bitIndex the zero-based index of the bit to set
+     * @return a BigInt with the specified bit set to 1
+     * @throws IllegalArgumentException if [bitIndex] is negative
+     */
     fun withSetBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = true)
 
+    /**
+     * Returns a new BigInt with the bit at [bitIndex] set to 0.
+     *
+     * If the bit is already clear, returns `this`. Otherwise returns a new BigInt
+     * with the same sign and the specified bit turned off in the magnitude.
+     *
+     * If this BigInt is a power of two and the bit being cleared is the only set bit,
+     * returns [ZERO].
+     *
+     * The bit index is zero-based, where bit 0 is the least significant bit.
+     *
+     * @param bitIndex the zero-based index of the bit to clear
+     * @return a BigInt with the specified bit set to 0
+     * @throws IllegalArgumentException if [bitIndex] is negative
+     */
     fun withClearBit(bitIndex: Int): BigInt = withBitOp(bitIndex, isSetOp = false)
 
     private fun withBitOp(bitIndex: Int, isSetOp: Boolean): BigInt {
