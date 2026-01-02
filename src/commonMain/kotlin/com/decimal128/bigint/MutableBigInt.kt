@@ -5,17 +5,15 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
-import com.decimal128.bigint.BigIntStats.BigIntOp
-import com.decimal128.bigint.BigIntStats.BigIntOp.*
-import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_MAGIA
-import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP1_KARATSUBA_SQR
-import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP1_KNUTH_DIVIDEND
-import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP1_MUL
-import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP1_SQR
-import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP2_KARATSUBA_Z1
-import com.decimal128.bigint.BigIntStats.BigIntOp.Companion.MBI_RESIZE_TMP2_KNUTH_DIVISOR
-import com.decimal128.bigint.BigIntStats.MutableResizeOperation
-import com.decimal128.bigint.BigIntStats.MutableResizeOperation.*
+import com.decimal128.bigint.BigIntStats.StatsOp
+import com.decimal128.bigint.BigIntStats.StatsOp.*
+import com.decimal128.bigint.BigIntStats.StatsOp.Companion.MBI_RESIZE_MAGIA
+import com.decimal128.bigint.BigIntStats.StatsOp.Companion.MBI_RESIZE_TMP1_KARATSUBA_SQR
+import com.decimal128.bigint.BigIntStats.StatsOp.Companion.MBI_RESIZE_TMP1_KNUTH_DIVIDEND
+import com.decimal128.bigint.BigIntStats.StatsOp.Companion.MBI_RESIZE_TMP1_MUL
+import com.decimal128.bigint.BigIntStats.StatsOp.Companion.MBI_RESIZE_TMP1_SQR
+import com.decimal128.bigint.BigIntStats.StatsOp.Companion.MBI_RESIZE_TMP2_KARATSUBA_Z1
+import com.decimal128.bigint.BigIntStats.StatsOp.Companion.MBI_RESIZE_TMP2_KNUTH_DIVISOR
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.absoluteValue
 import kotlin.math.max
@@ -261,7 +259,7 @@ class MutableBigInt private constructor (
      *        current capacity of the temporary buffer.
      */
     private fun resizeTmp1(requestedLimbLen: Int,
-                           resizeOp: BigIntOp
+                           resizeOp: StatsOp
     ) {
         verify (requestedLimbLen > tmp1.size)
         // tmp arrays start off with zero size
@@ -274,7 +272,6 @@ class MutableBigInt private constructor (
             val hintBit = (-limbCapacityHint ushr 30) and 2
             val repeatBit = (5 - magia.size) ushr 31
             val counterIndex = resizeOp.ordinal + hintBit + repeatBit
-            println("counterIndex:$counterIndex")
             ++BI_OP_COUNTS[counterIndex]
         }
         val headRoom = (requestedLimbLen ushr 1) and ((5 - tmp1.size) shr 31)
@@ -296,7 +293,7 @@ class MutableBigInt private constructor (
      *        current capacity of the temporary buffer.
      */
     private fun resizeTmp2(requestedLimbLen: Int,
-                           resizeOp: BigIntOp) {
+                           resizeOp: StatsOp) {
         verify (requestedLimbLen > tmp2.size)
         // tmp2 starts off with zero size
         // there is no swapTmp2
@@ -404,7 +401,7 @@ class MutableBigInt private constructor (
      * @param requestedLimbLen the minimum number of limbs required.
      */
     private inline fun ensureTmp1Capacity(requestedLimbLen: Int,
-                                          resizeOp: BigIntOp) {
+                                          resizeOp: StatsOp) {
         if (requestedLimbLen > tmp1.size) {
             val required = max(limbCapacityHint, requestedLimbLen)
             resizeTmp1(required, resizeOp)
@@ -412,7 +409,7 @@ class MutableBigInt private constructor (
     }
 
     private inline fun ensureTmp2Capacity(requestedLimbLen: Int,
-                                          resizeOp: BigIntOp) {
+                                          resizeOp: StatsOp) {
         if (requestedLimbLen > tmp2.size) {
             val required = max(limbCapacityHint, requestedLimbLen)
             resizeTmp2(required, resizeOp)
@@ -432,7 +429,7 @@ class MutableBigInt private constructor (
      * @param zeroedLimbLen the number of limbs to be zeroed.
      */
     private inline fun ensureTmp1CapacityZeroed(zeroedLimbLen: Int,
-                                                resizeOp: BigIntOp) {
+                                                resizeOp: StatsOp) {
         if (zeroedLimbLen <= tmp1.size)
             tmp1.fill(0, 0, zeroedLimbLen)
         else

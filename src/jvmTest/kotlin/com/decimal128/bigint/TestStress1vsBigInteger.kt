@@ -10,8 +10,9 @@ import kotlin.test.fail
 class TestStress1vsBigInteger {
 
     val verbose = false
+    val showReport = true
 
-    val REPETITION_COUNT = 10
+    val REPETITION_COUNT = 100
     val MAX_BIT_LENGTH = 1000
 
     fun genBigInt(rng: Random, maxLimbs: Int): BigInt {
@@ -173,6 +174,7 @@ class TestStress1vsBigInteger {
         val ma = MutableBigInt()
         val mb = MutableBigInt()
         val mz = MutableBigInt()
+        val snapStart = BigIntStats.snapshot()
         try {
             repeat(REPETITION_COUNT) { iter ->
                 val a = genBigInt(rng, maxLimbs)
@@ -188,6 +190,12 @@ class TestStress1vsBigInteger {
         } catch (t: Throwable) {
             println("FAIL seed=$seed")
             throw t
+        }
+        if (showReport) {
+            val snapEnd = BigIntStats.snapshot()
+            val interval = snapEnd.delta(snapStart)
+            val report = interval.toString("^MBI_".toRegex()) { it > 0L }
+            println(report)
         }
     }
 

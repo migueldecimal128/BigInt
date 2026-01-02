@@ -6,7 +6,7 @@ package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
-import com.decimal128.bigint.BigIntStats.BigIntOp.*
+import com.decimal128.bigint.BigIntStats.StatsOp.*
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min

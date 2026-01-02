@@ -1,10 +1,14 @@
 package com.decimal128.bigint
 
+import kotlin.time.TimeSource.Monotonic
+
 object BigIntStats {
 
-    internal val BI_OP_COUNTS = LongArray(BigIntOp.CARDINALITY)
+    internal val BI_OP_COUNTS = LongArray(StatsOp.CARDINALITY)
 
-    enum class BigIntOp {
+    fun snapshot(): Snapshot = Snapshot(Monotonic.markNow(), BI_OP_COUNTS.copyOf())
+
+    enum class StatsOp {
         BI_CONSTRUCT_32,
         BI_CONSTRUCT_64,
         BI_CONSTRUCT_DBL,
@@ -96,7 +100,7 @@ object BigIntStats {
         ;
 
         companion object {
-            val values = BigIntOp.values()
+            val values = StatsOp.values()
             val CARDINALITY = values.size
 
             val MBI_RESIZE_MAGIA = MBI_RESIZE_MAGIA_INITIAL_UNHINTED
@@ -108,34 +112,37 @@ object BigIntStats {
             val MBI_RESIZE_TMP2_KARATSUBA_Z1 = MBI_RESIZE_TMP2_KARATSUBA_Z1_INITIAL_UNHINTED
         }
 
-
     }
 
-    enum class MutableResizeOperation {
-        RESIZE_MAGIA,
-        RESIZE_TMP1_MUL,
-        RESIZE_TMP1_SQR,
-        RESIZE_TMP1_KNUTH_DIVIDEND,
-        RESIZE_TMP1_KARATSUBA_SQR,
-        RESIZE_TMP2_KNUTH_DIVISOR,
-        RESIZE_TMP2_KARATSUBA_Z1;
+    class Snapshot internal constructor(val mark: Monotonic.ValueTimeMark, val counts: LongArray) {
+        fun delta(prevSnapshot: Snapshot): Interval {
+            require (mark > prevSnapshot.mark)
+            val deltas = LongArray(counts.size) { i -> counts[i] - prevSnapshot.counts[i] }
+            return Interval(mark - prevSnapshot.mark, deltas)
+        }
 
-        companion object {
-            val values = MutableResizeOperation.values()
-            val CARDINALITY = values.size
+        override fun toString(): String = buildString {
+            appendLine("mark: $mark")
+            for (e in StatsOp.values) {
+                appendLine("${e.name}: ${counts[e.ordinal]}")
+            }
         }
     }
 
-    enum class MutableResizeEvent {
-        INITIAL_UNHINTED,
-        INITIAL_HINTED,
-        REPEAT_UNHINTED,
-        REPEAT_HINTED;
+    class Interval internal constructor(val duration: kotlin.time.Duration, val counts: LongArray) {
+        override fun toString(): String = toString(null, null)
 
-        companion object {
-            val values = MutableResizeEvent.values()
-            val CARDINALITY = values.size
+        fun toString(nameFilter: Regex?, valuePredicate: ((Long) -> Boolean)? = null): String = buildString {
+            appendLine("duration: $duration")
+            for (e in StatsOp.values) {
+                val name = e.name
+                val count = counts[e.ordinal]
+                val nameMatch = nameFilter == null || name.contains(nameFilter)
+                val valueMatch = valuePredicate == null || valuePredicate(count)
+                if (nameMatch && valueMatch)
+                    appendLine("$name: $count")
+            }
         }
     }
+
 }
-
