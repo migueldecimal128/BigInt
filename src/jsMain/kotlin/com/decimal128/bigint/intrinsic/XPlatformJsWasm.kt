@@ -4,6 +4,8 @@
 
 package com.decimal128.bigint.intrinsic
 
+actual inline fun isJsPlatform(): Boolean = true
+
 actual inline fun unsignedMulHi(x: ULong, y: ULong): ULong {
     val x0 = (x and 0xFFFF_FFFFu).toULong()
     val x1 = (x shr 32)         // upper 32 bits

@@ -153,6 +153,34 @@ kotlin {
         //val linuxX64Main by getting
         //val mingwX64Main by getting
 
+        js(IR) {
+            browser {
+                testTask {
+                    useMocha {
+                        timeout = "30000"  // 30 seconds in milliseconds
+                    }
+                }
+            }
+            nodejs {
+                testTask {
+                    useMocha {
+                        timeout = "30000"  // 30 seconds in milliseconds
+                    }
+                }
+            }
+        }
+
+        wasmJs {
+            browser()
+            nodejs()
+            // Don't configure Mocha for Wasm - it uses a different runner
+        }
+
+        wasmWasi {
+            nodejs()
+            // Don't configure Mocha for Wasm - it uses a different runner
+        }
+
     }
 
 }

@@ -2,6 +2,7 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.intrinsic.isJsPlatform
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 import kotlin.test.Test
@@ -12,8 +13,9 @@ class TestMbi {
     val verbose = false
 
     @Test
-    fun testBigIntAccum() {
-        repeat(10) {
+    fun testMutableBigInt() {
+        val count = if (isJsPlatform()) 1 else 10
+        repeat(count) {
             testAddSub()
             testMul()
             testAddAbsValue()

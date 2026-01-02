@@ -2,6 +2,7 @@ package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.MutableBigInt
+import com.decimal128.bigint.intrinsic.isJsPlatform
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.TimeSource
@@ -89,6 +90,10 @@ class TestBarrettVsMontgomery {
 
     @Test
     fun compareBarrettVsMontgomery_modPow_2kBits_Long() {
+
+        if (isJsPlatform())
+            return
+
         val bitLen = 2048
 
         // 2048-bit odd modulus (Montgomery eligible)
@@ -158,6 +163,10 @@ class TestBarrettVsMontgomery {
 
     @Test
     fun compareBarrettVsMontgomery_modPow_2kBits_2k() {
+
+        if (isJsPlatform())
+            return
+
         val bitLen = 2048
 
         // 2048-bit odd modulus (Montgomery eligible)

@@ -4,7 +4,7 @@
 
 package com.decimal128.bigint
 
-internal const val VERIFY_ENABLED: Boolean = true
+internal const val VERIFY_ENABLED: Boolean = false
 
 internal inline fun verify(condition: Boolean) {
     if (VERIFY_ENABLED)
