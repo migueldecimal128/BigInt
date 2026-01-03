@@ -4,9 +4,9 @@
 
 package com.decimal128.bigint.intrinsic
 
-actual inline fun platformName() = "wasmJS"
+actual inline fun platformName() = "js"
 
-actual inline fun isJsPlatform() = true
+actual inline fun isJsPlatform(): Boolean = true
 
 actual inline fun unsignedMulHi(x: ULong, y: ULong): ULong {
     val x0 = (x and 0xFFFF_FFFFu).toULong()
@@ -31,5 +31,4 @@ actual inline fun unsignedMulHi(x: ULong, y: ULong): ULong {
 
     return hi
 }
-
 

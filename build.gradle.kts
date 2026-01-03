@@ -87,9 +87,21 @@ kotlin {
         }
     }
 
-    js(IR) {
-        browser()
-        nodejs()
+    js {
+        browser {
+            testTask {
+                useMocha {
+                    timeout = "30000"  // 30 seconds in milliseconds
+                }
+            }
+        }
+        nodejs {
+            testTask {
+                useMocha {
+                    timeout = "30000"  // 30 seconds in milliseconds
+                }
+            }
+        }
     }
 
     wasmJs {
@@ -101,18 +113,11 @@ kotlin {
         nodejs()
     }
 
-    macosX64{
-        compilations["main"].cinterops {
-            val unsigned_mul_hi by creating {
-                defFile(project.file("src/nativeInterop/cinterop/unsigned_mul_hi.def"))
-            }
-        }
-    }
-    //macosArm64()
-    //linuxX64()
-    //mingwX64()
+    // Uncomment the commented targets
+    macosX64()
+    linuxX64()
 
-    /*
+// Configure cinterop for ALL native targets
     targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget> {
         compilations.getByName("main") {
             cinterops {
@@ -123,7 +128,6 @@ kotlin {
         }
     }
 
-     */
     // ---------------------------
     // 2. Source-set hierarchy
     // ---------------------------
@@ -153,33 +157,6 @@ kotlin {
         //val linuxX64Main by getting
         //val mingwX64Main by getting
 
-        js(IR) {
-            browser {
-                testTask {
-                    useMocha {
-                        timeout = "30000"  // 30 seconds in milliseconds
-                    }
-                }
-            }
-            nodejs {
-                testTask {
-                    useMocha {
-                        timeout = "30000"  // 30 seconds in milliseconds
-                    }
-                }
-            }
-        }
-
-        wasmJs {
-            browser()
-            nodejs()
-            // Don't configure Mocha for Wasm - it uses a different runner
-        }
-
-        wasmWasi {
-            nodejs()
-            // Don't configure Mocha for Wasm - it uses a different runner
-        }
 
     }
 
@@ -228,7 +205,7 @@ afterEvaluate {
                 "wasmJs" -> artifactId = "bigint-wasm-js"
                 "wasmWasi" -> artifactId = "bigint-wasm-wasi"
                 "macosX64" -> artifactId = "bigint-macosx64"
-                // add more if you add more targets
+                "linuxX64" -> artifactId = "bigint-linuxx64"
             }
             pom {
                 licenses {
