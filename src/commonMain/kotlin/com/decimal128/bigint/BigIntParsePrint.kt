@@ -564,61 +564,139 @@ object BigIntParsePrint {
     fun from(src: Latin1Iterator): Magia {
         invalid_syntax@
         do {
-            var leadingZeroSeen = false
-            var ch = src.nextChar()
-            if (ch == '-' || ch == '+') // discard leading sign
-                ch = src.nextChar()
-            if (ch == '0') { // discard leading zero
-                ch = src.nextChar()
-                if (ch == 'x' || ch == 'X')
-                    return fromHex(src.reset())
-                leadingZeroSeen = true
-            }
-            while (ch == '0' || ch == '_') {
-                if (ch == '_' && !leadingZeroSeen)
-                    break@invalid_syntax
-                leadingZeroSeen = leadingZeroSeen or (ch == '0')
-                ch = src.nextChar() // discard all leading zeros
-            }
-            var accumulator = 0u
-            var accumulatorDigitCount = 0
-            val remainingLen = src.remainingLen() + if (ch == '\u0000') 0 else 1
-            // val bitLen = (remainingLen * 13607 + 4095) ushr 12
-            val roundUp32 = (1uL shl 32) - 1uL
-            val bitLen =
-                ((remainingLen.toULong() * LOG2_10_CEIL_32 + roundUp32) shr 32).toInt()
-            if (bitLen == 0) {
-                if (leadingZeroSeen)
-                    return ZERO
-                break@invalid_syntax
+            val bitLen = prefixDetermineBitLen(src)
+            when {
+                bitLen < 0 -> break@invalid_syntax
+                bitLen == 0 -> return ZERO
+                bitLen == Int.MAX_VALUE -> return fromHex(src.reset())
             }
             val z = newWithBitLen(bitLen)
-
-            src.prevChar() // back up one
-            var chLast = '\u0000'
-            while (true) {
-                chLast = ch
-                ch = src.nextChar()
-                if (ch == '_')
-                    continue
-                if (ch !in '0'..'9')
-                    break
-                val n = ch - '0'
-                accumulator = accumulator * 10u + n.toUInt()
-                ++accumulatorDigitCount
-                if (accumulatorDigitCount < 9)
-                    continue
-                mutateFmaPow10(z, 9, accumulator)
-                accumulator = 0u
-                accumulatorDigitCount = 0
-            }
-            if (ch == '\u0000' && chLast != '_') {
-                if (accumulatorDigitCount > 0)
-                    mutateFmaPow10(z, accumulatorDigitCount, accumulator)
+            if (parseHelper(src, z))
                 return z
-            }
         } while (false)
         throw IllegalArgumentException("integer parse error:$src")
+    }
+
+    /**
+     * Scans the textual prefix of a decimal (or hexadecimal) integer literal and
+     * determines how many bits of storage are required for its magnitude.
+     *
+     * This function performs **lightweight prefix validation and sizing only**.
+     * It does **not** consume the full literal; on success it leaves the iterator
+     * positioned at the first significant digit.
+     *
+     * Parsing rules:
+     * - An optional leading '+' or '-' sign is ignored.
+     * - Leading zeros are skipped.
+     * - Underscores ('_') are permitted *only after* at least one leading zero
+     *   has been seen; a leading underscore is rejected.
+     * - A prefix of `"0x"` or `"0X"` signals hexadecimal input and is delegated
+     *   to the hex parser.
+     *
+     * Return values:
+     * - `-1` if the prefix is syntactically invalid.
+     * - `0` if the value is exactly zero.
+     * - `Int.MAX_VALUE` if hexadecimal parsing is required.
+     * - Otherwise, a conservative upper bound on the number of bits required
+     *   to store the decimal magnitude.
+     *
+     * The returned bit length is computed from the remaining decimal digit count
+     * using a fixed-point ⌈log₂(10)⌉ approximation. The estimate may slightly
+     * over-allocate but is guaranteed to be sufficient.
+     *
+     * On success, the iterator is rewound by one character so that the first
+     * non-prefix digit will be re-read by the main parser.
+     *
+     * @param src the input iterator positioned at the start of the literal
+     * @return sizing sentinel or estimated bit length as described above
+     */
+    private fun prefixDetermineBitLen(src: Latin1Iterator): Int {
+        var leadingZeroSeen = false
+        var ch = src.nextChar()
+        if (ch == '-' || ch == '+') // discard leading sign
+            ch = src.nextChar()
+        if (ch == '0') { // discard leading zero
+            ch = src.nextChar()
+            if (ch == 'x' || ch == 'X')
+                return Int.MAX_VALUE
+            leadingZeroSeen = true
+        }
+        while (ch == '0' || ch == '_') {
+            if (ch == '_' && !leadingZeroSeen)
+                return -1
+            leadingZeroSeen = leadingZeroSeen or (ch == '0')
+            ch = src.nextChar() // discard all leading zeros
+        }
+        val remainingLen = src.remainingLen() + if (ch == '\u0000') 0 else 1
+        // val bitLen = (remainingLen * 13607 + 4095) ushr 12
+        val roundUp32 = (1uL shl 32) - 1uL
+        val bitLen =
+            ((remainingLen.toULong() * LOG2_10_CEIL_32 + roundUp32) shr 32).toInt()
+        if (bitLen == 0) {
+            if (leadingZeroSeen)
+                return 0
+            return -1
+        }
+        src.prevChar() // back up one
+        return bitLen
+    }
+
+    /**
+     * Parses the decimal digit sequence of an unsigned integer literal into the
+     * provided magnitude buffer.
+     *
+     * The iterator is expected to be positioned at the first significant digit
+     * (after any prefix handling). Only base-10 digits and underscores are accepted:
+     *
+     * - Digits `'0'..'9'` are accumulated.
+     * - Underscores (`'_'`) are ignored and may appear between digits.
+     * - Parsing stops at the first non-digit, non-underscore character.
+     *
+     * Digits are processed in blocks of up to 9 and folded into `z` using
+     * repeated fused multiply-add operations via [mutateFmaPow10].
+     *
+     * Success conditions:
+     * - The input must terminate (`'\u0000'`) after the digit sequence.
+     * - The final character must not be an underscore.
+     *
+     * On success, `z` contains the parsed magnitude (not normalized), and
+     * `true` is returned. On failure, `z` is left partially modified and
+     * `false` is returned.
+     *
+     * This function performs **no sign handling, no normalization, and no
+     * trailing validation** beyond the digit sequence itself.
+     *
+     * @param src the input iterator positioned at the first digit
+     * @param z the target magnitude buffer (pre-allocated)
+     * @return `true` if parsing completed successfully, `false` otherwise
+     */
+    private fun parseHelper(src: Latin1Iterator, z: Magia): Boolean {
+        var accumulator = 0u
+        var accumulatorDigitCount = 0
+        var ch = '\u0000'
+        var chLast = '\u0000'
+        while (true) {
+            chLast = ch
+            ch = src.nextChar()
+            if (ch == '_')
+                continue
+            if (ch !in '0'..'9')
+                break
+            val n = ch - '0'
+            accumulator = accumulator * 10u + n.toUInt()
+            ++accumulatorDigitCount
+            if (accumulatorDigitCount < 9)
+                continue
+            mutateFmaPow10(z, 9, accumulator)
+            accumulator = 0u
+            accumulatorDigitCount = 0
+        }
+        if (ch == '\u0000' && chLast != '_') {
+            if (accumulatorDigitCount > 0)
+                mutateFmaPow10(z, accumulatorDigitCount, accumulator)
+            return true
+        }
+        return false;
     }
 
     /**
