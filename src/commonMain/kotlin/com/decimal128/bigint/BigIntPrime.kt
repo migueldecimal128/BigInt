@@ -21,10 +21,19 @@ package com.decimal128.bigint
  */
 object BigIntPrime {
 
+    fun nextProbablePrime(n: BigIntNumber): BigInt {
+        val tmp = MutableBigInt()
+        val candidate = MutableBigInt(n)
+        candidate += if (n.isOdd()) 2 else 1
+        while (! isProbablePrime(candidate, tmp))
+            candidate += 2
+        return candidate.toBigInt()
+    }
+
     /**
      * Returns `true` if [n] is a probable prime (Baillie–PSW test).
      */
-    fun isProbablePrime(n: BigInt, tmp: MutableBigInt = MutableBigInt()) =
+    fun isProbablePrime(n: BigIntNumber, tmp: MutableBigInt = MutableBigInt()) =
         isBailliePSWProbablePrime(n, tmp)
 
     /**
@@ -56,15 +65,17 @@ object BigIntPrime {
      * @return `true` if [n] is a probable prime, `false` if composite
      * @throws IllegalArgumentException if [n] is negative
      */
-    fun isBailliePSWProbablePrime(n: BigInt, tmp: MutableBigInt = MutableBigInt()): Boolean {
+    fun isBailliePSWProbablePrime(n: BigIntNumber, tmp: MutableBigInt = MutableBigInt()): Boolean {
+        require(n !== tmp)
         require(!n.isNegative())
         return when (classifyBySmallPrimes(n, tmp)) {
             SmallPrimeResult.COMPOSITE -> false
             SmallPrimeResult.PRIME -> true
             SmallPrimeResult.INCONCLUSIVE -> {
-                if (!isMillerRabinProbablePrimeBase2(n, tmp)) return false
-                val selfridge = selectSelfridgeParams(n)
-                selfridge.D != 0 && isStrongLucasProbablePrime(n, selfridge)
+                val biN = n.toBigInt()
+                if (!isMillerRabinProbablePrimeBase2(biN, tmp)) return false
+                val selfridge = selectSelfridgeParams(biN)
+                selfridge.D != 0 && isStrongLucasProbablePrime(biN, selfridge)
             }
         }
     }
@@ -86,9 +97,10 @@ object BigIntPrime {
     }
 
     private fun classifyBySmallPrimes(
-        n: BigInt,
+        n: BigIntNumber,
         tmp: MutableBigInt
     ): SmallPrimeResult {
+        require (n !== tmp)
         return when {
             n <= 1 -> SmallPrimeResult.COMPOSITE
             n <= 3 -> SmallPrimeResult.PRIME
@@ -96,9 +108,8 @@ object BigIntPrime {
             else -> {
                 for (p0 in SMALL_PRIMES) {
                     val p = p0.toInt()
-                    tmp.set(n)
-                    tmp %= p
-                    if (tmp.isZero()) {
+                    val mod = n.modInt(p)
+                    if (mod == 0) {
                         return if (n EQ p) {
                             SmallPrimeResult.PRIME
                         } else {
@@ -154,7 +165,7 @@ object BigIntPrime {
         val d = nMinusOne ushr s
 
         val ctx = ModContext(n)
-        val tmp = if (tmpP is MutableBigInt) tmpP else MutableBigInt()
+        val tmp = tmpP ?: MutableBigInt()
 
         for (a in bases) {
             if (n <= a) continue   // important for small n

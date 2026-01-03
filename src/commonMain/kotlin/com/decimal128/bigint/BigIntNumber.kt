@@ -392,6 +392,12 @@ sealed class BigIntNumber(
         }
     }
 
+    infix fun modInt(n: Int): Int {
+        require(n > 0) { "modulus must be > 0" }
+        require(!this.isNegative())
+        return Mago.calcRem32(magia, meta.normLen, n.toUInt()).toInt()
+    }
+
     /**
      * Extracts a 64-bit unsigned value from the magnitude of this number,
      * starting at the given bit index (0 = least significant bit). Bits
