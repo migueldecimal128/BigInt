@@ -262,7 +262,7 @@ internal object Mago {
     fun newWithBitLen(bitLen: Int): Magia {
         return when {
             bitLen in 1..(MAX_ALLOC_SIZE*32) ->
-                Magia(normLenFromBitLen(bitLen))
+                Magia(limbLenFromBitLen(bitLen))
             bitLen == 0 -> ZERO
             else ->
                 throw IllegalArgumentException(ERR_MSG_INVALID_ALLOCATION_LENGTH)
@@ -811,7 +811,7 @@ internal object Mago {
         val xBitLen = bitLen(x, xNormLen)
         val yBitLen = bitLen(y, yNormLen)
         val z = newWithBitLen(xBitLen + yBitLen)
-        val zNormLen = setMul(z, x, normLenFromBitLen(xBitLen), y, normLenFromBitLen(yBitLen))
+        val zNormLen = setMul(z, x, limbLenFromBitLen(xBitLen), y, limbLenFromBitLen(yBitLen))
         verify (isNormalized(z, zNormLen))
         return z
     }
@@ -911,11 +911,11 @@ internal object Mago {
      * @param pow10 the decimal power (0..9) selecting the precomputed multiplier.
      * @param a the unsigned 32-bit addend fused into the result.
      */
-    fun mutateFmaPow10(x: Magia, pow10: Int, a: UInt) {
+    fun mutateFmaPow10(x: Magia, xLen: Int, pow10: Int, a: UInt) {
         if (pow10 in 0..9) {
             val m64 = POW10[pow10].toULong()
             var carry = a.toULong()
-            for (i in x.indices) {
+            for (i in 0..<xLen) {
                 val t = dw32(x[i]) * m64 + carry
                 x[i] = t.toInt()
                 carry = t shr 32
@@ -1062,7 +1062,7 @@ internal object Mago {
         if (bitCount == 0)
             return newNormalizedCopy(x, xNormLen)
         val zBitLen = xBitLen + bitCount
-        val zNormLen = normLenFromBitLen(zBitLen)
+        val zNormLen = limbLenFromBitLen(zBitLen)
         val z = Magia(zNormLen)
         val zNormLen2 = setShiftLeft(z, x, xNormLen, bitCount)
         verify (zNormLen == zNormLen2)
@@ -1092,7 +1092,7 @@ internal object Mago {
         // 1. Compute required bit length and limb length from *math*
         // ------------------------------------------------------------
         val zBitLen = xBitLen + bitCount
-        val zNormLen = normLenFromBitLen(zBitLen)
+        val zNormLen = limbLenFromBitLen(zBitLen)
 
         if (zNormLen > z.size)
             throw ArithmeticException(ERR_MSG_SHL_OVERFLOW)
@@ -1220,7 +1220,7 @@ internal object Mago {
      * @param bitLen the number of significant bits.
      * @return the minimum number of 32-bit limbs needed to hold that many bits.
      */
-    inline fun normLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
+    inline fun limbLenFromBitLen(bitLen: Int) = (bitLen + 0x1F) ushr 5
 
     /**
      * Returns the bit length using Java's BigInteger-style semantics.

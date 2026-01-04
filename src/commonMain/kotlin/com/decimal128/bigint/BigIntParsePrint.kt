@@ -568,7 +568,7 @@ object BigIntParsePrint {
                 bitLen == Int.MAX_VALUE -> return fromHex(src.reset())
             }
             val z = newWithBitLen(bitLen)
-            if (parseHelper(src, z))
+            if (parseHelper(src, z, z.size))
                 return z
         } while (false)
         throw IllegalArgumentException("integer parse error:$src")
@@ -585,18 +585,32 @@ object BigIntParsePrint {
             }
             bitLen == Int.MAX_VALUE -> return tryParseHexText(src, mbi)
         }
+        val limbLen = Mago.limbLenFromBitLen(bitLen)
         mbi.updateMeta(Meta(0))
-        mbi.ensureMagiaBitCapacityDiscard(bitLen)
-        val z = newWithBitLen(bitLen)
-        if (! parseHelper(src, z))
+        mbi.ensureMagiaCapacityCopyZeroExtend(limbLen)
+        if (! parseHelper(src, mbi.magia, limbLen))
             return false
-        val normLen = Mago.normLen(z)
+        val normLen = normLen(mbi.magia, limbLen)
         mbi.updateMeta(Meta(isNeg, normLen))
         return true
     }
 
     fun tryParseHexText(src: Latin1Iterator, mbi: MutableBigInt): Boolean {
-        TODO()
+        val sign = src.peek() == '-'
+        val nybbleCount = hexNybbleCount(src)
+        if (nybbleCount >= 0) {
+            if (nybbleCount == 0) {
+                mbi.setZero()
+                return true
+            }
+            mbi.updateMeta(Meta(0))
+            val limbLen = (nybbleCount + 7) ushr 3
+            mbi.ensureMagiaCapacityDiscard(limbLen)
+            parseHexHelper(src, nybbleCount, mbi.magia, limbLen)
+            mbi.updateMeta(Meta(sign, limbLen))
+            return true
+        }
+        return false
     }
 
     /**
@@ -692,7 +706,7 @@ object BigIntParsePrint {
      * @param z the target magnitude buffer (pre-allocated)
      * @return `true` if parsing completed successfully, `false` otherwise
      */
-    private fun parseHelper(src: Latin1Iterator, z: Magia): Boolean {
+    private fun parseHelper(src: Latin1Iterator, z: Magia, zLen: Int): Boolean {
         var accumulator = 0u
         var accumulatorDigitCount = 0
         var ch = '\u0000'
@@ -709,13 +723,13 @@ object BigIntParsePrint {
             ++accumulatorDigitCount
             if (accumulatorDigitCount < 9)
                 continue
-            mutateFmaPow10(z, 9, accumulator)
+            mutateFmaPow10(z, zLen, 9, accumulator)
             accumulator = 0u
             accumulatorDigitCount = 0
         }
         if (ch == '\u0000' && chLast != '_') {
             if (accumulatorDigitCount > 0)
-                mutateFmaPow10(z, accumulatorDigitCount, accumulator)
+                mutateFmaPow10(z, zLen, accumulatorDigitCount, accumulator)
             return true
         }
         return false;
@@ -733,65 +747,76 @@ object BigIntParsePrint {
      * @throws IllegalArgumentException if the input has invalid syntax or contains no digits.
      */
     internal fun fromHex(src: Latin1Iterator): Magia {
-        invalid_syntax@
-        do {
-            var leadingZeroSeen = false
-            var ch = src.nextChar()
-            if (ch == '+' || ch == '-')
-                ch = src.nextChar()
-            if (ch == '0') {
-                ch = src.nextChar()
-                if (ch == 'x' || ch == 'X')
-                    ch = src.nextChar()
-                else
-                    leadingZeroSeen = true
-            }
-            while (ch == '0' || ch == '_') {
-                if (ch == '_' && !leadingZeroSeen)
-                    break@invalid_syntax
-                leadingZeroSeen = leadingZeroSeen or (ch == '0')
-                ch = src.nextChar()
-            }
-            if (ch != '\u0000')
-                src.prevChar() // back up one
-            var nybbleCount = 0
-            while (src.hasNext()) {
-                ch = src.nextChar()
-                if (!isHexAsciiCharOrUnderscore(ch))
-                    break@invalid_syntax
-                nybbleCount += if (ch == '_') 0 else 1
-            }
-            if (ch == '_') // last char seen was '_'
-                break@invalid_syntax
-            if (nybbleCount == 0) {
-                if (leadingZeroSeen)
-                    return ZERO
-                break@invalid_syntax
-            }
+        val nybbleCount = hexNybbleCount(src)
+        if (nybbleCount >= 0) {
+            if (nybbleCount == 0)
+                return ZERO
             val z = newWithBitLen(nybbleCount shl 2)
-            var nybblesLeft = nybbleCount
-            for (k in 0..<z.size) {
-                var w = 0
-                val stepCount = min(nybblesLeft, 8)
-                repeat(stepCount) { n ->
-                    var ch: Char
-                    do {
-                        ch = src.prevChar()
-                    } while (ch == '_')
-                    val nybble = when (ch) {
-                        in '0'..'9' -> ch - '0'
-                        in 'A'..'F' -> ch - 'A' + 10
-                        in 'a'..'f' -> ch - 'a' + 10
-                        else -> throw IllegalStateException()
-                    }
-                    w = w or (nybble shl (n shl 2))
-                }
-                z[k] = w // compiler knows 0 <= k < zLen <= z.size, bounds check can be eliminated
-                nybblesLeft -= stepCount
-            }
+            parseHexHelper(src, nybbleCount, z, z.size)
             return z
-        } while (false)
-        throw IllegalArgumentException("integer parse error:$src")
+        }
+        throw IllegalArgumentException("hex integer parse error")
     }
 
+
+
+    internal fun hexNybbleCount(src: Latin1Iterator): Int {
+        var leadingZeroSeen = false
+        var ch = src.nextChar()
+        if (ch == '+' || ch == '-')
+            ch = src.nextChar()
+        if (ch == '0') {
+            ch = src.nextChar()
+            if (ch == 'x' || ch == 'X')
+                ch = src.nextChar()
+            else
+                leadingZeroSeen = true
+        }
+        while (ch == '0' || ch == '_') {
+            if (ch == '_' && !leadingZeroSeen)
+                return -1
+            leadingZeroSeen = leadingZeroSeen or (ch == '0')
+            ch = src.nextChar()
+        }
+        if (ch != '\u0000')
+            src.prevChar() // back up one
+        var nybbleCount = 0
+        while (src.hasNext()) {
+            ch = src.nextChar()
+            if (!isHexAsciiCharOrUnderscore(ch))
+                return -1
+            nybbleCount += if (ch == '_') 0 else 1
+        }
+        if (ch == '_') // last char seen was '_'
+            return -1
+        if (nybbleCount == 0) {
+            if (leadingZeroSeen)
+                return 0
+            return -1
+        }
+        return nybbleCount
+    }
+
+    private fun parseHexHelper(src: Latin1Iterator, nybbleCount: Int, z: Magia, zNormLen: Int) {
+        var nybblesLeft = nybbleCount
+        for (k in 0..<z.size) {
+            var w = 0
+            val stepCount = min(nybblesLeft, 8)
+            repeat(stepCount) { n ->
+                var ch: Char
+                do {
+                    ch = src.prevChar()
+                } while (ch == '_')
+                val nybble = when (ch) {
+                    in '0'..'9' -> ch - '0'
+                    in 'A'..'F' -> ch - 'A' + 10
+                    in 'a'..'f' -> ch - 'a' + 10
+                    else -> throw IllegalStateException()
+                }
+                w = w or (nybble shl (n shl 2))
+            }
+            z[k] = w // compiler knows 0 <= k < zLen <= z.size, bounds check can be eliminated
+            nybblesLeft -= stepCount
+        }
+    }
 }

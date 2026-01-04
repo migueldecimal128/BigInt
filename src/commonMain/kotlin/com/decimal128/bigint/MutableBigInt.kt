@@ -329,7 +329,7 @@ class MutableBigInt private constructor (
      *
      * @param requestedLimbLen the minimum number of limbs required.
      */
-    private inline fun ensureMagiaCapacityDiscard(requestedLimbLen: Int) {
+    internal inline fun ensureMagiaCapacityDiscard(requestedLimbLen: Int) {
         if (magia.size < requestedLimbLen)
             resizeMagiaDiscard(requestedLimbLen)
     }
@@ -363,7 +363,7 @@ class MutableBigInt private constructor (
      *
      * @param newLimbLen the required limb length to be zeroed.
      */
-    private inline fun ensureMagiaCapacityCopyZeroExtend(newLimbLen: Int) {
+    internal inline fun ensureMagiaCapacityCopyZeroExtend(newLimbLen: Int) {
         if (newLimbLen <= magia.size) {
             if (newLimbLen > meta.normLen)
                 magia.fill(0, meta.normLen, newLimbLen)
