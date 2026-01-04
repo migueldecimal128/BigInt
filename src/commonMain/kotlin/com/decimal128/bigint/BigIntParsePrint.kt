@@ -357,11 +357,8 @@ object BigIntParsePrint {
         return (newLen.toULong() shl 32) or (rem and 0xFFFF_FFFFuL)
     }
 
-
-
     private val HEX_PREFIX_UTF8_0x = byteArrayOf('0'.code.toByte(), 'x'.code.toByte())
     private val HEX_SUFFIX_UTF8_nada = ByteArray(0)
-
 
     /**
      * Returns the hexadecimal string representation of this BigInt.
@@ -577,6 +574,31 @@ object BigIntParsePrint {
         throw IllegalArgumentException("integer parse error:$src")
     }
 
+    fun tryParseText(src: Latin1Iterator, mbi: MutableBigInt): Boolean {
+        val isNeg = src.peek() == '-'
+        val bitLen = prefixDetermineBitLen(src)
+        when {
+            bitLen < 0 -> return false
+            bitLen == 0 -> {
+                mbi.setZero()
+                return true
+            }
+            bitLen == Int.MAX_VALUE -> return tryParseHexText(src, mbi)
+        }
+        mbi.updateMeta(Meta(0))
+        mbi.ensureMagiaBitCapacityDiscard(bitLen)
+        val z = newWithBitLen(bitLen)
+        if (! parseHelper(src, z))
+            return false
+        val normLen = Mago.normLen(z)
+        mbi.updateMeta(Meta(isNeg, normLen))
+        return true
+    }
+
+    fun tryParseHexText(src: Latin1Iterator, mbi: MutableBigInt): Boolean {
+        TODO()
+    }
+
     /**
      * Scans the textual prefix of a decimal (or hexadecimal) integer literal and
      * determines how many bits of storage are required for its magnitude.
@@ -771,6 +793,5 @@ object BigIntParsePrint {
         } while (false)
         throw IllegalArgumentException("integer parse error:$src")
     }
-
 
 }

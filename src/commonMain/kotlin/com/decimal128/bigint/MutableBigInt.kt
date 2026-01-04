@@ -382,7 +382,7 @@ class MutableBigInt private constructor (
      *
      * @param minBitLen the minimum number of bits required.
      */
-    private inline fun ensureMagiaBitCapacityDiscard(minBitLen: Int) =
+    internal inline fun ensureMagiaBitCapacityDiscard(minBitLen: Int) =
         ensureMagiaCapacityDiscard((minBitLen + 0x1F) ushr 5)
 
     /**
@@ -522,7 +522,7 @@ class MutableBigInt private constructor (
 
     // <<<<<<<<<<< END STORAGE MANAGEMENT FUNCTIONS >>>>>>>>>>>>
 
-    private fun updateMeta(meta: Meta) {
+    internal fun updateMeta(meta: Meta) {
         _meta = meta
         verify(validateNormLenAndInjectPoison())
         verify(isNormalized())
