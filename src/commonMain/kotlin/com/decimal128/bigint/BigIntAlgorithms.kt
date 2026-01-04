@@ -282,8 +282,12 @@ object BigIntAlgorithms {
         val bitLen = radicand.magnitudeBitLen()
         if (bitLen <= 53) {
             return when {
-                bitLen == 0 -> ZERO
-                bitLen == 1 -> ONE
+                bitLen == 0 -> {
+                    ZERO
+                }
+                bitLen == 1 -> {
+                    ONE
+                }
                 else -> {
                     val dw = radicand.toULong()
                     val d = dw.toDouble()
@@ -301,7 +305,7 @@ object BigIntAlgorithms {
                     //if (crossCheck > dw)
                     //    --isqrt
                     isqrt -= (dw - crossCheck) shr 63
-                    verify (isqrt * isqrt <= dw && (isqrt + 1uL) * (isqrt + 1uL) > dw)
+                    verify { isqrt * isqrt <= dw && (isqrt + 1uL) * (isqrt + 1uL) > dw }
                     // we started with 53 bits, so the result will be <= 27 bits
                     from(isqrt.toUInt())
                 }

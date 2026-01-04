@@ -119,7 +119,7 @@ class MutableBigInt private constructor (
         operator fun invoke(): MutableBigInt {
             ++BI_OP_COUNTS[MBI_CONSTRUCT_EMPTY.ordinal]
             val magia = Magia(4)
-            verify(validateNormLenAndInjectPoison(magia, 0))
+            verify { validateNormLenAndInjectPoison(magia, 0) }
             return MutableBigInt(Meta(0), magia)
         }
 
@@ -135,7 +135,7 @@ class MutableBigInt private constructor (
             m[1] = (dwMag shr 32).toInt()
             val lMag = dwMag.toLong()
             val normLen = (((-(lMag shr 32) ushr 63) + 1L) and ((lMag or -lMag) shr 63)).toInt()
-            verify(validateNormLenAndInjectPoison(m, normLen))
+            verify { validateNormLenAndInjectPoison(m, normLen) }
             return MutableBigInt(Meta(sign, normLen), m)
         }
 
@@ -143,7 +143,7 @@ class MutableBigInt private constructor (
             ++BI_OP_COUNTS[MBI_CONSTRUCT_BI.ordinal]
             val m = Mago.newWithFloorLen(other.meta.normLen)
             other.magia.copyInto(m, 0, 0, other.meta.normLen)
-            verify(validateNormLenAndInjectPoison(m, other.meta.normLen))
+            verify { validateNormLenAndInjectPoison(m, other.meta.normLen) }
             return MutableBigInt(other.meta, m)
         }
 
@@ -160,9 +160,9 @@ class MutableBigInt private constructor (
             if (initialBitCapacity >= 0) {
                 val initialLimbCapacity = max(4, limbLenFromBitLen(initialBitCapacity))
                 val magia = Mago.newWithFloorLen(initialLimbCapacity)
-                verify(validateNormLenAndInjectPoison(magia, 0))
+                verify { validateNormLenAndInjectPoison(magia, 0) }
                 val mbi = MutableBigInt(Meta(0), magia)
-                verify (mbi.magia.size >= 4)
+                verify { mbi.magia.size >= 4 }
                 mbi.limbCapacityHint = mbi.magia.size
                 ++BI_OP_COUNTS[MBI_CONSTRUCT_CAPACITY_HINT.ordinal]
                 return mbi
@@ -207,7 +207,7 @@ class MutableBigInt private constructor (
      */
     private fun resizeMagiaDiscard(requestedLimbLen: Int) {
 
-        verify (requestedLimbLen > 4 && requestedLimbLen > magia.size)
+        verify { requestedLimbLen > 4 && requestedLimbLen > magia.size }
         run { // accounting
             val hintBit = (-limbCapacityHint ushr 30) and 2
             val repeatBit = (5 - magia.size) ushr 31
@@ -268,7 +268,7 @@ class MutableBigInt private constructor (
     private fun resizeTmp1(requestedLimbLen: Int,
                            resizeOp: StatsOp
     ) {
-        verify (requestedLimbLen > tmp1.size)
+        verify { requestedLimbLen > tmp1.size }
         // tmp arrays start off with zero size
         // it might also have ended up with size == 4 because
         // of a tmp1 swap.
@@ -301,7 +301,7 @@ class MutableBigInt private constructor (
      */
     private fun resizeTmp2(requestedLimbLen: Int,
                            resizeOp: StatsOp) {
-        verify (requestedLimbLen > tmp2.size)
+        verify { requestedLimbLen > tmp2.size }
         // tmp2 starts off with zero size
         // there is no swapTmp2
         // if this is the first resize then give them what they want
@@ -451,7 +451,7 @@ class MutableBigInt private constructor (
      * the previous contents of `tmp1` become the active backing storage.
      */
     private fun swapTmp1() {
-        verify (tmp1.size >= 4)
+        verify { tmp1.size >= 4 }
         val t = tmp1; tmp1 = _magia; _magia = t
     }
 
@@ -524,8 +524,8 @@ class MutableBigInt private constructor (
 
     internal fun updateMeta(meta: Meta) {
         _meta = meta
-        verify(validateNormLenAndInjectPoison())
-        verify(isNormalized())
+        verify { validateNormLenAndInjectPoison() }
+        verify { isNormalized() }
     }
     /**
      * Sets this value to zero in place by clearing the normalized length and
@@ -752,27 +752,35 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setAddImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
-        verify (x.isNormalized())
+        verify { x.isNormalized() }
         val xMagia = x.magia // use only xMagia in here because of aliasing
         when {
             yDw == 0uL -> set(x)
             x.isZero() -> set(ySign, yDw)
             x.meta.signFlag == ySign -> {
-                verify (this.magia.size >= 4)
+                verify { this.magia.size >= 4 }
                 ensureMagiaCapacityDiscard(x.meta.normLen + 1)
-                updateMeta(Meta(
-                    x.meta.signBit,
-                    Mago.setAdd64(magia, xMagia, x.meta.normLen, yDw)))
+                updateMeta(
+                    Meta(
+                        x.meta.signBit,
+                        Mago.setAdd64(magia, xMagia, x.meta.normLen, yDw)
+                    )
+                )
             }
+
             else -> {
                 val cmp: Int = x.magnitudeCompareTo(yDw)
                 when {
                     cmp > 0 -> {
                         ensureMagiaCapacityDiscard(x.meta.normLen)
-                        updateMeta(Meta(
-                            x.meta.signBit,
-                            Mago.setSub64(magia, xMagia, x.meta.normLen, yDw)))
+                        updateMeta(
+                            Meta(
+                                x.meta.signBit,
+                                Mago.setSub64(magia, xMagia, x.meta.normLen, yDw)
+                            )
+                        )
                     }
+
                     cmp < 0 -> set(ySign, yDw - x.toULongMagnitude())
                     else -> setZero()
                 }
@@ -795,17 +803,20 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setAddImpl(x: BigIntNumber, yMeta: Meta, yMagia: Magia): MutableBigInt {
-        verify (x.isNormalized())
-        verify (Mago.isNormalized(yMagia, yMeta.normLen))
+        verify { x.isNormalized() }
+        verify { Mago.isNormalized(yMagia, yMeta.normLen) }
         val xMagia = x.magia // save for aliasing
         when {
             yMeta.isZero -> set(x)
             x.isZero() -> set(yMeta, yMagia)
             x.meta.signFlag == yMeta.signFlag -> {
                 ensureMagiaCapacityDiscard(max(x.meta.normLen, yMeta.normLen) + 1)
-                updateMeta(Meta(
-                    x.meta.signBit,
-                    Mago.setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)))
+                updateMeta(
+                    Meta(
+                        x.meta.signBit,
+                        Mago.setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
+                    )
+                )
             }
 
             else -> {
@@ -813,16 +824,22 @@ class MutableBigInt private constructor (
                 when {
                     cmp > 0 -> {
                         ensureMagiaCapacityDiscard(x.meta.normLen)
-                        updateMeta(Meta(
-                            x.meta.signBit,
-                            Mago.setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)))
+                        updateMeta(
+                            Meta(
+                                x.meta.signBit,
+                                Mago.setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
+                            )
+                        )
                     }
 
                     cmp < 0 -> {
                         ensureMagiaCapacityDiscard(yMeta.normLen)
-                        updateMeta(Meta(
-                            yMeta.signBit,
-                            Mago.setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen)))
+                        updateMeta(
+                            Meta(
+                                yMeta.signBit,
+                                Mago.setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen)
+                            )
+                        )
                     }
 
                     else -> setZero()
@@ -959,7 +976,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] for call chaining
      */
     fun setSqr(x: BigIntNumber): MutableBigInt {
-        verify(x.isNormalized())
+        verify { x.isNormalized() }
         val xNormLen = x.meta.normLen
         when {
             xNormLen == 0 -> return setZero()
@@ -967,12 +984,16 @@ class MutableBigInt private constructor (
                 val xMagia = x.magia
                 ensureTmp1CapacityZeroed(xNormLen + xNormLen, MBI_RESIZE_TMP1_SQR)
                 swapTmp1()
-                updateMeta(Meta(
-                    0,
-                    MagoSqr.setSqr(magia, xMagia, xNormLen)))
+                updateMeta(
+                    Meta(
+                        0,
+                        MagoSqr.setSqr(magia, xMagia, xNormLen)
+                    )
+                )
                 ++BI_OP_COUNTS[MBI_SET_SQR_SCHOOLBOOK.ordinal]
                 return this
             }
+
             else -> return karatsubaSetSqr(x)
         }
     }
@@ -1612,7 +1633,7 @@ class MutableBigInt private constructor (
                 var normLen = Mago.setShiftRight(
                     magia, x.magia, x.meta.normLen, bitCount
                 )
-                verify (normLen > 0)
+                verify { normLen > 0 }
 
                 if (needsIncrement) {
                     ensureMagiaBitCapacityCopy(zBitLen + 1)
@@ -1690,7 +1711,7 @@ class MutableBigInt private constructor (
      * @throws IllegalArgumentException if either parameter is negative
      */
     fun applyBitMask(bitWidth: Int, bitIndex: Int = 0): MutableBigInt {
-        verify (isNormalized())
+        verify { isNormalized() }
         ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
         val myBitLen = magnitudeBitLen()
         when {
@@ -1698,6 +1719,7 @@ class MutableBigInt private constructor (
                 throw IllegalArgumentException(
                     "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth"
                 )
+
             bitWidth == 0 || bitIndex >= myBitLen -> return setZero()
             bitWidth == 1 && !testBit(bitIndex) -> return setZero()
             bitWidth == 1 -> {
@@ -1705,7 +1727,7 @@ class MutableBigInt private constructor (
                 magia.fill(0, 0, limbIndex)
                 magia[limbIndex] = 1 shl (bitIndex and 0x1F)
                 updateMeta(Meta(limbIndex + 1))
-                verify (isNormalized())
+                verify { isNormalized() }
                 return this
             }
         }
@@ -1720,7 +1742,7 @@ class MutableBigInt private constructor (
         magia[loIndex] = magia[loIndex] and (-1 shl ctz)
         val normLen = Mago.normLen(magia, normLen0)
         updateMeta(Meta(normLen))
-        verify (isNormalized())
+        verify { isNormalized() }
         return this
     }
 

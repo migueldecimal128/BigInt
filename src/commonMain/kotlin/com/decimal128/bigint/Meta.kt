@@ -39,8 +39,8 @@ value class Meta internal constructor(val _meta: Int) {
          * @param normLen  non-negative normalizedLength stored in the lower 31 bits.
          */
         operator fun invoke(signBit: Int, normLen: Int): Meta {
-            verify ((signBit shr 1) == 0)
-            verify (normLen >= 0)
+            verify { (signBit shr 1) == 0 }
+            verify { normLen >= 0 }
             // mask `and (-normLen shr 31)` to prevent -0
             return Meta(((signBit shl 31) or normLen) and (-normLen shr 31))
         }
@@ -74,9 +74,9 @@ value class Meta internal constructor(val _meta: Int) {
         }
 
         operator fun invoke(signBit: Int, x: IntArray): Meta {
-            verify ((signBit ushr 1) == 0)
+            verify { (signBit ushr 1) == 0 }
             var normLen = x.size
-            while (normLen > 0 && x[normLen-1] == 0)
+            while (normLen > 0 && x[normLen - 1] == 0)
                 --normLen
             return Meta(signBit, normLen)
         }

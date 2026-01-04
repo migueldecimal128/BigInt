@@ -7,7 +7,7 @@ are still subject to change.
 `BigInt` is a high-performance arbitrary-precision
 signed integer type for **Kotlin Multiplatform**, designed to
 bring efficient big-integer arithmetic to
-**JVM, Native, and JavaScript** with **no external dependencies**.
+**JVM, Native, WASM, and JavaScript** with **no external dependencies**.
 
 It provides idiomatic Kotlin arithmetic operators, efficient
 mixed-primitive arithmetic, **reduced heap allocation overhead**,
@@ -18,14 +18,14 @@ needing *hundreds or thousands of digits*.
 
 ## ✨ Features
 
-- **Kotlin Multiplatform** (JVM / Native / JS)
+- **Kotlin Multiplatform** (JVM / Native / WASM / JS)
 - **No dependencies**
 - **Arbitrary-precision signed integers**
 - Arithmetic infix operators: `+ - * / % mod`
 - Comparator operators: `< <= == != >= >`
 - Integer math functions: `sqr() isqrt() pow(n) abs() gcd() factorial(n)` 
 - An extensive toolbox of binary bit-manipulation and boolean operations
-- Accepts primitive operands (`Int`, `UInt`, `Long`, `ULong`) without boxing
+- Accepts primitive operands (`Int`, `UInt`, `Long`, `ULong`) without BigInteger boxing
 - Schoolbook multiplication (O(n²))
 - Karatsuba squaring
 - Knuth’s Algorithm D for division
@@ -40,7 +40,7 @@ needing *hundreds or thousands of digits*.
 - **Statistical computing**: Large dataset aggregations with `MutableBigInt`
 - **Number theory**: Prime testing, GCD, LCM, factorials
 - **Cryptographic primitives**: modular exponentiation with Montgomery and Barrett reduction
-- **Multiplatform apps**: Consistent big-integer behavior across JVM/Native/JS
+- **Multiplatform apps**: Consistent big-integer behavior across JVM/Native/WASM/JS
 - **Learning**: Readable implementation for understanding arbitrary-precision arithmetic
 - 
 ---
@@ -96,7 +96,7 @@ val x = a + 5          // Int
 val y = a * 42u        // UInt
 val z = a - 123456789L // Long
 ```
-No boxing means reduced heap pressure!
+No BigInteger conversion means reduced heap pressure. 
 
 ---
 

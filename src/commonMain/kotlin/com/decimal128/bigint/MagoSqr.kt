@@ -385,12 +385,12 @@ internal object MagoSqr {
      */
     fun setSqrKaratsuba(z: Magia, x: Magia, xNormLen: Int, tmp: IntArray? = null): Int {
         val k1 = (xNormLen + 1) / 2
-        val tmpSize = 3*k1 + 3
-        verify (z.size >= 2*xNormLen + 1)
-        verify (tmp == null || tmp.size >= tmpSize)
+        val tmpSize = 3 * k1 + 3
+        verify { z.size >= 2 * xNormLen + 1 }
+        verify { tmp == null || tmp.size >= tmpSize }
         val t = tmp ?: IntArray(tmpSize)
         karatsubaSqr(z, 0, x, 0, xNormLen, t)
-        val zLastIndex = 2*xNormLen - 1
+        val zLastIndex = 2 * xNormLen - 1
         val zLastLimb = z[zLastIndex]
         val zNormLen = zLastIndex + ((zLastLimb or -zLastLimb) ushr 31)
         return zNormLen

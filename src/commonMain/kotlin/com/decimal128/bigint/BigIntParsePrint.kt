@@ -73,7 +73,7 @@ object BigIntParsePrint {
      */
     fun toString(isNegative: Boolean, x: Magia, xNormLen: Int): String {
         if (xNormLen >= 0 && xNormLen <= x.size) {
-            if (! isNormalized(x, xNormLen))
+            if (!isNormalized(x, xNormLen))
                 return "[not-normalized]"
             val bitLen = bitLen(x, xNormLen)
             if (bitLen < 2) {
@@ -87,7 +87,7 @@ object BigIntParsePrint {
             val t = newCopyWithExactLimbLen(x, xNormLen, limbLen)
             val len = destructiveToUtf8BeforeIndex(utf8, utf8.size, isNegative, t, limbLen)
             val startingIndex = utf8.size - len
-            verify (startingIndex <= 1)
+            verify { startingIndex <= 1 }
             return utf8.decodeToString(startingIndex, utf8.size)
         } else {
             throw IllegalArgumentException()
@@ -250,10 +250,10 @@ object BigIntParsePrint {
      * digits occupy the range `offMaxx - 9 .. offMaxx - 1`.
      */
     fun render9DigitsBeforeIndex(dw: ULong, utf8: ByteArray, offMaxx: Int) {
-        verify (dw < 1_000_000_000uL)
+        verify { dw < 1_000_000_000uL }
         //val abcde = unsignedMulHi(dw, M_U64_DIV_1E4) shr S_U64_DIV_1E4
         val abcde = (dw * M_1E9_DIV_1E4) shr S_1E9_DIV_1E4
-        val fghi  = dw - (abcde * 10000uL)
+        val fghi = dw - (abcde * 10000uL)
 
         val abc = (abcde * M_U32_DIV_1E2) shr S_U32_DIV_1E2
         val de = abcde - (abc * 100uL)
@@ -406,7 +406,7 @@ object BigIntParsePrint {
     }
 
     fun toHexUtf8(bi: BigIntNumber, utf8: ByteArray, off: Int, digitCount: Int, useUpperCase: Boolean) {
-        verify (bi.isNormalized())
+        verify { bi.isNormalized() }
         val alfaBase = if (useUpperCase) 'A' else 'a'
         var ichMax = off + digitCount
         var limbIndex = 0
@@ -418,7 +418,7 @@ object BigIntParsePrint {
                     // if there are no limbs left then take as
                     // many zero nybbles as you want
                     nybblesRemaining = Int.MAX_VALUE
-                    verify (w == 0)
+                    verify { w == 0 }
                 } else {
                     w = bi.magia[limbIndex]
                     ++limbIndex

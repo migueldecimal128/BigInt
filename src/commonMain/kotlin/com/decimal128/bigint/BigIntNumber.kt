@@ -100,7 +100,7 @@ sealed class BigIntNumber(
      * Used during development and debugging to help ensure correct
      * normalization.
      *
-     * Used with `verify(validateNormLenAndInjectPoison()` to
+     * Used with `verify { validateNormLenAndInjectPoison() }` to
      * ensure that operators so that it will go away when one is not
      * debugging on JVM and the equiv for debug vs fast Native libraries.
      *
@@ -935,7 +935,7 @@ sealed class BigIntNumber(
      * @return a hash code consistent with numeric equality of magnitudes
      */
     fun magnitudeHashCode(): Int {
-        verify (isNormalized())
+        verify { isNormalized() }
         var h = 0
         var i = 0
         while (i + 3 < meta.normLen) {

@@ -39,7 +39,7 @@ object BigIntSerde {
      * @throws IllegalArgumentException if the magnitude is not normalized.
      */
     fun toBinaryByteArray(bi: BigIntNumber, isTwosComplement: Boolean, isBigEndian: Boolean): ByteArray {
-        verify (bi.isNormalized())
+        verify { bi.isNormalized() }
         if (bi.meta.normLen >= 0 && bi.meta.normLen <= bi.magia.size) {
             val bitLen =
                 if (isTwosComplement)
@@ -79,9 +79,10 @@ object BigIntSerde {
                       isTwosComplement: Boolean, isBigEndian: Boolean,
                       bytes: ByteArray, offset: Int = 0, requestedLen: Int = -1
     ): Int {
-        verify (bi.isNormalized())
+        verify { bi.isNormalized() }
         if (bi.meta.normLen >= 0 && bi.meta.normLen <= bi.magia.size &&
-            offset >= 0 && (requestedLen <= 0 || requestedLen <= bytes.size - offset)) {
+            offset >= 0 && (requestedLen <= 0 || requestedLen <= bytes.size - offset)
+        ) {
 
             val actualLen = if (requestedLen > 0) requestedLen else {
                 val bitLen = if (isTwosComplement)
@@ -139,8 +140,8 @@ object BigIntSerde {
                     w = w shr 8
                 } while (--remaining > 0)
             }
-            verify (iw == bi.meta.normLen)
-            verify (ib - step1LoToHi == ibMsb)
+            verify { iw == bi.meta.normLen }
+            verify { ib - step1LoToHi == ibMsb }
             return actualLen
         }
         throw IllegalStateException()
@@ -177,7 +178,7 @@ object BigIntSerde {
         val offB1 = if (isBigEndian) -1 else 1 // BE == -1, LE ==  1
         val offB2 = offB1 shl 1                // BE == -2, LE ==  2
         val offB3 = offB1 + offB2              // BE == -3, LE ==  3
-        val step1HiToLo = - offB1              // BE ==  1, LE == -1
+        val step1HiToLo = -offB1              // BE ==  1, LE == -1
         val step4LoToHi = offB1 shl 2          // BE == -4, LE ==  4
 
         val ibLast = off + len - 1
@@ -208,12 +209,12 @@ object BigIntSerde {
             val b3 = bytes[ib + offB3].toInt() and 0xFF
             val b2 = bytes[ib + offB2].toInt() and 0xFF
             val b1 = bytes[ib + offB1].toInt() and 0xFF
-            val b0 = bytes[ib        ].toInt() and 0xFF
+            val b0 = bytes[ib].toInt() and 0xFF
             val w = (b3 shl 24) or (b2 shl 16) or (b1 shl 8) or b0
             carry += (w xor negativeMask).toLong() and 0xFFFF_FFFFL
             magia[iw++] = carry.toInt()
             carry = carry shr 32
-            verify ((carry shr 1) == 0L)
+            verify { (carry shr 1) == 0L }
             ib += step4LoToHi
             remaining -= 4
         }
@@ -225,7 +226,7 @@ object BigIntSerde {
             val w = (b3 shl 24) or (b2 shl 16) or (b1 shl 8) or b0
             magia[iw++] = (w xor negativeMask) + carry.toInt()
         }
-        verify (iw == magia.size)
+        verify { iw == magia.size }
         return magia
     }
 
