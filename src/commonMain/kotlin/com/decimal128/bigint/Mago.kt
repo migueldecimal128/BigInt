@@ -347,8 +347,8 @@ internal object Mago {
      */
     fun newAdd(x: Magia, xNormLen: Int, dw: ULong): Magia {
         verify { isNormalized(x, xNormLen) }
-        val dwLimbLen = if (dw == 0uL) 0 else if (dw <= 0xFFFFFFFFuL) 1 else 2
-        val newBitLen = max(normBitLen(x, xNormLen), dwLimbLen) + 1
+        val dwBitLen = 64 - dw.countLeadingZeroBits()
+        val newBitLen = max(normBitLen(x, xNormLen), dwBitLen) + 1
         val z = newWithBitLen(newBitLen)
         var carry = dw
         for (i in 0..<xNormLen) {
