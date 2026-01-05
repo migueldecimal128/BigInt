@@ -1299,7 +1299,7 @@ class BigInt private constructor(
                 verify { !isSetOp }
                 return ZERO
             }
-            val newBitLen = max(bitIndex + 1, Mago.bitLen(this.magia, this.meta.normLen))
+            val newBitLen = max(bitIndex + 1, Mago.normBitLen(this.magia, this.meta.normLen))
             val magia = Mago.newCopyWithExactBitLen(this.magia, this.meta.normLen, newBitLen)
             val wordIndex = bitIndex ushr 5
             val isolatedBit = (1 shl (bitIndex and 0x1F))

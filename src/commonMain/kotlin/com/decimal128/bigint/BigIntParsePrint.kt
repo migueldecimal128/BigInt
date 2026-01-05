@@ -10,6 +10,7 @@ import com.decimal128.bigint.Mago.isNormalized
 import com.decimal128.bigint.Mago.mutateFmaPow10
 import com.decimal128.bigint.Mago.newCopyWithExactLimbLen
 import com.decimal128.bigint.Mago.newWithBitLen
+import com.decimal128.bigint.Mago.normBitLen
 import com.decimal128.bigint.Mago.normLen
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.max
@@ -75,7 +76,7 @@ object BigIntParsePrint {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             if (!isNormalized(x, xNormLen))
                 return "[not-normalized]"
-            val bitLen = bitLen(x, xNormLen)
+            val bitLen = normBitLen(x, xNormLen)
             if (bitLen < 2) {
                 if (bitLen == 0)
                     return "0"
@@ -386,7 +387,7 @@ object BigIntParsePrint {
     private fun toHexString(bi: BigIntNumber, prefixUtf8: ByteArray, useUpperCase: Boolean, minPrintLength: Int, suffixUtf8: ByteArray): String {
         val signCount = bi.meta.signBit
         val prefixCount = prefixUtf8.size
-        val nybbleCount = max((bitLen(bi.magia, bi.meta.normLen) + 3) / 4, minPrintLength)
+        val nybbleCount = max((normBitLen(bi.magia, bi.meta.normLen) + 3) / 4, minPrintLength)
         val suffixCount = suffixUtf8.size
         val totalLen = signCount + prefixCount + nybbleCount + suffixCount
         val utf8 = ByteArray(totalLen)

@@ -347,7 +347,8 @@ internal object Mago {
      */
     fun newAdd(x: Magia, xNormLen: Int, dw: ULong): Magia {
         verify { isNormalized(x, xNormLen) }
-        val newBitLen = max(bitLen(x, xNormLen), (64 - dw.countLeadingZeroBits())) + 1
+        val dwLimbLen = if (dw == 0uL) 0 else if (dw <= 0xFFFFFFFFuL) 1 else 2
+        val newBitLen = max(normBitLen(x, xNormLen), dwLimbLen) + 1
         val z = newWithBitLen(newBitLen)
         var carry = dw
         for (i in 0..<xNormLen) {
@@ -370,8 +371,10 @@ internal object Mago {
     fun newAdd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
         verify { isNormalized(x, xNormLen) }
         verify { isNormalized(y, yNormLen) }
-        val newBitLen = max(bitLen(x, xNormLen), bitLen(y, yNormLen)) + 1
-        val z = newWithBitLen(newBitLen)
+        val newLen = max(xNormLen, yNormLen) + 1
+        val z = Magia(newLen)
+        //val newBitLen = max(normBitLen(x, xNormLen), normBitLen(y, yNormLen)) + 1
+        //val z = newWithBitLen(newBitLen)
         setAdd(z, x, xNormLen, y, yNormLen)
         return z
     }
@@ -443,7 +446,7 @@ internal object Mago {
      * Computes `z = x + y` using the low-order [xLen] and [yLen] limbs of the
      * inputs and returns the normalized limb length of the sum. The caller must
      * ensure that [z] is large enough to hold the result; the minimum size is
-     * `max(bitLen(x), bitLen(y)) + 1` bits.
+     * `max(normBitLen(x), normBitLen(y)) + 1` bits.
      *
      * @return the normalized limb count of the sum
      * @throws ArithmeticException if the result does not fit in [z]
@@ -659,7 +662,7 @@ internal object Mago {
         verify { isNormalized(x, xNormLen) }
         if (xNormLen == 0 || w == 0u)
             return ZERO
-        val xBitLen = bitLen(x, xNormLen)
+        val xBitLen = normBitLen(x, xNormLen)
         val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul32(z, x, xNormLen, w)
@@ -725,7 +728,7 @@ internal object Mago {
     fun newMul(x: Magia, xNormLen: Int, dw: ULong): Magia {
         if (xNormLen == 0 || dw == 0uL)
             return ZERO
-        val xBitLen = bitLen(x, xNormLen)
+        val xBitLen = normBitLen(x, xNormLen)
         val zBitLen = xBitLen + 64 - dw.countLeadingZeroBits()
         val z = newWithBitLen(zBitLen)
         val zNormLen = setMul64(z, x, xNormLen, dw)
@@ -809,8 +812,8 @@ internal object Mago {
     fun newMul(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
         if (xNormLen == 0 || yNormLen == 0)
             return ZERO
-        val xBitLen = bitLen(x, xNormLen)
-        val yBitLen = bitLen(y, yNormLen)
+        val xBitLen = normBitLen(x, xNormLen)
+        val yBitLen = normBitLen(y, yNormLen)
         val z = newWithBitLen(xBitLen + yBitLen)
         val zNormLen = setMul(z, x, limbLenFromBitLen(xBitLen), y, limbLenFromBitLen(yBitLen))
         verify { isNormalized(z, zNormLen) }
@@ -823,7 +826,7 @@ internal object Mago {
      *
      * Requirements:
      * - [z] must be of sufficient size to hold the product
-     *   `bitLen(x) + bitLen(y)`, at least [xNormLen] + [yNormLen] - 1.
+     *   `normBitLen(x) + normBitLen(y)`, at least [xNormLen] + [yNormLen] - 1.
      * - [xNormLen] and [yNormLen] must be greater than zero and within the array bounds.
      * - For efficiency, if one array is longer, it is preferable to use it as [y].
      *
@@ -971,7 +974,7 @@ internal object Mago {
         if (bitCount >= 0) {
             verify { isNormalized(x, xNormLen) }
             require(bitCount >= 0)
-            val newBitLen = bitLen(x, xNormLen) - bitCount
+            val newBitLen = normBitLen(x, xNormLen) - bitCount
             if (newBitLen <= 0)
                 return ZERO
             val z = newWithBitLen(newBitLen)
@@ -1020,7 +1023,7 @@ internal object Mago {
         if (xNormLen == 0)
             return 0
         require(x[xNormLen - 1] != 0)
-        val newBitLen = bitLen(x, xNormLen) - bitCount
+        val newBitLen = normBitLen(x, xNormLen) - bitCount
         if (newBitLen <= 0)
             return 0
         val zNormLen = (newBitLen + 0x1F) ushr 5
@@ -1058,7 +1061,7 @@ internal object Mago {
      * @throws IllegalArgumentException if [bitCount] is negative.
      */
     fun newShiftLeft(x: Magia, xNormLen: Int, bitCount: Int): Magia {
-        val xBitLen = bitLen(x, xNormLen)
+        val xBitLen = normBitLen(x, xNormLen)
         if (xBitLen == 0)
             return ZERO
         if (bitCount == 0)
@@ -1085,7 +1088,7 @@ internal object Mago {
         if (xNormLen == 0)
             return 0
 
-        val xBitLen = bitLen(x, xNormLen)
+        val xBitLen = normBitLen(x, xNormLen)
 
         val wordShift = bitCount ushr 5
         val innerShift = bitCount and 31
@@ -1214,6 +1217,15 @@ internal object Mago {
         }
     }
 
+    internal fun normBitLen(x: Magia, xLen: Int): Int {
+        if (xLen > 0) {
+            val lastLimb = x[xLen - 1]
+            verify { lastLimb != 0 }
+            return (xLen shl 5) - lastLimb.countLeadingZeroBits()
+        }
+        return 0
+    }
+
     /**
      * Returns the number of 32-bit limbs required to represent a value with the given [bitLen].
      *
@@ -1243,7 +1255,7 @@ internal object Mago {
     fun bitLengthBigIntegerStyle(sign: Boolean, x: Magia, xNormLen: Int): Int {
         verify { isNormalized(x, xNormLen) }
         if (xNormLen >= 0 && xNormLen <= x.size) {
-            val bitLen = bitLen(x, xNormLen)
+            val bitLen = normBitLen(x, xNormLen)
             val isNegPowerOfTwo = sign && isPowerOfTwo(x, xNormLen)
             val bitLengthBigIntegerStyle = bitLen - if (isNegPowerOfTwo) 1 else 0
             return bitLengthBigIntegerStyle
@@ -1712,8 +1724,8 @@ internal object Mago {
             // note that this will handle aliasing
             // when x === yMeta,yMagia
             xNormLen == yNormLen -> {
-                val xBitLen = bitLen(xMagia, xNormLen)
-                val yBitLen = bitLen(yMagia, yNormLen)
+                val xBitLen = normBitLen(xMagia, xNormLen)
+                val yBitLen = normBitLen(yMagia, yNormLen)
                 if (xBitLen < yBitLen)
                     return 0
                 if (xBitLen == yBitLen) {
@@ -1874,8 +1886,8 @@ internal object Mago {
             yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
             yNormLen == 1 -> return newDiv(x, xNormLen, y[0].toUInt())
             xNormLen <= yNormLen -> {
-                val xBitLen = bitLen(x, xNormLen)
-                val yBitLen = bitLen(y, yNormLen)
+                val xBitLen = normBitLen(x, xNormLen)
+                val yBitLen = normBitLen(y, yNormLen)
                 if (xBitLen < yBitLen)
                     return ZERO
                 if (xBitLen == yBitLen) {
@@ -2008,7 +2020,7 @@ internal object Mago {
             )
 
             xNormLen <= yNormLen -> {
-                if (bitLen(x, xNormLen) <= bitLen(y, yNormLen)) {
+                if (normBitLen(x, xNormLen) <= normBitLen(y, yNormLen)) {
                     val cmp = compare(x, xNormLen, y, yNormLen)
                     return when {
                         cmp < 0 && !applyModRingNormalization -> x.copyOf(xNormLen)
@@ -2090,8 +2102,8 @@ internal object Mago {
             // note that this will handle aliasing
             // when x === yMeta,yMagia
             xNormLen == yNormLen -> {
-                val xBitLen = bitLen(xMagia, xNormLen)
-                val yBitLen = bitLen(yMagia, yNormLen)
+                val xBitLen = normBitLen(xMagia, xNormLen)
+                val yBitLen = normBitLen(yMagia, yNormLen)
                 if (xBitLen < yBitLen) {
                     xMagia.copyInto(zMagia, 0, 0, xNormLen)
                     return xNormLen

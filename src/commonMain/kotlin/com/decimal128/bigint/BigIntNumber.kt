@@ -413,7 +413,7 @@ sealed class BigIntNumber(
      *
      * Equivalent to the number of bits required to represent the absolute value.
      */
-    fun magnitudeBitLen() = Mago.bitLen(magia, meta.normLen)
+    fun magnitudeBitLen() = Mago.normBitLen(magia, meta.normLen)
 
     /**
      * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
