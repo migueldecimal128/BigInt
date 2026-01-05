@@ -20,22 +20,22 @@ import kotlin.random.Random
  *   so that they produce correct signed results when a primitive appears on the left-hand side.
  */
 operator fun Int.plus(other: BigInt) =
-    other.addImpl(signFlipThis = false, this < 0, this.absoluteValue.toUInt().toULong())
+    other.addImpl64(signFlipThis = false, this < 0, this.absoluteValue.toUInt().toULong())
 operator fun UInt.plus(other: BigInt) =
-    other.addImpl(signFlipThis = false, false, this.toULong())
+    other.addImpl64(signFlipThis = false, false, this.toULong())
 operator fun Long.plus(other: BigInt) =
-    other.addImpl(signFlipThis = false, this < 0, this.absoluteValue.toULong())
+    other.addImpl64(signFlipThis = false, this < 0, this.absoluteValue.toULong())
 operator fun ULong.plus(other: BigInt) =
-    other.addImpl(signFlipThis = false, false, this)
+    other.addImpl64(signFlipThis = false, false, this)
 
 operator fun Int.minus(other: BigInt) =
-    other.addImpl(signFlipThis = true, this < 0, this.absoluteValue.toUInt().toULong())
+    other.addImpl64(signFlipThis = true, this < 0, this.absoluteValue.toUInt().toULong())
 operator fun UInt.minus(other: BigInt) =
-    other.addImpl(signFlipThis = true, false, this.toULong())
+    other.addImpl64(signFlipThis = true, false, this.toULong())
 operator fun Long.minus(other: BigInt) =
-    other.addImpl(signFlipThis = true, this < 0L, this.absoluteValue.toULong())
+    other.addImpl64(signFlipThis = true, this < 0L, this.absoluteValue.toULong())
 operator fun ULong.minus(other: BigInt) =
-    other.addImpl(signFlipThis = true, false, this)
+    other.addImpl64(signFlipThis = true, false, this)
 
 operator fun Int.times(other: BigInt) = other.times(this)
 operator fun UInt.times(other: BigInt) = other.times(this)

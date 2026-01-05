@@ -1061,23 +1061,23 @@ class BigInt private constructor(
 
     operator fun plus(other: BigIntNumber): BigInt = this.addImpl(false, other)
     operator fun plus(n: Int): BigInt =
-        this.addImpl(signFlipThis = false, n < 0, n.absoluteValue.toUInt().toULong())
+        this.addImpl64(signFlipThis = false, n < 0, n.absoluteValue.toUInt().toULong())
     operator fun plus(w: UInt): BigInt =
-        this.addImpl(signFlipThis = false, false, w.toULong())
+        this.addImpl64(signFlipThis = false, false, w.toULong())
     operator fun plus(l: Long): BigInt =
-        this.addImpl(signFlipThis = false, l < 0, l.absoluteValue.toULong())
+        this.addImpl64(signFlipThis = false, l < 0, l.absoluteValue.toULong())
     operator fun plus(dw: ULong): BigInt =
-        this.addImpl(signFlipThis = false, false, dw)
+        this.addImpl64(signFlipThis = false, false, dw)
 
     operator fun minus(other: BigIntNumber): BigInt = this.addImpl(true, other)
     operator fun minus(n: Int): BigInt =
-        this.addImpl(signFlipThis = false, n >= 0, n.absoluteValue.toUInt().toULong())
+        this.addImpl64(signFlipThis = false, n >= 0, n.absoluteValue.toUInt().toULong())
     operator fun minus(w: UInt): BigInt =
-        this.addImpl(signFlipThis = false, true, w.toULong())
+        this.addImpl64(signFlipThis = false, true, w.toULong())
     operator fun minus(l: Long): BigInt =
-        this.addImpl(signFlipThis = false, l >= 0, l.absoluteValue.toULong())
+        this.addImpl64(signFlipThis = false, l >= 0, l.absoluteValue.toULong())
     operator fun minus(dw: ULong): BigInt =
-        this.addImpl(signFlipThis = false, true, dw)
+        this.addImpl64(signFlipThis = false, true, dw)
 
     operator fun times(other: BigIntNumber): BigInt = mulImpl(other)
 
@@ -1495,7 +1495,7 @@ class BigInt private constructor(
      * @param dw the ULong operand
      * @return a new BigInt representing the result
      */
-    fun addImpl(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
+    fun addImpl64(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
         val thisSign = this.meta.signFlag xor signFlipThis
         when {
             dw == 0uL && signFlipThis -> return this.negate()
@@ -1503,7 +1503,7 @@ class BigInt private constructor(
             this.isZero() -> return from(otherSign, dw)
             thisSign == otherSign -> {
                 ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
-                return fromNonNormalizedNonZero(thisSign, Mago.newAdd(this.magia, this.meta.normLen, dw))
+                return fromNonNormalizedNonZero(thisSign, Mago.newAdd64(this.magia, this.meta.normLen, dw))
             }
         }
         val cmp = this.magnitudeCompareTo(dw)

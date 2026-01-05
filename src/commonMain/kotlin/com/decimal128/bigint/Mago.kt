@@ -345,7 +345,7 @@ internal object Mago {
      *
      * The result is extended as needed to hold any carry or sign extension from the addition.
      */
-    fun newAdd(x: Magia, xNormLen: Int, dw: ULong): Magia {
+    fun newAdd64(x: Magia, xNormLen: Int, dw: ULong): Magia {
         verify { isNormalized(x, xNormLen) }
         val dwBitLen = 64 - dw.countLeadingZeroBits()
         val newBitLen = max(normBitLen(x, xNormLen), dwBitLen) + 1
@@ -360,6 +360,22 @@ internal object Mago {
             z[xNormLen] = carry.toInt()
         if (carry shr 32 != 0uL)
             z[xNormLen + 1] = (carry shr 32).toInt()
+        return z
+    }
+
+    fun newAdd32(x: Magia, xNormLen: Int, w: UInt): Magia {
+        verify { isNormalized(x, xNormLen) }
+        val wBitLen = 32 - w.countLeadingZeroBits()
+        val newBitLen = max(normBitLen(x, xNormLen), wBitLen) + 1
+        val z = newWithBitLen(newBitLen)
+        var carry = w.toULong()
+        for (i in 0..<xNormLen) {
+            carry += dw32(x[i])
+            z[i] = carry.toInt()
+            carry = carry shr 32
+        }
+        if (xNormLen < z.size)
+            z[xNormLen] = carry.toInt()
         return z
     }
 
