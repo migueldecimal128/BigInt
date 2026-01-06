@@ -344,67 +344,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new limb array representing [x] plus the unsigned 32-bit value [w].
-     */
-
-    inline fun newAdd32(x: Magia, xNormLen: Int, w: UInt): Magia {
-        val ws = w.toInt()
-        if (xNormLen > 0 && xNormLen <= x.size) {
-            verify { isNormalized(x, xNormLen) }
-            val wBitLen = 32 - ws.countLeadingZeroBits()
-            val newBitLen = max(normBitLen(x, xNormLen), wBitLen) + 1
-            val z = newWithBitLen(newBitLen)
-            //val z = IntArray(xNormLen + 1)
-            var carry = ws.toDws()
-            var i = 0
-            while (i < xNormLen) {
-                carry += x[i].toDws()
-                z[i] = carry.toInt()
-                carry = carry ushr 32
-                ++i
-            }
-            if (i < z.size)
-                z[i] = carry.toInt()
-            return z
-        }
-        if (xNormLen == 0) {
-            if (ws != 0)
-                return intArrayOf(ws)
-            return ZERO
-        }
-        throw IllegalArgumentException()
-    }
-
-    /**
-     * Returns a new limb array representing [x] plus the unsigned 64-bit value [dw].
-     */
-    inline fun newAdd64(x: Magia, xNormLen: Int, dw: ULong): Magia {
-        val dws = dw.toLong()
-        if (xNormLen <= x.size) {
-            verify { isNormalized(x, xNormLen) }
-            val dwBitLen = 64 - dws.countLeadingZeroBits()
-            val newBitLen = max(normBitLen(x, xNormLen), dwBitLen) + 1
-            val z = newWithBitLen(newBitLen)
-            var carry = dws
-            var i = 0
-            while (i < xNormLen) {
-                val t = x[i].toDws() + (carry and MASK32L)
-                z[i] = t.toInt()
-                carry = (t ushr 32) + (carry ushr 32)
-                ++i
-            }
-            if (i < z.size) {
-                z[i] = carry.toInt()
-                ++i
-                if (i < z.size)
-                    z[i] = (carry ushr 32).toInt()
-            }
-            return z
-        }
-        throw IllegalArgumentException()
-    }
-
-    /**
      * Returns a new limb array representing the sum of [x] and [y].
      *
      * The result will sometimes be not normalized.
@@ -1292,6 +1231,12 @@ internal object Mago {
             return (xLen shl 5) - lastLimb.countLeadingZeroBits()
         }
         return 0
+    }
+
+    internal inline fun nonZeroNormBitLen(x: Magia, xLen: Int): Int {
+        val lastLimb = x[xLen - 1]
+        verify { lastLimb != 0 }
+        return (xLen shl 5) - lastLimb.countLeadingZeroBits()
     }
 
     /**

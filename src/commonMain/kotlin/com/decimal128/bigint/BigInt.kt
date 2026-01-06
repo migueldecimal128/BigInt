@@ -7,6 +7,8 @@ package com.decimal128.bigint
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
+import com.decimal128.bigint.Mago.newWithBitLen
+import com.decimal128.bigint.Mago.normBitLen
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
@@ -89,6 +91,16 @@ class BigInt private constructor(
             return BigInt(Meta(sign, magia.size), magia)
         }
 
+        internal fun fromNormalizedNonZero(magia: Magia, normLen: Int): BigInt {
+            verify { magia.isNotEmpty() && validateNormLenAndInjectPoison(magia, normLen) }
+            return BigInt(Meta(normLen), magia)
+        }
+
+        internal fun fromNormalizedNonZero(sign: Boolean, magia: Magia, normLen: Int): BigInt {
+            verify { magia.isNotEmpty() && validateNormLenAndInjectPoison(magia, normLen) }
+            return BigInt(Meta(sign, normLen), magia)
+        }
+
         internal fun fromNormalizedOrZero(magia: Magia): BigInt =
             fromNormalizedOrZero(false, magia)
 
@@ -102,10 +114,10 @@ class BigInt private constructor(
             return BigInt(Meta(sign, magia.size), magia)
         }
 
-        internal fun fromNonNormalizedNonZero(magia: Magia): BigInt =
-            fromNonNormalizedNonZero(false, magia)
+        internal fun fromNonNormalizedManyNonZero(magia: Magia): BigInt =
+            fromNonNormalizedManyNonZero(false, magia)
 
-        internal fun fromNonNormalizedNonZero(sign: Boolean, magia: Magia): BigInt {
+        internal fun fromNonNormalizedManyNonZero(sign: Boolean, magia: Magia): BigInt {
             val normLen = Mago.normLen(magia)
             verify { normLen > 0 }
             verify { validateNormLenAndInjectPoison(magia, normLen) }
@@ -585,7 +597,7 @@ class BigInt private constructor(
                     val sign = withRandomSign && rng.nextBoolean()
                     if (zeroTest != 0) {
                         ++BI_OP_COUNTS[BI_CONSTRUCT_RANDOM.ordinal]
-                        return fromNonNormalizedNonZero(sign, magia)
+                        return fromNonNormalizedManyNonZero(sign, magia)
                     }
                     return ZERO
                 }
@@ -1255,7 +1267,7 @@ class BigInt private constructor(
      */
     fun sqr(): BigInt {
         if (this.isNotZero())
-            return fromNonNormalizedNonZero(Mago.newSqr(this.magia, this.meta.normLen))
+            return fromNonNormalizedManyNonZero(Mago.newSqr(this.magia, this.meta.normLen))
         return ZERO
     }
 
@@ -1322,7 +1334,7 @@ class BigInt private constructor(
                     limb or isolatedBit
                 else
                     limb and isolatedBit.inv()
-            return fromNonNormalizedNonZero(this.meta.signFlag, magia)
+            return fromNonNormalizedManyNonZero(this.meta.signFlag, magia)
         }
         throw IllegalArgumentException()
     }
@@ -1509,9 +1521,15 @@ class BigInt private constructor(
      */
     fun addImpl32(otherSign: Boolean, w: UInt): BigInt {
         val thisSign = this.meta.signFlag
-        if (thisSign == otherSign && w != 0u) {
-            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
-            return fromNonNormalized1NonZero(thisSign, Mago.newAdd32(this.magia, this.meta.normLen, w))
+        val thisNormLen = this.meta.normLen
+        if (thisNormLen > 0 && thisSign == otherSign && w != 0u) {
+            BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal] += 1
+            val wBitLen = 32 - w.countLeadingZeroBits()
+            val thisBitLen = Mago.nonZeroNormBitLen(magia, thisNormLen)
+            val newBitLen = max(thisBitLen, wBitLen) + 1
+            val z = newWithBitLen(newBitLen)
+            return fromNormalizedNonZero(thisSign, z,
+                Mago.setAdd32(z, this.magia, thisNormLen, w))
         }
         if (w == 0u)
             return this
@@ -1528,9 +1546,15 @@ class BigInt private constructor(
      */
     fun addImpl64(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
         val thisSign = this.meta.signFlag xor signFlipThis
-        if (thisSign == otherSign && dw != 0uL) {
-            BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal] += 1
-            return fromNonNormalizedNonZero(thisSign, Mago.newAdd64(this.magia, this.meta.normLen, dw))
+        val thisNormLen = this.meta.normLen
+        if (thisNormLen > 0 && thisSign == otherSign && dw != 0uL) {
+            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
+            val dwBitLen = 64 - dw.countLeadingZeroBits()
+            val thisBitLen = Mago.nonZeroNormBitLen(magia, thisNormLen)
+            val newBitLen = max(thisBitLen, dwBitLen) + 1
+            val z = newWithBitLen(newBitLen)
+            return fromNormalizedNonZero(thisSign, z,
+                Mago.setAdd64(z, this.magia, thisNormLen, dw))
         }
         if (dw == 0uL)
             return if (signFlipThis) this.negate() else this
@@ -1543,7 +1567,7 @@ class BigInt private constructor(
         if (cmp != 0) {
             ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
             return if (cmp > 0) {
-                fromNonNormalizedNonZero(thisSign, Mago.newSub32(this.magia, this.meta.normLen, w))
+                fromNonNormalizedManyNonZero(thisSign, Mago.newSub32(this.magia, this.meta.normLen, w))
             } else {
                 val thisMag = this.toULongMagnitude().toUInt()
                 val diff = w - thisMag
@@ -1560,7 +1584,7 @@ class BigInt private constructor(
         if (cmp != 0) {
             ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
             return if (cmp > 0) {
-                fromNonNormalizedNonZero(thisSign, Mago.newSub64(this.magia, this.meta.normLen, dw))
+                fromNonNormalizedManyNonZero(thisSign, Mago.newSub64(this.magia, this.meta.normLen, dw))
             } else {
                 val thisMag = this.toULongMagnitude()
                 val diff = dw - thisMag
@@ -1587,7 +1611,7 @@ class BigInt private constructor(
             this.isZero() -> other.toBigInt()
             this.meta.signFlag == otherSign -> {
                 ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
-                return BigInt.fromNonNormalizedNonZero(
+                return BigInt.fromNonNormalizedManyNonZero(
                     this.meta.signFlag,
                     Mago.newAdd(
                         this.magia, this.meta.normLen,
@@ -1600,10 +1624,10 @@ class BigInt private constructor(
         if (cmp != 0) {
             return if (cmp > 0) {
                 ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
-                fromNonNormalizedNonZero(this.meta.signFlag,
+                fromNonNormalizedManyNonZero(this.meta.signFlag,
                     Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
             } else {
-                fromNonNormalizedNonZero(otherSign,
+                fromNonNormalizedManyNonZero(otherSign,
                     Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
             }
         }
@@ -1613,7 +1637,7 @@ class BigInt private constructor(
     fun mulImpl32(dwSign: Boolean, w: UInt): BigInt {
         return if (!isZero() && w != 0u) {
             ++BI_OP_COUNTS[BI_MUL_PRIMITIVE.ordinal]
-            fromNonNormalizedNonZero(
+            fromNonNormalizedManyNonZero(
                 this.meta.signFlag xor dwSign,
                 Mago.newMul32(this.magia, this.meta.normLen, w)
             )
@@ -1623,7 +1647,7 @@ class BigInt private constructor(
     fun mulImpl(dwSign: Boolean, dw: ULong): BigInt {
         return if (!isZero() && dw != 0uL) {
             ++BI_OP_COUNTS[BI_MUL_PRIMITIVE.ordinal]
-            fromNonNormalizedNonZero(
+            fromNonNormalizedManyNonZero(
                 this.meta.signFlag xor dwSign,
                 Mago.newMul64(this.magia, this.meta.normLen, dw)
             )
@@ -1633,7 +1657,7 @@ class BigInt private constructor(
     fun mulImpl(other: BigIntNumber): BigInt {
         return if (!isZero() && !other.isZero()) {
             ++BI_OP_COUNTS[BI_MUL_BI.ordinal]
-            fromNonNormalizedNonZero(
+            fromNonNormalizedManyNonZero(
                 meta.signFlag xor other.meta.signFlag,
                 Mago.newMul(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
             )
@@ -1647,7 +1671,7 @@ class BigInt private constructor(
             val q = Mago.newDiv(magia, meta.normLen, dw)
             if (q !== Mago.ZERO) {
                 ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
-                return fromNonNormalizedNonZero(this.meta.signFlag xor dwSign, q)
+                return fromNonNormalizedManyNonZero(this.meta.signFlag xor dwSign, q)
             }
         }
         return ZERO
@@ -1660,7 +1684,7 @@ class BigInt private constructor(
             val q = Mago.newDiv(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
             if (q !== Mago.ZERO) {
                 ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
-                return fromNonNormalizedNonZero(this.meta.signFlag xor other.meta.signFlag, q)
+                return fromNonNormalizedManyNonZero(this.meta.signFlag xor other.meta.signFlag, q)
             }
         }
         return ZERO
@@ -1690,7 +1714,7 @@ class BigInt private constructor(
                 other.magia, other.meta.normLen)
             if (r !== Mago.ZERO) {
                 ++BI_OP_COUNTS[BI_DIV_BI.ordinal]
-                return fromNonNormalizedNonZero(!isMod && meta.isNegative, r)
+                return fromNonNormalizedManyNonZero(!isMod && meta.isNegative, r)
             }
         }
         return ZERO
