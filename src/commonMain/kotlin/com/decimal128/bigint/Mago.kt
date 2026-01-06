@@ -2371,28 +2371,29 @@ internal object Mago {
             }
 
             // multiply & subtract
-            var carry = 0uL
+            var carry = 0L
+            val dwsQhat = qhat.toLong()
             for (i in 0 until n) {
-                val prod = qhat * dw32(vn[i])
-                val prodHi = prod shr 32
-                val prodLo = prod and MASK32
-                val unIJ = dw32(un[j + i])
+                val prod = dwsQhat * vn[i].toDws()
+                val prodHi = prod ushr 32
+                val prodLo = prod and MASK32L
+                val unIJ = un[j + i].toDws()
                 val t = unIJ - prodLo - carry
                 un[j + i] = t.toInt()
-                carry = prodHi - (t.toLong() shr 32).toULong() // yes, this is a signed shift right
+                carry = prodHi - (t shr 32) // yes, this is a signed shift right
             }
-            val t = dw32(un[jn]) - carry
+            val t = un[jn].toDws() - carry
             un[jn] = t.toInt()
             if (q != null) {
-                val borrow = t shr 63
-                q[j] = (qhat - borrow).toInt()
+                val borrow = t ushr 63
+                q[j] = (dwsQhat - borrow).toInt()
             }
-            if (t.toLong() < 0L) {
-                var c2 = 0uL
+            if (t < 0L) {
+                var c2 = 0L
                 for (i in 0 until n) {
-                    val sum = dw32(un[j + i]) + dw32(vn[i]) + c2
+                    val sum = un[j + i].toDws() + vn[i].toDws() + c2
                     un[j + i] = sum.toInt()
-                    c2 = sum shr 32
+                    c2 = sum ushr 32
                 }
                 un[j + n] += c2.toInt()
             }
