@@ -1793,6 +1793,7 @@ internal object Mago {
             val q = z
             val r = null
             val qNormLen = knuthDivide64(q, r, u, vnDw, m, unBuf).toInt()
+            verify { isNormalized(z, qNormLen) }
             return qNormLen
         }
         throw IllegalArgumentException()
@@ -1860,30 +1861,41 @@ internal object Mago {
     fun calcRem32(x: Magia, xNormLen: Int, w: UInt): UInt {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             verify { isNormalized(x, xNormLen) }
+            val ws = w.toInt()
             when {
-                w == 0u -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
-                xNormLen <= 2 -> return when {
-                    xNormLen == 2 -> {
-                        val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
+                ws == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+                xNormLen <= 2 -> return when (xNormLen) {
+                    2 -> {
+                        val xDw = ((x[1].toLong() shl 32) or x[0].toDws()).toULong()
                         (xDw % w.toULong()).toUInt()
                     }
-
-                    xNormLen == 1 -> x[0].toUInt() % w
+                    1 -> x[0].toUInt() % w
                     else -> 0u
                 }
 
                 w.countOneBits() == 1 ->
-                    return x[0].toUInt() and ((1u shl w.countTrailingZeroBits()) - 1u)
+                    return (x[0] and ((1 shl ws.countTrailingZeroBits()) - 1)).toUInt()
             }
 
-            val dw = w.toULong()
-            var carry = 0uL
-            for (i in xNormLen - 1 downTo 0) {
-                val t = (carry shl 32) + dw32(x[i])
-                val r = t % dw
-                carry = r
+            if (ws >= 0) {
+                val dws = ws.toLong()
+                var carry = 0L
+                for (i in xNormLen - 1 downTo 0) {
+                    val t = (carry shl 32) + x[i].toDws()
+                    val r = t % dws
+                    carry = r
+                }
+                return carry.toUInt()
+            } else {
+                val dw = w.toULong()
+                var carry = 0uL
+                for (i in xNormLen - 1 downTo 0) {
+                    val t = (carry shl 32) + dw32(x[i])
+                    val r = t % dw
+                    carry = r
+                }
+                return carry.toUInt()
             }
-            return carry.toUInt()
         }
         throw IllegalArgumentException()
     }
@@ -1893,13 +1905,12 @@ internal object Mago {
             verify { isNormalized(x, xNormLen) }
             when {
                 (dw shr 32) == 0uL -> return calcRem32(x, xNormLen, dw.toUInt()).toULong()
-                xNormLen <= 2 -> return when {
-                    xNormLen == 2 -> {
-                        val xDw = (x[1].toULong() shl 32) or x[0].toUInt().toULong()
+                xNormLen <= 2 -> return when (xNormLen) {
+                    2 -> {
+                        val xDw = ((x[1].toLong() shl 32) or x[0].toDws()).toULong()
                         xDw % dw
                     }
-
-                    xNormLen == 1 -> x[0].toUInt().toULong()
+                    1 -> x[0].toUInt().toULong()
                     else -> 0uL
                 }
 
@@ -2039,7 +2050,8 @@ internal object Mago {
             val qNormLen = knuthDivide(q, r, u, v, m, n, xTmp, yTmp)
             return qNormLen
         }
-        val vDw: ULong = (v[1].toULong() shl 32) or (v[0].toUInt().toULong())
+        verify { yNormLen == 2 }
+        val vDw: ULong = ((v[1].toLong() shl 32) or v[0].toDws()).toULong()
         val qNormLen = knuthDivide64(q, r, u, vDw, m, xTmp).toInt()
         return qNormLen
     }
@@ -2240,7 +2252,8 @@ internal object Mago {
             val rNormLen = knuthDivide(q = null, r, u, v, m, n, xTmp, yTmp)
             return rNormLen
         }
-        val vDw: ULong = (v[1].toULong() shl 32) or (v[0].toUInt().toULong())
+        verify { yNormLen == 2 }
+        val vDw: ULong = ((v[1].toLong() shl 32) or v[0].toDws()).toULong()
         val rNormLen = knuthDivide64(q = null, r, u, vDw, m, xTmp).toInt()
         return rNormLen
     }
