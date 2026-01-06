@@ -834,32 +834,33 @@ internal object Mago {
         if (xNormLen >= 0 && xNormLen <= x.size) {
             verify { isNormalized(x, xNormLen) }
             if (xNormLen > 0 && dw.countOneBits() > 1) {
-                val lo = dw and MASK32
-                val hi = dw shr 32
+                val dws = dw.toLong()
+                val lo = dws and MASK32L
+                val hi = dws ushr 32
 
-                var ppPrevHi = 0uL
+                var ppPrevHi = 0L
 
                 var i = 0
                 while (i < xNormLen) {
-                    val xi = dw32(x[i])
+                    val xi = x[i].toDws()
 
-                    val pp = xi * lo + (ppPrevHi and MASK32)
+                    val pp = xi * lo + (ppPrevHi and MASK32L)
                     z[i] = pp.toInt()
 
-                    ppPrevHi = xi * hi + (ppPrevHi shr 32) + (pp shr 32)
+                    ppPrevHi = xi * hi + (ppPrevHi ushr 32) + (pp ushr 32)
                     ++i
                 }
-                if (ppPrevHi != 0uL && i < z.size) {
+                if (ppPrevHi != 0L && i < z.size) {
                     z[i] = ppPrevHi.toInt()
-                    ppPrevHi = ppPrevHi shr 32
+                    ppPrevHi = ppPrevHi ushr 32
                     ++i
+                    if (ppPrevHi != 0L && i < z.size) {
+                        z[i] = ppPrevHi.toInt()
+                        ppPrevHi = ppPrevHi ushr 32
+                        ++i
+                    }
                 }
-                if (ppPrevHi != 0uL && i < z.size) {
-                    z[i] = ppPrevHi.toInt()
-                    ppPrevHi = ppPrevHi shr 32
-                    ++i
-                }
-                if (ppPrevHi == 0uL) {
+                if (ppPrevHi == 0L) {
                     verify { isNormalized(z, i) }
                     return i
                 }
@@ -895,7 +896,7 @@ internal object Mago {
         val xBitLen = normBitLen(x, xNormLen)
         val yBitLen = normBitLen(y, yNormLen)
         val z = newWithBitLen(xBitLen + yBitLen)
-        val zNormLen = setMul(z, x, limbLenFromBitLen(xBitLen), y, limbLenFromBitLen(yBitLen))
+        val zNormLen = setMul(z, x, xNormLen, y, yNormLen)
         verify { isNormalized(z, zNormLen) }
         return z
     }
@@ -938,17 +939,17 @@ internal object Mago {
             // higher limbs will be written before read
             z.fill(0, 0, largoLen)
             for (i in 0..<cortoLen) {
-                val cortoLimb = dw32(corto[i])
-                var carry = 0uL
+                val cortoLimb = corto[i].toDws()
+                var carry = 0L
                 for (j in 0..<largoLen) {
-                    val largoLimb = dw32(largo[j])
-                    carry = cortoLimb * largoLimb + dw32(z[i + j]) + carry
+                    val largoLimb = largo[j].toDws()
+                    carry += cortoLimb * largoLimb + z[i + j].toDws()
                     z[i + j] = carry.toInt()
-                    carry = carry shr 32
+                    carry = carry ushr 32
                 }
                 if (i + largoLen < z.size)
                     z[i + largoLen] = carry.toInt()
-                else if (carry != 0uL)
+                else if (carry != 0L)
                     throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
             }
             var lastIndex = cortoLen + largoLen - 1
@@ -965,7 +966,7 @@ internal object Mago {
     /**
      * Powers of 10 from 10⁰ through 10⁹.
      *
-     * Used for fast small-power decimal scaling.
+     * Used for fast small-power decimal scaling during parsing.
      */
     private val POW10 = IntArray(10)
     init {
@@ -998,12 +999,12 @@ internal object Mago {
      */
     fun mutateFmaPow10(x: Magia, xLen: Int, pow10: Int, a: UInt) {
         if (pow10 in 0..9) {
-            val m64 = POW10[pow10].toULong()
-            var carry = a.toULong()
+            val m64 = POW10[pow10]
+            var carry = a.toLong()
             for (i in 0..<xLen) {
-                val t = dw32(x[i]) * m64 + carry
-                x[i] = t.toInt()
-                carry = t shr 32
+                carry += x[i].toDws() * m64
+                x[i] = carry.toInt()
+                carry = carry ushr 32
             }
         } else {
             throw IllegalArgumentException()
@@ -1694,10 +1695,10 @@ internal object Mago {
         verify { isNormalized(y, yNormLen) }
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
             if (xNormLen != yNormLen)
-                return if (xNormLen > yNormLen) 1 else -1
+                return ((xNormLen - yNormLen) shr 31) or 1 // does this really have to be -1 ?
             for (i in xNormLen - 1 downTo 0) {
                 if (x[i] != y[i])
-                    return ((dw32(x[i]) - dw32(y[i])).toLong() shr 63).toInt() or 1
+                    return ((x[i].toDws() - y[i].toDws()) shr 63).toInt() or 1
             }
             return 0
         } else {
