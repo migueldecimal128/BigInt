@@ -1733,21 +1733,36 @@ internal object Mago {
      */
     fun setDiv32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen) {
+            val ws = w.toInt()
             verify { isNormalized(x, xNormLen) }
             when {
-                w == 0u -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+                ws == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
                 xNormLen == 0 -> return 0
-                w.countOneBits() == 1 ->
-                    return setShiftRight(z, x, xNormLen, w.countTrailingZeroBits())
+                ws.countOneBits() == 1 ->
+                    return setShiftRight(z, x, xNormLen, ws.countTrailingZeroBits())
             }
-            val dw = w.toULong()
-            var carry = 0uL
-            for (i in xNormLen - 1 downTo 0) {
-                val t = (carry shl 32) + dw32(x[i])
-                val q = t / dw
-                val r = t % dw
-                z[i] = q.toInt()
-                carry = r
+            if (ws >= 0) {
+                // Fast path: signed division gives the same results
+                val dws = ws.toLong()
+                var carry = 0L
+                for (i in xNormLen - 1 downTo 0) {
+                    val t = (carry shl 32) + x[i].toDws()
+                    val q = t / dws
+                    val r = t % dws
+                    z[i] = q.toInt()
+                    carry = r
+                }
+            } else {
+                // Slow path: unsigned division ... requires sign-bit correction on jvm
+                val dw = w.toULong()
+                var carry = 0uL
+                for (i in xNormLen - 1 downTo 0) {
+                    val t = (carry shl 32) + dw32(x[i])
+                    val q = t / dw
+                    val r = t % dw
+                    z[i] = q.toInt()
+                    carry = r
+                }
             }
             val zNormLen = xNormLen - if (z[xNormLen - 1] == 0) 1 else 0
             verify { isNormalized(z, zNormLen) }
