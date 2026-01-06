@@ -158,6 +158,11 @@ class BigInt private constructor(
             BigInt(Meta(false, 1), intArrayOf(w.toInt()))
         } else ZERO
 
+        fun from(sign: Boolean, w: UInt) = if (w != 0u) {
+            ++BI_OP_COUNTS[BI_CONSTRUCT_32.ordinal]
+            BigInt(Meta(sign, 1), intArrayOf(w.toInt()))
+        } else ZERO
+
         /**
          * Converts a 64-bit signed [Long] into a signed [BigInt].
          *
@@ -1061,9 +1066,9 @@ class BigInt private constructor(
 
     operator fun plus(other: BigIntNumber): BigInt = this.addImpl(false, other)
     operator fun plus(n: Int): BigInt =
-        this.addImpl64(signFlipThis = false, n < 0, n.absoluteValue.toUInt().toULong())
+        this.addImpl32(n < 0, n.absoluteValue.toUInt())
     operator fun plus(w: UInt): BigInt =
-        this.addImpl64(signFlipThis = false, false, w.toULong())
+        this.addImpl32(false, w)
     operator fun plus(l: Long): BigInt =
         this.addImpl64(signFlipThis = false, l < 0, l.absoluteValue.toULong())
     operator fun plus(dw: ULong): BigInt =
@@ -1071,9 +1076,9 @@ class BigInt private constructor(
 
     operator fun minus(other: BigIntNumber): BigInt = this.addImpl(true, other)
     operator fun minus(n: Int): BigInt =
-        this.addImpl64(signFlipThis = false, n >= 0, n.absoluteValue.toUInt().toULong())
+        this.addImpl32(n >= 0, n.absoluteValue.toUInt())
     operator fun minus(w: UInt): BigInt =
-        this.addImpl64(signFlipThis = false, true, w.toULong())
+        this.addImpl32(true, w)
     operator fun minus(l: Long): BigInt =
         this.addImpl64(signFlipThis = false, l >= 0, l.absoluteValue.toULong())
     operator fun minus(dw: ULong): BigInt =
@@ -1488,6 +1493,24 @@ class BigInt private constructor(
 
 
     /**
+     * Internal helper for addition or subtraction with a UInt operand.
+     *
+     * @param otherSign the sign of the ULong operand
+     * @param w the UInt operand
+     * @return a new BigInt representing the result
+     */
+    fun addImpl32(otherSign: Boolean, w: UInt): BigInt {
+        val thisSign = this.meta.signFlag
+        if (thisSign == otherSign && w != 0u) {
+            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
+            return fromNonNormalizedNonZero(thisSign, Mago.newAdd32(this.magia, this.meta.normLen, w))
+        }
+        if (w == 0u)
+            return this
+        return subImpl32(otherSign, w)
+    }
+
+    /**
      * Internal helper for addition or subtraction with a ULong operand.
      *
      * @param signFlipThis true to flip the sign of this BigInt before operation
@@ -1497,20 +1520,39 @@ class BigInt private constructor(
      */
     fun addImpl64(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
         val thisSign = this.meta.signFlag xor signFlipThis
-        when {
-            dw == 0uL && signFlipThis -> return this.negate()
-            dw == 0uL -> return this
-            this.isZero() -> return from(otherSign, dw)
-            thisSign == otherSign -> {
-                ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
-                return fromNonNormalizedNonZero(thisSign, Mago.newAdd64(this.magia, this.meta.normLen, dw))
+        if (thisSign == otherSign && dw != 0uL) {
+            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
+            return fromNonNormalizedNonZero(thisSign, Mago.newAdd64(this.magia, this.meta.normLen, dw))
+        }
+        if (dw == 0uL)
+            return if (signFlipThis) this.negate() else this
+        return subImpl64(signFlipThis, otherSign, dw)
+    }
+
+    fun subImpl32(otherSign: Boolean, w: UInt): BigInt {
+        val thisSign = this.meta.signFlag
+        val cmp = this.magnitudeCompareTo(w)
+        if (cmp != 0) {
+            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
+            return if (cmp > 0) {
+                fromNonNormalizedNonZero(thisSign, Mago.newSub32(this.magia, this.meta.normLen, w))
+            } else {
+                val thisMag = this.toULongMagnitude().toUInt()
+                val diff = w - thisMag
+                --BI_OP_COUNTS[BI_CONSTRUCT_64.ordinal] // do not double count
+                from(otherSign, diff)
             }
         }
+        return ZERO
+    }
+
+    fun subImpl64(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
+        val thisSign = this.meta.signFlag xor signFlipThis
         val cmp = this.magnitudeCompareTo(dw)
         if (cmp != 0) {
             ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
             return if (cmp > 0) {
-                fromNonNormalizedNonZero(thisSign, Mago.newSub(this.magia, this.meta.normLen, dw))
+                fromNonNormalizedNonZero(thisSign, Mago.newSub64(this.magia, this.meta.normLen, dw))
             } else {
                 val thisMag = this.toULongMagnitude()
                 val diff = dw - thisMag

@@ -114,7 +114,14 @@ kotlin {
     }
 
     // Uncomment the commented targets
-    macosX64()
+    macosX64 {
+        compilations.named("test") {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-opt")
+            }
+        }
+    }
+
     linuxX64()
 
 // Configure cinterop for ALL native targets

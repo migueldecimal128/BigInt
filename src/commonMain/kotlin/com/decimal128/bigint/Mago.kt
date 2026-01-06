@@ -341,42 +341,57 @@ internal object Mago {
     }
 
     /**
-     * Returns a new limb array representing [x] plus the unsigned 64-bit value [dw].
-     *
-     * The result is extended as needed to hold any carry or sign extension from the addition.
+     * Returns a new limb array representing [x] plus the unsigned 32-bit value [w].
      */
-    fun newAdd64(x: Magia, xNormLen: Int, dw: ULong): Magia {
-        verify { isNormalized(x, xNormLen) }
-        val dwBitLen = 64 - dw.countLeadingZeroBits()
-        val newBitLen = max(normBitLen(x, xNormLen), dwBitLen) + 1
-        val z = newWithBitLen(newBitLen)
-        var carry = dw
-        for (i in 0..<xNormLen) {
-            val t = dw32(x[i]) + (carry and MASK32)
-            z[i] = t.toInt()
-            carry = (t shr 32) + (carry shr 32)
+
+    inline fun newAdd32(x: Magia, xNormLen: Int, w: UInt): Magia {
+        if (xNormLen <= x.size) {
+            verify { isNormalized(x, xNormLen) }
+            val wBitLen = 32 - w.countLeadingZeroBits()
+            val newBitLen = max(normBitLen(x, xNormLen), wBitLen) + 1
+            val z = newWithBitLen(newBitLen)
+            //val z = IntArray(xNormLen + 1)
+            var carry = w.toULong()
+            var i = 0
+            while (i < xNormLen) {
+                carry += dw32(x[i])
+                z[i] = carry.toInt()
+                carry = carry shr 32
+                ++i
+            }
+            if (i < z.size)
+                z[i] = carry.toInt()
+            return z
         }
-        if (carry != 0uL)
-            z[xNormLen] = carry.toInt()
-        if (carry shr 32 != 0uL)
-            z[xNormLen + 1] = (carry shr 32).toInt()
-        return z
+        throw IllegalArgumentException()
     }
 
-    fun newAdd32(x: Magia, xNormLen: Int, w: UInt): Magia {
-        verify { isNormalized(x, xNormLen) }
-        val wBitLen = 32 - w.countLeadingZeroBits()
-        val newBitLen = max(normBitLen(x, xNormLen), wBitLen) + 1
-        val z = newWithBitLen(newBitLen)
-        var carry = w.toULong()
-        for (i in 0..<xNormLen) {
-            carry += dw32(x[i])
-            z[i] = carry.toInt()
-            carry = carry shr 32
+    /**
+     * Returns a new limb array representing [x] plus the unsigned 64-bit value [dw].
+     */
+    inline fun newAdd64(x: Magia, xNormLen: Int, dw: ULong): Magia {
+        if (xNormLen <= x.size) {
+            verify { isNormalized(x, xNormLen) }
+            val dwBitLen = 64 - dw.countLeadingZeroBits()
+            val newBitLen = max(normBitLen(x, xNormLen), dwBitLen) + 1
+            val z = newWithBitLen(newBitLen)
+            var carry = dw
+            var i = 0
+            while (i < xNormLen) {
+                val t = dw32(x[i]) + (carry and MASK32)
+                z[i] = t.toInt()
+                carry = (t shr 32) + (carry shr 32)
+                ++i
+            }
+            if (i < z.size) {
+                z[i] = carry.toInt()
+                ++i
+                if (i < z.size)
+                    z[i] = (carry shr 32).toInt()
+            }
+            return z
         }
-        if (xNormLen < z.size)
-            z[xNormLen] = carry.toInt()
-        return z
+        throw IllegalArgumentException()
     }
 
     /**
@@ -509,7 +524,7 @@ internal object Mago {
      *
      * If the result is zero or the subtraction underflows, returns [ZERO].
      */
-    fun newSub(x: Magia, xNormLen: Int, dw: ULong): Magia {
+    fun newSub64(x: Magia, xNormLen: Int, dw: ULong): Magia {
         verify { isNormalized(x, xNormLen) }
         if (xNormLen >= 0 && xNormLen <= x.size) {
             val z = Magia(xNormLen)
@@ -543,7 +558,7 @@ internal object Mago {
         throw IllegalArgumentException()
     }
 
-    fun newSub(x: Magia, xNormLen: Int, w: UInt): Magia = newSub(x, xNormLen, w.toULong())
+    fun newSub32(x: Magia, xNormLen: Int, w: UInt): Magia = newSub64(x, xNormLen, w.toULong())
 
     /**
      * Subtracts a 64-bit unsigned integer [dw] from a multi-limb big integer [x] (first [xLen] limbs),

@@ -20,9 +20,9 @@ import kotlin.random.Random
  *   so that they produce correct signed results when a primitive appears on the left-hand side.
  */
 operator fun Int.plus(other: BigInt) =
-    other.addImpl64(signFlipThis = false, this < 0, this.absoluteValue.toUInt().toULong())
+    other.addImpl32(this < 0, this.absoluteValue.toUInt())
 operator fun UInt.plus(other: BigInt) =
-    other.addImpl64(signFlipThis = false, false, this.toULong())
+    other.addImpl32(false, this)
 operator fun Long.plus(other: BigInt) =
     other.addImpl64(signFlipThis = false, this < 0, this.absoluteValue.toULong())
 operator fun ULong.plus(other: BigInt) =

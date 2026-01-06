@@ -19,7 +19,7 @@ needing *hundreds or thousands of digits*.
 ## ✨ Features
 
 - **Kotlin Multiplatform** (JVM / Native / WASM / JS)
-- **No dependencies**
+- **No external dependencies**
 - **Arbitrary-precision signed integers**
 - Arithmetic infix operators: `+ - * / % mod`
 - Comparator operators: `< <= == != >= >`
@@ -55,7 +55,7 @@ dependencies {
 }
 ```
 
-BigInt is written in Kotlin and has no dependencies. 
+BigInt is written in Kotlin and has no external dependencies. 
 
 ---
 
@@ -157,7 +157,7 @@ For production cryptography, use established, audited libraries.
 BigInt prioritizes:
 
 - **Heap efficiency**: Mutable operations avoid temporary allocations
-- **Kotlin-first API**: Idiomatic operators and multiplatform from day one
+- **Kotlin-first API**: Idiomatic operators and Kotlin multiplatform from day one
 - **Transparency**: Readable implementation you can understand and audit
 - **No dependencies**: Works everywhere Kotlin does
 
@@ -167,7 +167,7 @@ BigInt prioritizes:
 - **No mutable variant**: Every operation allocates new objects
 - **JVM-only**: Not available on Native or JS targets
 
-BigInt does not implement some advanced algorithms (like Toom-Cook
+BigInt does not implement some advanced algorithms (like Toom-Cook-3
 and FFT multiplication) and has not been performance tested for 
 operations involving tens-of-thousand of digits. 
 
