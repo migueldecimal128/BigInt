@@ -72,12 +72,12 @@ class TestMagia {
         val magiaShl = Mago.newShiftLeft(magia, magiaNormLen, shift)
         assert(MagiaTransducer.EQ(magiaShl, jbiLeft))
 
-        Mago.mutateShiftRight(magiaShl, Mago.normLen(magiaShl), shift)
-        assert(MagiaTransducer.EQ(magiaShl, jbi))
+        //Mago.mutateShiftRight(magiaShl, Mago.normLen(magiaShl), shift)
+        //assert(MagiaTransducer.EQ(magiaShl, jbi))
 
-        val jbiRight = jbi.shiftRight(shift)
-        Mago.mutateShiftRight(magia, Mago.normLen(magia), shift)
-        assert(MagiaTransducer.EQ(magia, jbiRight))
+        //val jbiRight = jbi.shiftRight(shift)
+        //Mago.mutateShiftRight(magia, Mago.normLen(magia), shift)
+        //assert(MagiaTransducer.EQ(magia, jbiRight))
     }
 
     fun testBitLen(jbi: BigInteger) {

@@ -469,11 +469,13 @@ internal object Mago {
             if (carry == 0L) {
                 if (i < xNormLen && z !== x)
                     x.copyInto(z, i, i, xNormLen)
+                verify { isNormalized(z, xNormLen) }
                 return xNormLen
             }
             if (i < z.size) {
                 z[i] = carry.toInt()
                 ++i
+                verify { isNormalized(z, i) }
                 return i
             }
             throw ArithmeticException(ERR_MSG_ADD_OVERFLOW)
@@ -501,16 +503,20 @@ internal object Mago {
             if (carry == 0L) {
                 if (i < xNormLen && z !== x)
                     x.copyInto(z, i, i, xNormLen)
+                verify { isNormalized(z, xNormLen) }
                 return xNormLen
             }
             if (i < z.size) {
                 z[i] = carry.toInt()
                 ++i
                 carry = carry ushr 32
-                if (carry == 0L)
+                if (carry == 0L) {
+                    verify { isNormalized(z, i) }
                     return i
+                }
                 if (i < z.size) {
                     z[i] = carry.toInt()
+                    verify { isNormalized(z, i + 1) }
                     return i + 1
                 }
             }
@@ -915,10 +921,8 @@ internal object Mago {
      * @throws IllegalArgumentException if preconditions on array sizes or lengths are violated.
      */
 
-    fun setMul(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-        val zNormLen = setMulSchoolbook(z, x, xNormLen, y, yNormLen)
-        return zNormLen
-    }
+    fun setMul(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int =
+        setMulSchoolbook(z, x, xNormLen, y, yNormLen)
 
     fun setMulSchoolbook(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
         verify { z !== x && z !== y }
@@ -982,20 +986,23 @@ internal object Mago {
      *     x = x * 10^pow10 + a
      *
      * where the multiplication is carried out using a precomputed 64-bit
-     * multiplier for powers of ten in the fixed range **0‥9**.
+     * multiplier for powers of ten in the fixed range 0‥9.
      *
      * This is used internally during text parsing of decimal inputs to
      * accumulate digits efficiently in base-2³² limbs.
      *
      * Requirements:
-     *  • `pow10` must be in **0..9**
+     *  • `pow10` must be in 0..9
      *  • `a` is an unsigned 32-bit addend (lower 32 bits of the next digit chunk)
+     *  • `xLen` must not exceed the capacity of [x]
      *
      * If `pow10` lies outside 0..9, an `IllegalArgumentException` is thrown.
      *
      * @param x the limb array to mutate (little-endian base-2³²).
+     * @param xLen the number of active limbs in [x] to process.
      * @param pow10 the decimal power (0..9) selecting the precomputed multiplier.
      * @param a the unsigned 32-bit addend fused into the result.
+     * @throws IllegalArgumentException if `pow10` is not in 0..9.
      */
     fun mutateFmaPow10(x: Magia, xLen: Int, pow10: Int, a: UInt) {
         if (pow10 in 0..9) {
@@ -1032,11 +1039,12 @@ internal object Mago {
         if (xNormLen < MagoSqr.KARATSUBA_SQR_THRESHOLD) {
             val z = IntArray(2 * xNormLen)
             val zNormLen = MagoSqr.setSqr(z, x, xNormLen)
+            verify { isNormalized(z, zNormLen) }
             return z
         }
         val z = IntArray(2 * xNormLen + 1)
         val t = IntArray(3 * ((xNormLen + 1) / 2) + 3)
-        val zNormLen = MagoSqr.karatsubaSqr(z, 0, x, 0, xNormLen, t)
+        MagoSqr.karatsubaSqr(z, 0, x, 0, xNormLen, t)
         return z
     }
 
@@ -1068,32 +1076,11 @@ internal object Mago {
     }
 
     /**
-     * Shifts the first [xLen] limbs of [x] right by [bitCount] bits, in place.
-     *
-     * Bits shifted out of the low end are discarded, and high bits are filled with zeros.
-     * Returns [x] for convenience.
-     *
-     * @throws IllegalArgumentException if [xLen] or [bitCount] is out of range.
-     * @return normLen
-     */
-    fun mutateShiftRight(x: Magia, xLen: Int, bitCount: Int): Magia {
-        require (bitCount >= 0 && xLen >= 0 && xLen <= x.size)
-        if (xLen > 0 && bitCount > 0) {
-            val shiftedLen = setShiftRight(x, x, xLen, bitCount)
-            verify { shiftedLen <= xLen }
-            for (i in shiftedLen..<xLen)
-                x[i] = 0
-        }
-        return x
-    }
-
-    /**
      * Shifts the first [xLen] limbs of [x] right by [bitCount] bits, storing
      * the results in z.
      *
      * This will successfully operate mutate in-place, where z === x
      *
-     * Bits shifted out of the low end are discarded.
      * returns the number of limbs used in z.
      *
      * @throws IllegalArgumentException if [xLen] or [bitCount] is out of range.
@@ -1413,6 +1400,7 @@ internal object Mago {
                     z[i] = x[i] and y[i]
                     --i
                 }
+                verify { isNormalized(z, zNormLen) }
                 return zNormLen
             }
         }
