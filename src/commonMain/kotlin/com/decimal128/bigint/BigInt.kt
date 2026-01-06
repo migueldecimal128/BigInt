@@ -1610,12 +1610,22 @@ class BigInt private constructor(
         return ZERO
     }
 
+    fun mulImpl32(dwSign: Boolean, w: UInt): BigInt {
+        return if (!isZero() && w != 0u) {
+            ++BI_OP_COUNTS[BI_MUL_PRIMITIVE.ordinal]
+            fromNonNormalizedNonZero(
+                this.meta.signFlag xor dwSign,
+                Mago.newMul32(this.magia, this.meta.normLen, w)
+            )
+        } else ZERO
+    }
+
     fun mulImpl(dwSign: Boolean, dw: ULong): BigInt {
         return if (!isZero() && dw != 0uL) {
             ++BI_OP_COUNTS[BI_MUL_PRIMITIVE.ordinal]
             fromNonNormalizedNonZero(
                 this.meta.signFlag xor dwSign,
-                Mago.newMul(this.magia, this.meta.normLen, dw)
+                Mago.newMul64(this.magia, this.meta.normLen, dw)
             )
         } else ZERO
     }

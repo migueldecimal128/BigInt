@@ -97,6 +97,9 @@ internal object Mago {
      */
     private inline fun dw32(n: Int) = n.toUInt().toULong()
 
+    private inline fun Int.toDws() = this.toLong() and MASK32L
+    private inline fun UInt.toDws() = this.toLong()
+
     /**
      * Largest allowed limb-array length.  (2²⁶−1 elements)
      * Chosen so that bitLength = limbLen * 32 always remains < Int.MAX_VALUE.
@@ -345,18 +348,19 @@ internal object Mago {
      */
 
     inline fun newAdd32(x: Magia, xNormLen: Int, w: UInt): Magia {
+        val ws = w.toInt()
         if (xNormLen > 0 && xNormLen <= x.size) {
             verify { isNormalized(x, xNormLen) }
-            val wBitLen = 32 - w.countLeadingZeroBits()
+            val wBitLen = 32 - ws.countLeadingZeroBits()
             val newBitLen = max(normBitLen(x, xNormLen), wBitLen) + 1
             val z = newWithBitLen(newBitLen)
             //val z = IntArray(xNormLen + 1)
-            var carry = w.toULong()
+            var carry = ws.toDws()
             var i = 0
             while (i < xNormLen) {
-                carry += dw32(x[i])
+                carry += x[i].toDws()
                 z[i] = carry.toInt()
-                carry = carry shr 32
+                carry = carry ushr 32
                 ++i
             }
             if (i < z.size)
@@ -364,8 +368,8 @@ internal object Mago {
             return z
         }
         if (xNormLen == 0) {
-            if (w != 0u)
-                return intArrayOf(w.toInt())
+            if (ws != 0)
+                return intArrayOf(ws)
             return ZERO
         }
         throw IllegalArgumentException()
@@ -375,24 +379,25 @@ internal object Mago {
      * Returns a new limb array representing [x] plus the unsigned 64-bit value [dw].
      */
     inline fun newAdd64(x: Magia, xNormLen: Int, dw: ULong): Magia {
+        val dws = dw.toLong()
         if (xNormLen <= x.size) {
             verify { isNormalized(x, xNormLen) }
-            val dwBitLen = 64 - dw.countLeadingZeroBits()
+            val dwBitLen = 64 - dws.countLeadingZeroBits()
             val newBitLen = max(normBitLen(x, xNormLen), dwBitLen) + 1
             val z = newWithBitLen(newBitLen)
-            var carry = dw
+            var carry = dws
             var i = 0
             while (i < xNormLen) {
-                val t = dw32(x[i]) + (carry and MASK32)
+                val t = x[i].toDws() + (carry and MASK32L)
                 z[i] = t.toInt()
-                carry = (t shr 32) + (carry shr 32)
+                carry = (t ushr 32) + (carry ushr 32)
                 ++i
             }
             if (i < z.size) {
                 z[i] = carry.toInt()
                 ++i
                 if (i < z.size)
-                    z[i] = (carry shr 32).toInt()
+                    z[i] = (carry ushr 32).toInt()
             }
             return z
         }
@@ -426,15 +431,15 @@ internal object Mago {
      */
     fun newOrMutateIncrement(x: Magia): Magia {
         verify { isNormalized(x, x.size) }
-        var carry = 1uL
+        var carry = 1L
         var i = 0
-        while (carry != 0uL && i < x.size) {
-            val t = dw32(x[i]) + carry
+        while (carry != 0L && i < x.size) {
+            val t = x[i].toDws() + carry
             x[i] = t.toInt()
-            carry = t shr 32
+            carry = t ushr 32
             ++i
         }
-        if (carry == 0uL)
+        if (carry == 0L)
             return x
         // the only way we can have a carry is if all limbs
         // have mutated to zero
@@ -453,15 +458,15 @@ internal object Mago {
      */
     fun setAdd32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
-            var carry = w.toULong()
+            var carry = w.toDws()
             var i = 0
-            while (carry != 0uL && i < xNormLen) {
-                carry += dw32(x[i])
+            while (carry != 0L && i < xNormLen) {
+                carry += x[i].toDws()
                 z[i] = carry.toInt()
-                carry = carry shr 32
+                carry = carry ushr 32
                 ++i
             }
-            if (carry == 0uL) {
+            if (carry == 0L) {
                 if (i < xNormLen && z !== x)
                     x.copyInto(z, i, i, xNormLen)
                 return xNormLen
@@ -485,25 +490,29 @@ internal object Mago {
      */
     fun setAdd64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
-            var carry = dw
+            var carry = dw.toLong()
             var i = 0
-            while (carry != 0uL && i < xNormLen) {
-                val s = dw32(x[i]) + (carry and MASK32)
-                z[i] = s.toInt()
-                carry = (carry shr 32) + (s shr 32)
+            while (carry != 0L && i < xNormLen) {
+                val t = x[i].toDws() + (carry and MASK32L)
+                z[i] = t.toInt()
+                carry = (carry ushr 32) + (t ushr 32)
                 ++i
             }
-            if (carry == 0uL) {
+            if (carry == 0L) {
                 if (i < xNormLen && z !== x)
                     x.copyInto(z, i, i, xNormLen)
                 return xNormLen
             }
-            while (i < z.size) {
+            if (i < z.size) {
                 z[i] = carry.toInt()
                 ++i
-                carry = carry shr 32
-                if (carry == 0uL)
+                carry = carry ushr 32
+                if (carry == 0L)
                     return i
+                if (i < z.size) {
+                    z[i] = carry.toInt()
+                    return i + 1
+                }
             }
             throw ArithmeticException(ERR_MSG_ADD_OVERFLOW)
         }
@@ -526,23 +535,23 @@ internal object Mago {
             val maxNormLen = max(xNormLen, yNormLen)
             val minNormLen = min(xNormLen, yNormLen)
             if (z.size >= maxNormLen) {
-                var carry = 0uL
+                var carry = 0L
                 var i = 0
                 while (i < minNormLen) {
-                    val t = dw32(x[i]) + dw32(y[i]) + carry
+                    val t = x[i].toDws() + y[i].toDws() + carry
                     z[i] = t.toInt()
-                    carry = t shr 32
-                    verify { (carry shr 1) == 0uL }
+                    carry = t ushr 32
+                    verify { (carry shr 1) == 0L }
                     ++i
                 }
                 val longer = if (xNormLen > yNormLen) x else y
                 while (i < maxNormLen && i < z.size) {
-                    val t = dw32(longer[i]) + carry
+                    val t = longer[i].toDws() + carry
                     z[i] = t.toInt()
-                    carry = t shr 32
+                    carry = t ushr 32
                     ++i
                 }
-                if (carry != 0uL) {
+                if (carry != 0L) {
                     if (i == z.size)
                         throw ArithmeticException(ERR_MSG_ADD_OVERFLOW)
                     z[i] = 1
@@ -564,33 +573,35 @@ internal object Mago {
     fun newSub64(x: Magia, xNormLen: Int, dw: ULong): Magia {
         verify { isNormalized(x, xNormLen) }
         if (xNormLen >= 0 && xNormLen <= x.size) {
+            val dws = dw.toLong()
             val z = Magia(xNormLen)
             var orAccumulator = 0
-            var borrow = 0uL
+            var borrow = 0L
             if (z.isNotEmpty()) {
-                val t0 = dw32(x[0]) - (dw and MASK32)
+                val t0 = x[0].toDws() - (dws and MASK32L)
                 val z0 = t0.toInt()
                 z[0] = z0
                 orAccumulator = z0
                 if (z.size > 1) {
-                    borrow = t0 shr 63
-                    val t1 = dw32(x[1]) - (dw shr 32) - borrow
+                    borrow = t0 ushr 63
+                    val t1 = x[1].toDws() - (dws ushr 32) - borrow
                     val z1 = t1.toInt()
                     z[1] = z1
                     orAccumulator = orAccumulator or z1
-                    borrow = t1 shr 63
+                    borrow = t1 ushr 63
                     var i = 2
                     while (i < z.size) {
-                        val t = dw32(x[i]) - borrow
+                        val t = x[i].toDws() - borrow
                         val zi = t.toInt()
                         z[i] = zi
                         orAccumulator = orAccumulator or zi
-                        borrow = t shr 63
+                        borrow = t ushr 63
                         ++i
                     }
                 }
             }
-            return if (orAccumulator == 0 || borrow != 0uL) ZERO else z
+            if (borrow == 0L)
+                return if (orAccumulator == 0) ZERO else z
         }
         throw IllegalArgumentException()
     }
@@ -618,24 +629,25 @@ internal object Mago {
                 if (xNormLen <= 2 && toRawULong(x, xNormLen) < dw)
                     throw ArithmeticException(ERR_MSG_SUB_UNDERFLOW)
                 var lastNonZeroIndex = -1
-                var borrow = dw
+                var borrow = dw.toLong()
                 var i = 0
                 while (i < xNormLen) {
-                    val t = dw32(x[i]) - (borrow and MASK32)
+                    val t = x[i].toDws() - (borrow and MASK32L)
                     val zi = t.toInt()
                     z[i] = zi
-                    val carryOut = t shr 63         // 1 if borrow-in consumed more than limb
-                    borrow = (borrow shr 32) + carryOut
+                    val carryOut = t ushr 63         // 1 if borrow-in consumed more than limb
+                    borrow = (borrow ushr 32) + carryOut
                     // branchless update of last non-zero
                     val nonZeroMask = (zi or -zi) shr 31
                     lastNonZeroIndex =
                         (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
                     ++i
                 }
-                verify { borrow == 0uL }
-                val zNormLen = lastNonZeroIndex + 1
-                verify { isNormalized(z, zNormLen) }
-                return zNormLen
+                if (borrow == 0L) {
+                    val zNormLen = lastNonZeroIndex + 1
+                    verify { isNormalized(z, zNormLen) }
+                    return zNormLen
+                }
             }
         }
         throw IllegalArgumentException()
@@ -677,28 +689,28 @@ internal object Mago {
             verify { isNormalized(y, yNormLen) }
             if (z.size >= xNormLen) {
                 if (xNormLen >= yNormLen) {
-                    var borrow = 0uL
+                    var borrow = 0L
                     var lastNonZeroIndex = -1
                     var i = 0
                     while (i < yNormLen) {
-                        val t = dw32(x[i]) - dw32(y[i]) - borrow
+                        val t = x[i].toDws() - y[i].toDws() - borrow
                         val zi = t.toInt()
                         z[i] = zi
                         val nonZeroMask = (zi or -zi) shr 31
                         lastNonZeroIndex = (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
-                        borrow = t shr 63
+                        borrow = t ushr 63
                         ++i
                     }
                     while (i < xNormLen) {
-                        val t = dw32(x[i]) - borrow
+                        val t = x[i].toDws() - borrow
                         val zi = t.toInt()
                         z[i] = zi
                         val nonZeroMask = (zi or -zi) shr 31
                         lastNonZeroIndex = (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
-                        borrow = t shr 63
+                        borrow = t ushr 63
                         ++i
                     }
-                    if (borrow == 0uL) {
+                    if (borrow == 0L) {
                         val zNormLen = lastNonZeroIndex + 1
                         verify { isNormalized(z, zNormLen) }
                         return zNormLen
@@ -726,7 +738,7 @@ internal object Mago {
      *
      * @return [ZERO] or a (possibly non-normalized) [Magia] containing the product.
      */
-    fun newMul(x: Magia, xNormLen: Int, w: UInt): Magia {
+    fun newMul32(x: Magia, xNormLen: Int, w: UInt): Magia {
         verify { isNormalized(x, xNormLen) }
         if (xNormLen == 0 || w == 0u)
             return ZERO
@@ -751,17 +763,17 @@ internal object Mago {
             verify { isNormalized(x, xNormLen) }
             return when {
                 xNormLen > 0 && w.countOneBits() > 1 -> {
-                    val w64 = w.toULong()
-                    var carry = 0uL
+                    val dws = w.toLong()
+                    var carry = 0L
                     var i = 0
                     while (i < xNormLen) {
-                        val t = dw32(x[i]) * w64 + carry
+                        val t = x[i].toDws() * dws + carry
                         z[i] = t.toInt()
-                        carry = t shr 32
+                        carry = t ushr 32
                         ++i
                     }
-                    if (carry != 0uL) {
-                        if (i == z.size)
+                    if (carry != 0L) {
+                        if (i >= z.size)
                             throw ArithmeticException(ERR_MSG_MUL_OVERFLOW)
                         z[i] = carry.toInt()
                         ++i
@@ -793,7 +805,7 @@ internal object Mago {
      *
      * @return [ZERO] or a (possibly non-normalized) [Magia] containing the product.
      */
-    fun newMul(x: Magia, xNormLen: Int, dw: ULong): Magia {
+    fun newMul64(x: Magia, xNormLen: Int, dw: ULong): Magia {
         if (xNormLen == 0 || dw == 0uL)
             return ZERO
         val xBitLen = normBitLen(x, xNormLen)
