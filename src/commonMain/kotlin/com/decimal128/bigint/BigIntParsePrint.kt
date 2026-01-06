@@ -16,7 +16,7 @@ import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.max
 import kotlin.math.min
 
-object BigIntParsePrint {
+internal object BigIntParsePrint {
 
     fun toString(x: Magia, xNormLen: Int) = toString(false, x, xNormLen)
 

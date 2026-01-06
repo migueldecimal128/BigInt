@@ -709,13 +709,13 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] for call chaining
      */
     fun setAdd(x: BigIntNumber, n: Int) =
-        setAddImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
+        setAddImpl32(x, n < 0, n.absoluteValue.toUInt())
     fun setAdd(x: BigIntNumber, w: UInt) =
-        setAddImpl(x, false, w.toULong())
+        setAddImpl32(x, false, w)
     fun setAdd(x: BigIntNumber, l: Long) =
-        setAddImpl(x, l < 0, l.absoluteValue.toULong())
+        setAddImpl64(x, l < 0, l.absoluteValue.toULong())
     fun setAdd(x: BigIntNumber, dw: ULong) =
-        setAddImpl(x, false, dw)
+        setAddImpl64(x, false, dw)
     fun setAdd(x: BigIntNumber, y: BigIntNumber) =
         setAddImpl(x, y.meta, y.magia)
 
@@ -729,15 +729,66 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] for call chaining
      */
     fun setSub(x: BigIntNumber, n: Int) =
-        setAddImpl(x, n >= 0, n.absoluteValue.toUInt().toULong())
+        setAddImpl32(x, n >= 0, n.absoluteValue.toUInt())
     fun setSub(x: BigIntNumber, w: UInt) =
-        setAddImpl(x, true, w.toULong())
+        setAddImpl32(x, true, w)
     fun setSub(x: BigIntNumber, l: Long) =
-        setAddImpl(x, l >= 0L, l.absoluteValue.toULong())
+        setAddImpl64(x, l >= 0L, l.absoluteValue.toULong())
     fun setSub(x: BigIntNumber, dw: ULong) =
-        setAddImpl(x, true, dw)
+        setAddImpl64(x, true, dw)
     fun setSub(x: BigIntNumber, y: BigIntNumber) =
         setAddImpl(x, y.meta.negate(), y.magia)
+
+    /**
+     * Internal helper for implementing addition and subtraction against a 32-bit
+     * unsigned operand. Computes `x ± yW` depending on [ySign], updates this
+     * instance in place, and reuses or expands limb storage as needed. Zero,
+     * sign-match, and magnitude-comparison cases are optimized. The caller must
+     * supply a normalized [x].
+     *
+     * @param x the normalized source value
+     * @param ySign `true` if the addend should be treated as negative
+     * @param yW the unsigned 32-bit magnitude of the addend
+     * @return this [MutableBigInt] after mutation
+     */
+    private fun setAddImpl32(x: BigIntNumber, ySign: Boolean, yW: UInt): MutableBigInt {
+        verify { x.isNormalized() }
+        val xMagia = x.magia // use only xMagia in here because of aliasing
+        when {
+            yW == 0u -> set(x)
+            x.isZero() -> set(ySign, yW.toULong())
+            x.meta.signFlag == ySign -> {
+                verify { this.magia.size >= 4 }
+                ensureMagiaCapacityDiscard(x.meta.normLen + 1)
+                updateMeta(
+                    Meta(
+                        x.meta.signBit,
+                        Mago.setAdd32(magia, xMagia, x.meta.normLen, yW)
+                    )
+                )
+            }
+
+            else -> {
+                val cmp: Int = x.magnitudeCompareTo(yW)
+                when {
+                    cmp > 0 -> {
+                        ensureMagiaCapacityDiscard(x.meta.normLen)
+                        updateMeta(
+                            Meta(
+                                x.meta.signBit,
+                                Mago.setSub64(magia, xMagia, x.meta.normLen, yW.toULong())
+                            )
+                        )
+                    }
+
+                    cmp < 0 -> set(ySign, yW.toULong() - x.toULongMagnitude())
+                    else -> setZero()
+                }
+            }
+        }
+        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
+        return this
+    }
 
     /**
      * Internal helper for implementing addition and subtraction against a 64-bit
@@ -751,7 +802,7 @@ class MutableBigInt private constructor (
      * @param yDw the unsigned 64-bit magnitude of the addend
      * @return this [MutableBigInt] after mutation
      */
-    private fun setAddImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
+    private fun setAddImpl64(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
         verify { x.isNormalized() }
         val xMagia = x.magia // use only xMagia in here because of aliasing
         when {
@@ -1255,14 +1306,14 @@ class MutableBigInt private constructor (
      *
      * @param n the value to add
      */
-    operator fun plusAssign(n: Int) { setAdd(this, n) }
+    operator fun plusAssign(n: Int) { setAddImpl32(this, n < 0, n.absoluteValue.toUInt()) }
 
     /**
      * Adds an unsigned 32-bit integer to this value in place.
      *
      * @param w the value to add
      */
-    operator fun plusAssign(w: UInt) { setAdd(this, w) }
+    operator fun plusAssign(w: UInt) { setAddImpl32(this, false, w) }
 
     /**
      * Adds a signed 64-bit integer to this value in place. This is the canonical
@@ -1291,14 +1342,14 @@ class MutableBigInt private constructor (
      *
      * @param n the value to subtract
      */
-    operator fun minusAssign(n: Int) { setSub(this, n) }
+    operator fun minusAssign(n: Int) { setAddImpl32(this, n > 0, n.absoluteValue.toUInt()) }
 
     /**
      * Subtracts an unsigned 32-bit integer from this value in place.
      *
      * @param w the value to subtract
      */
-    operator fun minusAssign(w: UInt) { setSub(this, w) }
+    operator fun minusAssign(w: UInt) { setAddImpl32(this, true, w) }
 
     /**
      * Subtracts a signed 64-bit integer from this value in place. This is the

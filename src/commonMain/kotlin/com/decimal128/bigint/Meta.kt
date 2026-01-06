@@ -29,7 +29,7 @@ import kotlin.jvm.JvmInline
  *
  */
 @JvmInline
-value class Meta internal constructor(val _meta: Int) {
+internal value class Meta internal constructor(val _meta: Int) {
     companion object {
 
         /**
@@ -151,5 +151,8 @@ value class Meta internal constructor(val _meta: Int) {
 
     val normLen: Int
         get() = _meta and Int.MAX_VALUE
+
+    val signum: Int
+        get() = (_meta shr 31) or ((-_meta) ushr 31)
 
 }

@@ -112,6 +112,14 @@ class BigInt private constructor(
             return BigInt(Meta(sign, normLen), magia)
         }
 
+        internal fun fromNonNormalized1NonZero(sign: Boolean, magia: Magia): BigInt {
+            //val normLen = Mago.normLen(magia)
+            val normLen = magia.size - if (magia[magia.size - 1] != 0) 0 else 1
+            verify { normLen > 0 }
+            verify { validateNormLenAndInjectPoison(magia, normLen) }
+            return BigInt(Meta(sign, normLen), magia)
+        }
+
         internal fun fromNonNormalizedOrZero(magia: Magia): BigInt =
             fromNonNormalizedOrZero(false, magia)
 
@@ -1503,7 +1511,7 @@ class BigInt private constructor(
         val thisSign = this.meta.signFlag
         if (thisSign == otherSign && w != 0u) {
             ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
-            return fromNonNormalizedNonZero(thisSign, Mago.newAdd32(this.magia, this.meta.normLen, w))
+            return fromNonNormalized1NonZero(thisSign, Mago.newAdd32(this.magia, this.meta.normLen, w))
         }
         if (w == 0u)
             return this
@@ -1521,7 +1529,7 @@ class BigInt private constructor(
     fun addImpl64(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
         val thisSign = this.meta.signFlag xor signFlipThis
         if (thisSign == otherSign && dw != 0uL) {
-            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
+            BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal] += 1
             return fromNonNormalizedNonZero(thisSign, Mago.newAdd64(this.magia, this.meta.normLen, dw))
         }
         if (dw == 0uL)

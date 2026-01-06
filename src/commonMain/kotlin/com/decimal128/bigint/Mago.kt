@@ -345,7 +345,7 @@ internal object Mago {
      */
 
     inline fun newAdd32(x: Magia, xNormLen: Int, w: UInt): Magia {
-        if (xNormLen <= x.size) {
+        if (xNormLen > 0 && xNormLen <= x.size) {
             verify { isNormalized(x, xNormLen) }
             val wBitLen = 32 - w.countLeadingZeroBits()
             val newBitLen = max(normBitLen(x, xNormLen), wBitLen) + 1
@@ -362,6 +362,11 @@ internal object Mago {
             if (i < z.size)
                 z[i] = carry.toInt()
             return z
+        }
+        if (xNormLen == 0) {
+            if (w != 0u)
+                return intArrayOf(w.toInt())
+            return ZERO
         }
         throw IllegalArgumentException()
     }
@@ -437,6 +442,38 @@ internal object Mago {
         val z = Magia(x.size + 1)
         z[x.size] = 1
         return z
+    }
+
+    /**
+     * Adds the unsigned 64-bit value `dw` to `x[0‥xNormLen)` and writes the result
+     * into `z` (which may be the same array for in-place mutation).
+     *
+     * Returns the resulting normalized limb length.
+     * Throws `ArithmeticException` if the sum overflows `z`.
+     */
+    fun setAdd32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
+        if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
+            var carry = w.toULong()
+            var i = 0
+            while (carry != 0uL && i < xNormLen) {
+                carry += dw32(x[i])
+                z[i] = carry.toInt()
+                carry = carry shr 32
+                ++i
+            }
+            if (carry == 0uL) {
+                if (i < xNormLen && z !== x)
+                    x.copyInto(z, i, i, xNormLen)
+                return xNormLen
+            }
+            if (i < z.size) {
+                z[i] = carry.toInt()
+                ++i
+                return i
+            }
+            throw ArithmeticException(ERR_MSG_ADD_OVERFLOW)
+        }
+        throw IllegalArgumentException()
     }
 
     /**

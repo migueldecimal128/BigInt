@@ -152,7 +152,7 @@ sealed class BigIntNumber(
      *
      * @return -1 if negative, 0 if zero, 1 if positive
      */
-    fun signum(meta: Meta) = (meta._meta shr 31) or ((-meta._meta) ushr 31)
+    fun signum() = meta.signum
 
     /**
      * Returns `true` if this value is even.
