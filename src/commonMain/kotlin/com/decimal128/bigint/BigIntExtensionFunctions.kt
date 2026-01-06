@@ -24,18 +24,18 @@ operator fun Int.plus(other: BigInt) =
 operator fun UInt.plus(other: BigInt) =
     other.addImpl32(false, this)
 operator fun Long.plus(other: BigInt) =
-    other.addImpl64(signFlipThis = false, this < 0, this.absoluteValue.toULong())
+    other.addImpl64(this < 0, this.absoluteValue.toULong())
 operator fun ULong.plus(other: BigInt) =
-    other.addImpl64(signFlipThis = false, false, this)
+    other.addImpl64(false, this)
 
 operator fun Int.minus(other: BigInt) =
-    other.addImpl64(signFlipThis = true, this < 0, this.absoluteValue.toUInt().toULong())
+    other.negate().addImpl64(this < 0, this.absoluteValue.toUInt().toULong())
 operator fun UInt.minus(other: BigInt) =
-    other.addImpl64(signFlipThis = true, false, this.toULong())
+    other.negate().addImpl64(false, this.toULong())
 operator fun Long.minus(other: BigInt) =
-    other.addImpl64(signFlipThis = true, this < 0L, this.absoluteValue.toULong())
+    other.negate().addImpl64(this < 0L, this.absoluteValue.toULong())
 operator fun ULong.minus(other: BigInt) =
-    other.addImpl64(signFlipThis = true, false, this)
+    other.negate().addImpl64(false, this)
 
 operator fun Int.times(other: BigInt) = other.times(this)
 operator fun UInt.times(other: BigInt) = other.times(this)

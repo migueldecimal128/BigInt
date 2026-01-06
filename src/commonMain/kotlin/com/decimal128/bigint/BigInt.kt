@@ -8,7 +8,6 @@ import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
 import com.decimal128.bigint.Mago.newWithBitLen
-import com.decimal128.bigint.Mago.normBitLen
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
@@ -1090,9 +1089,9 @@ class BigInt private constructor(
     operator fun plus(w: UInt): BigInt =
         this.addImpl32(false, w)
     operator fun plus(l: Long): BigInt =
-        this.addImpl64(signFlipThis = false, l < 0, l.absoluteValue.toULong())
+        this.addImpl64(l < 0, l.absoluteValue.toULong())
     operator fun plus(dw: ULong): BigInt =
-        this.addImpl64(signFlipThis = false, false, dw)
+        this.addImpl64(false, dw)
 
     operator fun minus(other: BigIntNumber): BigInt = this.addImpl(true, other)
     operator fun minus(n: Int): BigInt =
@@ -1100,9 +1099,9 @@ class BigInt private constructor(
     operator fun minus(w: UInt): BigInt =
         this.addImpl32(true, w)
     operator fun minus(l: Long): BigInt =
-        this.addImpl64(signFlipThis = false, l >= 0, l.absoluteValue.toULong())
+        this.addImpl64(l >= 0, l.absoluteValue.toULong())
     operator fun minus(dw: ULong): BigInt =
-        this.addImpl64(signFlipThis = false, true, dw)
+        this.addImpl64(true, dw)
 
     operator fun times(other: BigIntNumber): BigInt = mulImpl(other)
 
@@ -1511,6 +1510,7 @@ class BigInt private constructor(
 
     override fun compareTo(other: BigInt): Int = super.compareTo(other)
 
+    private inline fun Int.toDws() = this.toLong() and 0xFFFF_FFFFL
 
     /**
      * Internal helper for addition or subtraction with a UInt operand.
@@ -1520,79 +1520,75 @@ class BigInt private constructor(
      * @return a new BigInt representing the result
      */
     fun addImpl32(otherSign: Boolean, w: UInt): BigInt {
+        BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal] += 1
         val thisSign = this.meta.signFlag
         val thisNormLen = this.meta.normLen
-        if (thisNormLen > 0 && thisSign == otherSign && w != 0u) {
-            BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal] += 1
-            val wBitLen = 32 - w.countLeadingZeroBits()
-            val thisBitLen = Mago.nonZeroNormBitLen(magia, thisNormLen)
-            val newBitLen = max(thisBitLen, wBitLen) + 1
-            val z = newWithBitLen(newBitLen)
-            return fromNormalizedNonZero(thisSign, z,
-                Mago.setAdd32(z, this.magia, thisNormLen, w))
+        if (thisNormLen <= magia.size) {
+            when {
+                thisNormLen > 0 && thisSign == otherSign && w != 0u -> {
+                    val wBitLen = 32 - w.countLeadingZeroBits()
+                    val thisBitLen = Mago.nonZeroNormBitLen(magia, thisNormLen)
+                    val newBitLen = max(thisBitLen, wBitLen) + 1
+                    val z = newWithBitLen(newBitLen)
+                    return fromNormalizedNonZero(
+                        thisSign, z,
+                        Mago.setAdd32(z, this.magia, thisNormLen, w)
+                    )
+                }
+
+                w == 0u -> return this
+                // do subtraction
+                thisNormLen > 1 ->
+                    return fromNonNormalizedManyNonZero(thisSign, Mago.newSub32(this.magia, this.meta.normLen, w))
+
+                thisNormLen == 1 -> {
+                    val loLimb = magia[0].toUInt()
+                    val cmp = loLimb.compareTo(w)
+                    return when {
+                        cmp > 0 -> from(thisSign, loLimb - w)
+                        cmp < 0 -> from(!thisSign, w - loLimb)
+                        else -> ZERO
+                    }
+                }
+                else -> return from(otherSign, w) // thisNormLen == 0
+            }
         }
-        if (w == 0u)
-            return this
-        return subImpl32(otherSign, w)
+        throw IllegalStateException()
     }
 
-    /**
-     * Internal helper for addition or subtraction with a ULong operand.
-     *
-     * @param signFlipThis true to flip the sign of this BigInt before operation
-     * @param otherSign the sign of the ULong operand
-     * @param dw the ULong operand
-     * @return a new BigInt representing the result
-     */
-    fun addImpl64(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
-        val thisSign = this.meta.signFlag xor signFlipThis
-        val thisNormLen = this.meta.normLen
-        if (thisNormLen > 0 && thisSign == otherSign && dw != 0uL) {
-            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
-            val dwBitLen = 64 - dw.countLeadingZeroBits()
-            val thisBitLen = Mago.nonZeroNormBitLen(magia, thisNormLen)
-            val newBitLen = max(thisBitLen, dwBitLen) + 1
-            val z = newWithBitLen(newBitLen)
-            return fromNormalizedNonZero(thisSign, z,
-                Mago.setAdd64(z, this.magia, thisNormLen, dw))
-        }
-        if (dw == 0uL)
-            return if (signFlipThis) this.negate() else this
-        return subImpl64(signFlipThis, otherSign, dw)
-    }
-
-    fun subImpl32(otherSign: Boolean, w: UInt): BigInt {
+    fun addImpl64(otherSign: Boolean, dw: ULong): BigInt {
+        BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal] += 1
         val thisSign = this.meta.signFlag
-        val cmp = this.magnitudeCompareTo(w)
-        if (cmp != 0) {
-            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
-            return if (cmp > 0) {
-                fromNonNormalizedManyNonZero(thisSign, Mago.newSub32(this.magia, this.meta.normLen, w))
-            } else {
-                val thisMag = this.toULongMagnitude().toUInt()
-                val diff = w - thisMag
-                --BI_OP_COUNTS[BI_CONSTRUCT_64.ordinal] // do not double count
-                from(otherSign, diff)
+        val thisNormLen = this.meta.normLen
+        if (thisNormLen <= magia.size) {
+            when {
+                thisNormLen > 0 && thisSign == otherSign && dw != 0uL -> {
+                    val wBitLen = 64 - dw.countLeadingZeroBits()
+                    val thisBitLen = Mago.nonZeroNormBitLen(magia, thisNormLen)
+                    val newBitLen = max(thisBitLen, wBitLen) + 1
+                    val z = newWithBitLen(newBitLen)
+                    return fromNormalizedNonZero(
+                        thisSign, z,
+                        Mago.setAdd64(z, this.magia, thisNormLen, dw)
+                    )
+                }
+                dw == 0uL -> return this
+                thisNormLen == 0 -> return from(otherSign, dw)
+                // do subtraction
+                thisNormLen > 2 ->
+                    return fromNonNormalizedManyNonZero(thisSign, Mago.newSub64(this.magia, this.meta.normLen, dw))
+                else -> {
+                    val loLimbs = toULongMagnitude()
+                    val cmp = loLimbs.compareTo(dw)
+                    return when {
+                        cmp > 0 -> from(thisSign, loLimbs - dw)
+                        cmp < 0 -> from(!thisSign, dw - loLimbs)
+                        else -> ZERO
+                    }
+                }
             }
         }
-        return ZERO
-    }
-
-    fun subImpl64(signFlipThis: Boolean, otherSign: Boolean, dw: ULong): BigInt {
-        val thisSign = this.meta.signFlag xor signFlipThis
-        val cmp = this.magnitudeCompareTo(dw)
-        if (cmp != 0) {
-            ++BI_OP_COUNTS[BI_ADD_SUB_PRIMITIVE.ordinal]
-            return if (cmp > 0) {
-                fromNonNormalizedManyNonZero(thisSign, Mago.newSub64(this.magia, this.meta.normLen, dw))
-            } else {
-                val thisMag = this.toULongMagnitude()
-                val diff = dw - thisMag
-                --BI_OP_COUNTS[BI_CONSTRUCT_64.ordinal] // do not double count
-                from(otherSign, diff)
-            }
-        }
-        return ZERO
+        throw IllegalStateException()
     }
 
     /**
