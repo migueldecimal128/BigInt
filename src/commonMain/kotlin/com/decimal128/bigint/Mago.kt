@@ -1961,6 +1961,7 @@ internal object Mago {
         val q = Magia(m - 2 + 1)
         val r = null
         val qNormLen = knuthDivide64(q, r, u, vnDw, m, unBuf=null).toInt()
+        verify { isNormalized(q, qNormLen) }
         return if (qNormLen > 0) q else ZERO
     }
 
@@ -2000,6 +2001,7 @@ internal object Mago {
         val q = IntArray(m - n + 1)
         val r = null
         val qNormLen = knuthDivide(q, r, u, v, m, n)
+        verify { isNormalized(q, qNormLen) }
         return if (qNormLen > 0) q else ZERO
     }
 
@@ -2038,11 +2040,13 @@ internal object Mago {
         val r = null
         if (yNormLen > 2) {
             val qNormLen = knuthDivide(q, r, u, v, m, n, xTmp, yTmp)
+            verify { isNormalized(q, qNormLen) }
             return qNormLen
         }
         verify { yNormLen == 2 }
         val vDw: ULong = ((v[1].toLong() shl 32) or v[0].toDws()).toULong()
         val qNormLen = knuthDivide64(q, r, u, vDw, m, xTmp).toInt()
+        verify { isNormalized(q, qNormLen) }
         return qNormLen
     }
 
@@ -2204,6 +2208,7 @@ internal object Mago {
                 val yBitLen = normBitLen(yMagia, yNormLen)
                 if (xBitLen < yBitLen) {
                     xMagia.copyInto(zMagia, 0, 0, xNormLen)
+                    verify { isNormalized(zMagia, xNormLen) }
                     return xNormLen
                 }
                 if (xBitLen == yBitLen) {
@@ -2211,6 +2216,7 @@ internal object Mago {
                     return when {
                         cmp < 0 -> {
                             xMagia.copyInto(zMagia, 0, 0, xNormLen)
+                            verify { isNormalized(zMagia, xNormLen) }
                             xNormLen
                         }
                         cmp == 0 -> 0
@@ -2240,11 +2246,13 @@ internal object Mago {
         val r = z
         if (yNormLen > 2) {
             val rNormLen = knuthDivide(q = null, r, u, v, m, n, xTmp, yTmp)
+            verify { isNormalized(z, rNormLen) }
             return rNormLen
         }
         verify { yNormLen == 2 }
         val vDw: ULong = ((v[1].toLong() shl 32) or v[0].toDws()).toULong()
         val rNormLen = knuthDivide64(q = null, r, u, vDw, m, xTmp).toInt()
+        verify { isNormalized(z, rNormLen) }
         return rNormLen
     }
 
