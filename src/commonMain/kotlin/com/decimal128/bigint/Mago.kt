@@ -1450,6 +1450,7 @@ internal object Mago {
                     minLen < yNormLen ->
                         y.copyInto(z, minLen, minLen, yNormLen)
                 }
+                verify { isNormalized(z, zNormLen) }
                 return zNormLen
             }
         }
@@ -1497,6 +1498,7 @@ internal object Mago {
 
                     else -> normLen(z, minLen)
                 }
+                verify { isNormalized(z, zNormLen) }
                 return zNormLen
             }
         }

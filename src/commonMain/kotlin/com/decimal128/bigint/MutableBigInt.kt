@@ -1797,6 +1797,160 @@ class MutableBigInt private constructor (
         return this
     }
 
+    /**
+     * Sets this value to the bitwise AND of [x] and [y].
+     *
+     * Performs a bitwise AND operation on two unsigned big integers, where each bit
+     * in the result is set only if the corresponding bit is set in both operands.
+     * The result's magnitude will not exceed the magnitude of the smaller operand.
+     *
+     * Existing limb storage is reused or grown as needed. This operation supports
+     * aliasing, meaning [x] and/or [y] can safely reference `this` instance.
+     *
+     * @param x the first operand (must be normalized)
+     * @param y the second operand (must be normalized)
+     * @return this [MutableBigInt] for call chaining
+     * @throws IllegalArgumentException if either operand is not normalized
+     *
+     * @see mutAnd for an in-place variant
+     */
+    fun setAnd(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
+        verify { x.isNormalized() }
+        verify { y.isNormalized() }
+        val xNormLen = x.meta.normLen
+        val yNormLen = y.meta.normLen
+        val minNormLen = min(x.meta.normLen, y.meta.normLen)
+        if (minNormLen == 0)
+            return setZero()
+        val xMagia = x.magia // save for aliasing
+        val yMagia = y.magia
+        ensureMagiaCapacityDiscard(minNormLen)
+        updateMeta(
+            Meta(
+                0,
+                Mago.setAnd(magia, xMagia, xNormLen, yMagia, yNormLen))
+        )
+        verify { isNormalized() }
+        return this
+    }
+
+    /**
+     * Performs an in-place bitwise AND operation with [y].
+     *
+     * Equivalent to `setAnd(this, y)`. Updates this instance to contain the bitwise
+     * AND of its current value and [y].
+     *
+     * @param y the operand to AND with this value (must be normalized)
+     * @return this [MutableBigInt] for call chaining
+     * @throws IllegalArgumentException if [y] is not normalized
+     *
+     * @see setAnd
+     */
+    fun mutAnd(y: BigIntNumber) = setAnd(this, y)
+
+    /**
+     * Sets this value to the bitwise OR of [x] and [y].
+     *
+     * Performs a bitwise OR operation on two unsigned big integers, where each bit
+     * in the result is set if the corresponding bit is set in either operand.
+     * The result's magnitude will equal the magnitude of the larger operand.
+     *
+     * Existing limb storage is reused or grown as needed. This operation supports
+     * aliasing, meaning [x] and/or [y] can safely reference `this` instance.
+     *
+     * @param x the first operand (must be normalized)
+     * @param y the second operand (must be normalized)
+     * @return this [MutableBigInt] for call chaining
+     * @throws IllegalArgumentException if either operand is not normalized
+     *
+     * @see mutOr for an in-place variant
+     */
+    fun setOr(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
+        verify { x.isNormalized() }
+        verify { y.isNormalized() }
+        val xNormLen = x.meta.normLen
+        val yNormLen = y.meta.normLen
+        val maxNormLen = max(x.meta.normLen, y.meta.normLen)
+        if (maxNormLen == 0)
+            return setZero()
+        val xMagia = x.magia // save for aliasing
+        val yMagia = y.magia
+        ensureMagiaCapacityDiscard(maxNormLen)
+        updateMeta(
+            Meta(
+                0,
+                Mago.setOr(magia, xMagia, xNormLen, yMagia, yNormLen))
+        )
+        verify { isNormalized() }
+        return this
+    }
+
+    /**
+     * Performs an in-place bitwise OR operation with [y].
+     *
+     * Equivalent to `setOr(this, y)`. Updates this instance to contain the bitwise
+     * OR of its current value and [y].
+     *
+     * @param y the operand to OR with this value (must be normalized)
+     * @return this [MutableBigInt] for call chaining
+     * @throws IllegalArgumentException if [y] is not normalized
+     *
+     * @see setOr
+     */
+    fun mutOr(y: BigIntNumber) = setOr(this, y)
+
+    /**
+     * Sets this value to the bitwise XOR (exclusive OR) of [x] and [y].
+     *
+     * Performs a bitwise XOR operation on two unsigned big integers, where each bit
+     * in the result is set only if the corresponding bits in the operands differ.
+     * The result's magnitude may be smaller than both operands if high-order bits cancel.
+     * When [x] equals [y], the result is zero.
+     *
+     * Existing limb storage is reused or grown as needed. This operation supports
+     * aliasing, meaning [x] and/or [y] can safely reference `this` instance.
+     *
+     * @param x the first operand (must be normalized)
+     * @param y the second operand (must be normalized)
+     * @return this [MutableBigInt] for call chaining
+     * @throws IllegalArgumentException if either operand is not normalized
+     *
+     * @see mutXor for an in-place variant
+     */
+    fun setXor(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
+        verify { x.isNormalized() }
+        verify { y.isNormalized() }
+        val xNormLen = x.meta.normLen
+        val yNormLen = y.meta.normLen
+        val maxNormLen = max(x.meta.normLen, y.meta.normLen)
+        if (maxNormLen == 0)
+            return setZero()
+        val xMagia = x.magia // save for aliasing
+        val yMagia = y.magia
+        ensureMagiaCapacityDiscard(maxNormLen)
+        updateMeta(
+            Meta(
+                0,
+                Mago.setXor(magia, xMagia, xNormLen, yMagia, yNormLen))
+        )
+        verify { isNormalized() }
+        return this
+    }
+
+    /**
+     * Performs an in-place bitwise XOR (exclusive OR) operation with [y].
+     *
+     * Equivalent to `setXor(this, y)`. Updates this instance to contain the bitwise
+     * XOR of its current value and [y]. When this value equals [y], the result is zero.
+     *
+     * @param y the operand to XOR with this value (must be normalized)
+     * @return this [MutableBigInt] for call chaining
+     * @throws IllegalArgumentException if [y] is not normalized
+     *
+     * @see setXor
+     */
+    fun mutXor(y: BigIntNumber) = setXor(this, y)
+
     fun montgomeryRedc(modulus: BigInt, np: UInt): MutableBigInt {
         require (modulus.isOdd())
         val k = modulus.meta.normLen
