@@ -1359,10 +1359,25 @@ class BigInt private constructor(
      *
      * The result is always non-negative.
      */
-    infix fun and(other: BigInt): BigInt =
-        fromNormalizedOrZero(
-            Mago.newAnd(this.magia, this.meta.normLen,
-                other.magia, other.meta.normLen))
+    infix fun and(other: BigInt): BigInt {
+        var iLast = min(this.meta.normLen, other.meta.normLen)
+        val thisMagia = magia
+        val otherMagia = other.magia
+        if (iLast <= thisMagia.size && iLast <= otherMagia.size) { // BCE
+            do {
+                --iLast
+                if (iLast < 0)
+                    return ZERO
+            } while ((thisMagia[iLast] and otherMagia[iLast]) == 0)
+            val z = Magia((iLast + 1))
+            while (iLast >= 0) {
+                z[iLast] = thisMagia[iLast] and otherMagia[iLast]
+                --iLast
+            }
+            return fromNormalizedNonZero(z)
+        }
+        throw IllegalStateException()
+    }
 
     /**
      * Returns a new BigInt representing the bitwise OR of the magnitudes,

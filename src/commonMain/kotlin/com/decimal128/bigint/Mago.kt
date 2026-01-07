@@ -1064,28 +1064,6 @@ internal object Mago {
 
 
     /**
-     * Returns a new normalized array holding `x AND y` over their normalized
-     * ranges. The result is trimmed to its highest non-zero limb, or [ZERO] if the
-     * AND is entirely zero.
-     *
-     * @return normalized [Magia] value or [ZERO]
-     */
-    fun newAnd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        var iLast = min(xNormLen, yNormLen)
-        do {
-            --iLast
-            if (iLast < 0)
-                return ZERO
-        } while ((x[iLast] and y[iLast]) == 0)
-        val z = Magia((iLast + 1))
-        while (iLast >= 0) {
-            z[iLast] = x[iLast] and y[iLast]
-            --iLast
-        }
-        return z
-    }
-
-    /**
      * Computes `z = x AND y` over the normalized ranges `x[0‥xNormLen)` and
      * `y[0‥yNormLen)`, returning the normalized limb length of the result.
      * Supports in-place mutation when `z` aliases `x` or `y`.
