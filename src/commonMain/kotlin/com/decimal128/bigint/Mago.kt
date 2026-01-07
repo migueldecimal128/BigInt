@@ -1511,68 +1511,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new integer array representing [x] divided by the 32-bit unsigned integer [w].
-     *
-     * This operation does not mutate the input [x]. The quotient is computed and returned as a
-     * new array. If the quotient is zero, a shared [ZERO] array is returned.
-     *
-     * @param x the integer array (least significant limb first) to be divided.
-     * @param w the 32-bit unsigned divisor.
-     * @return a new non-normalized [Magia] containing the quotient of the division.
-     * @throws ArithmeticException if [w] is zero.
-     */
-    fun newDiv32(x: Magia, xNormLen: Int, w: UInt): Magia {
-        verify { isNormalized(x, xNormLen) }
-        if (xNormLen > 0) {
-            val z = Magia(xNormLen)
-            val zNormLen = setDiv32(z, x, xNormLen, w)
-            if (zNormLen > 0)
-                return z
-        }
-        return ZERO
-    }
-
-    /**
-     * Divides the normalized limb array `x` by the normalized limb array `y` and
-     * returns a new non-normalized quotient array.
-     *
-     * Handles all size relations:
-     * - If `y` fits in one limb, delegates to the 32-bit divisor path.
-     * - If `x < y`, returns [ZERO].
-     * - If `x == y`, returns `[1]`.
-     * - Otherwise performs full Knuth division on `x` by `y`.
-     *
-     * @return the non-normalized quotient, or [ZERO] if the quotient is zero.
-     */
-    fun newDiv(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        verify { isNormalized(x, xNormLen) }
-        verify { isNormalized(y, yNormLen) }
-        when {
-            yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
-            yNormLen == 1 -> return newDiv32(x, xNormLen, y[0].toUInt())
-            xNormLen <= yNormLen -> {
-                val xBitLen = normBitLen(x, xNormLen)
-                val yBitLen = normBitLen(y, yNormLen)
-                if (xBitLen < yBitLen)
-                    return ZERO
-                if (xBitLen == yBitLen) {
-                    val cmp = compare(x, xNormLen, y, yNormLen)
-                    return if (cmp < 0) ZERO else ONE
-                }
-            }
-        }
-        val m = xNormLen
-        val n = yNormLen
-        val u = x
-        val v = y
-        val q = IntArray(m - n + 1)
-        val r = null
-        val qNormLen = knuthDivide(q, r, u, v, m, n)
-        verify { isNormalized(q, qNormLen) }
-        return if (qNormLen > 0) q else ZERO
-    }
-
-    /**
      * Divides the normalized integer [x] by [y] using Knuth division.
      *
      * @param z destination limb array for the quotient; must have size ≥ `xNormLen - yNormLen + 1`.

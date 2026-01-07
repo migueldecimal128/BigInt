@@ -1118,8 +1118,6 @@ class BigInt private constructor(
 
     operator fun times(dw: ULong): BigInt = mulImpl64(false, dw)
 
-    operator fun div(other: BigInt): BigInt = divImpl(other)
-
     operator fun div(n: Int): BigInt = divImpl32(n < 0, n.absoluteValue.toUInt())
 
     operator fun div(w: UInt): BigInt = divImpl32(false, w)
@@ -1127,6 +1125,36 @@ class BigInt private constructor(
     operator fun div(l: Long): BigInt = divImpl64(l < 0, l.absoluteValue.toULong())
 
     operator fun div(dw: ULong): BigInt = divImpl64(false, dw)
+
+    operator fun div(other: BigInt): BigInt {
+        val otherSign = other.meta.signFlag
+        val otherNormLen = other.meta.normLen
+        if (otherNormLen <= 2) {
+            return when {
+                otherNormLen == 1 -> divImpl32(otherSign, other.magia[0].toUInt())
+                otherNormLen == 2 -> {
+                    val divisor = (other.magia[1].toLong() shl 32) or (other.magia[0].toLong() and 0xFFFF_FFFFL)
+                    divImpl64(otherSign, divisor.toULong())
+                }
+                else -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+            }
+        }
+        val thisNormLen = meta.normLen
+        if (thisNormLen >= otherNormLen) {
+            if (thisNormLen == otherNormLen) {
+                val cmp = Mago.compare(magia, thisNormLen, other.magia, otherNormLen)
+                if (cmp < 0)
+                    return ZERO
+                if (cmp == 0)
+                    return ONE
+            }
+            val z = Magia(thisNormLen - otherNormLen + 1)
+            val zNormLen = Mago.setDivKnuth(z, magia, thisNormLen, null, other.magia, otherNormLen, null)
+            if (zNormLen > 0)
+                return fromNormalizedNonZero(meta.signFlag xor otherSign, z, zNormLen)
+        }
+        return ZERO
+    }
 
     operator fun rem(other: BigIntNumber): BigInt = remModImpl(other, isMod = false)
 
@@ -1788,19 +1816,6 @@ class BigInt private constructor(
             else -> Mago.setDivKnuth64(z, magia, meta.normLen, null, dw)
         }
         return fromNormalizedNonZero(sign, z, zNormLen)
-    }
-
-    fun divImpl(other: BigIntNumber): BigInt {
-        if (other.isZero())
-            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
-        if (!isZero()) {
-            val q = Mago.newDiv(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-            if (q !== Mago.ZERO) {
-                ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
-                return fromNonNormalizedManyNonZero(this.meta.signFlag xor other.meta.signFlag, q)
-            }
-        }
-        return ZERO
     }
 
     fun remModImpl(dw: ULong, isMod: Boolean): BigInt {

@@ -18,14 +18,6 @@ class TestMagia {
     }
 
     @Test
-    fun testProblemChild() {
-        testDiv(BigInteger.ONE.shiftLeft(32), BigInteger.ONE.shiftLeft(32))
-        testDiv(BigInteger.ONE, BigInteger.ONE)
-        testDiv(BigInteger.TWO, BigInteger.ONE)
-        testDiv(BigInteger.TEN, BigInteger.ONE)
-    }
-
-    @Test
     fun testProblem2() {
         val jbi = randJbi(1000)
         testRoundTripShift(jbi)
@@ -85,33 +77,6 @@ class TestMagia {
         val magia = MagiaTransducer.magiaFromBi(jbi)
         val bitLen = Mago.bitLen(magia)
         Assertions.assertEquals(jbi.bitLength(), bitLen)
-    }
-
-    @Test
-    fun testArithmetic() {
-        for (i in 0..<1000) {
-            val jjbiA = randJbi()
-            testDiv(jjbiA, jjbiA)
-
-            val jjbiB = randJbi()
-            testDiv(jjbiA, jjbiB)
-
-            val jbiC = jjbiA.add(BigInteger.ONE)
-            testDiv(jjbiA, jbiC)
-
-        }
-    }
-
-    fun testDiv(jbiA: BigInteger, jbiB: BigInteger) {
-        if (jbiB.signum() == 0)
-            return
-        val magiaA = MagiaTransducer.magiaFromBi(jbiA)
-        val magiaB = MagiaTransducer.magiaFromBi(jbiB)
-        val magiaQuot = Mago.newDiv(magiaA, Mago.normLen(magiaA), magiaB, Mago.normLen(magiaB))
-
-        val jbiQuot = jbiA.divide(jbiB)
-
-        assert(MagiaTransducer.EQ(magiaQuot, jbiQuot))
     }
 
 }

@@ -487,4 +487,12 @@ class TestBigInt {
         prod.setMul(BigInt.NEG_ONE, BigInt.NEG_ONE)
         assertEquals(BigInt.ONE, prod.toBigInt())
     }
+
+    @Test
+    fun testDivProblem1() {
+        val bi = "46412399206347454776".toBigInt()
+
+        val q = bi / bi
+        assertEquals(BigInt.ONE, q)
+    }
 }
