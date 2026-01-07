@@ -721,33 +721,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new limb array representing the product of [x] and [y].
-     *
-     * Only the normalized limbs `[0, xNormLen)` of [x] and `[0, yNormLen)` of [y] are used.
-     * Returns [ZERO] if either operand is zero.
-     *
-     * Limb storage is preallocated using bit-length estimates; the returned array may
-     * contain unused high limbs even though the product itself is normalized.
-     *
-     * @param x magnitude limb array for the first operand.
-     * @param xNormLen normalized limb length of [x].
-     * @param y magnitude limb array for the second operand.
-     * @param yNormLen normalized limb length of [y].
-     *
-     * @return [ZERO] or a (possibly non-normalized) limb array containing the product.
-     */
-    fun newMul(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        if (xNormLen == 0 || yNormLen == 0)
-            return ZERO
-        val xBitLen = normBitLen(x, xNormLen)
-        val yBitLen = normBitLen(y, yNormLen)
-        val z = newWithBitLen(xBitLen + yBitLen)
-        val zNormLen = setMul(z, x, xNormLen, y, yNormLen)
-        verify { isNormalized(z, zNormLen) }
-        return z
-    }
-
-    /**
      * Multiplies the first [xNormLen] limbs of [x] by the first [yNormLen] limbs of [y],
      * accumulating the result into [z].
      *
@@ -856,36 +829,6 @@ internal object Mago {
         } else {
             throw IllegalArgumentException()
         }
-    }
-
-    /**
-     * Returns a new limb array containing the square of a normalized magnitude.
-     *
-     * The result represents `x²`, computed from the first [xNormLen] limbs of [x].
-     * If `xNormLen == 0` (canonical zero), this function returns [ZERO].
-     *
-     * The returned array is freshly allocated, large enough to hold the full
-     * square estimated from bit length.
-     *
-     * Preconditions:
-     * - [x] must be normalized for [xNormLen]
-     *
-     * @param x the source limb array (least-significant limb first)
-     * @param xNormLen number of significant limbs in [x]
-     * @return a non-normalized limb array representing `x²`
-     */
-    fun newSqr(x: Magia, xNormLen: Int): Magia {
-        verify { isNormalized(x, xNormLen) }
-        if (xNormLen < MagoSqr.KARATSUBA_SQR_THRESHOLD) {
-            val z = IntArray(2 * xNormLen)
-            val zNormLen = MagoSqr.setSqr(z, x, xNormLen)
-            verify { isNormalized(z, zNormLen) }
-            return z
-        }
-        val z = IntArray(2 * xNormLen + 1)
-        val t = IntArray(3 * ((xNormLen + 1) / 2) + 3)
-        MagoSqr.karatsubaSqr(z, 0, x, 0, xNormLen, t)
-        return z
     }
 
     /**
