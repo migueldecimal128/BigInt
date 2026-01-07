@@ -1093,24 +1093,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new normalized array holding `x OR y` over their normalized ranges.
-     * If the OR is zero, returns [ZERO].
-     *
-     * @return the normalized [Magia] value or [ZERO]
-     */
-    fun newOr(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        verify { isNormalized(x, xNormLen) }
-        verify { isNormalized(y, yNormLen) }
-        val maxLen = max(xNormLen, yNormLen)
-        if (maxLen != 0) {
-            val z = Magia(maxLen)
-            setOr(z, x, xNormLen, y, yNormLen)
-            return z
-        }
-        return ZERO
-    }
-
-    /**
      * Computes `z = x OR y` over the normalized ranges `x[0‥xNormLen)` and
      * `y[0‥yNormLen)`.
      * The result length is the larger of the two operand lengths, and the write
@@ -1140,20 +1122,6 @@ internal object Mago {
             }
         }
         throw IllegalArgumentException()
-    }
-
-    /**
-     * Returns a new non-normalized array holding `x XOR y` over their normalized
-     * ranges. Uses `setXor` to compute the result. Returns [ZERO] if the
-     * XOR result is zero.
-     *
-     * @return non-normalized [Magia]
-     */
-    fun newXor(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        val maxLen = max(xNormLen, yNormLen)
-        val z = Magia(maxLen)
-        val zNormLen = setXor(z, x, xNormLen, y, yNormLen)
-        return if (zNormLen == 0) ZERO else z
     }
 
     /**
@@ -1278,40 +1246,6 @@ internal object Mago {
         }
         throw IllegalArgumentException(ERR_MSG_NEGATIVE_INDEX)
 
-    }
-
-    /**
-     * Creates a new limb array containing the 32-bit unsigned value [w] placed at the
-     * bit position [bitIndex], with all other bits zero. This is equivalent to
-     *
-     *     result = w << bitIndex
-     *
-     * represented as a little-endian array of 32-bit limbs.
-     *
-     * The array is sized to hold all non-zero bits of `(w << bitIndex)`. If [w] is
-     * zero, the canonical zero array [ZERO] is returned.
-     *
-     * Shift operations rely on JVM semantics, where 32-bit shifts use the shift
-     * count modulo 32.
-     *
-     * @param w the 32-bit unsigned value to place.
-     * @param bitIndex the bit position (0 = least-significant bit).
-     * @return a new limb array with `w` inserted beginning at [bitIndex].
-     */
-    fun newWithUIntAtBitIndex(w: UInt, bitIndex: Int): Magia {
-        if (w == 0u)
-            return ZERO
-        val wBitLen = 32 - w.countLeadingZeroBits()
-        val z = newWithBitLen(wBitLen + bitIndex)
-        val limbIndex = bitIndex ushr 5
-        val innerShift = bitIndex and 0x1F
-        z[limbIndex] = (w shl innerShift).toInt()
-        if (limbIndex + 1 < z.size) {
-            verify { innerShift != 0 }
-            z[limbIndex + 1] = (w shr (32 - innerShift)).toInt()
-        }
-        verify { extractULongAtBitIndex(z, z.size, bitIndex) == w.toULong() }
-        return z
     }
 
     /**
@@ -1599,7 +1533,7 @@ internal object Mago {
      * @return a new non-normalized [Magia] containing the quotient of the division.
      * @throws ArithmeticException if [w] is zero.
      */
-    fun newDiv(x: Magia, xNormLen: Int, w: UInt): Magia {
+    fun newDiv32(x: Magia, xNormLen: Int, w: UInt): Magia {
         verify { isNormalized(x, xNormLen) }
         if (xNormLen > 0) {
             val z = Magia(xNormLen)
@@ -1620,9 +1554,9 @@ internal object Mago {
      * - [ONE]  if `x == dw`
      * - the non-normalized quotient otherwise.
      */
-    fun newDiv(x: Magia, xNormLen: Int, dw: ULong): Magia {
+    fun newDiv64(x: Magia, xNormLen: Int, dw: ULong): Magia {
         if ((dw shr 32) == 0uL)
-            return newDiv(x, xNormLen, dw.toUInt())
+            return newDiv32(x, xNormLen, dw.toUInt())
         val cmp = compare(x, xNormLen, dw)
         when {
             cmp < 0 -> return ZERO
@@ -1655,7 +1589,7 @@ internal object Mago {
         verify { isNormalized(y, yNormLen) }
         when {
             yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
-            yNormLen == 1 -> return newDiv(x, xNormLen, y[0].toUInt())
+            yNormLen == 1 -> return newDiv32(x, xNormLen, y[0].toUInt())
             xNormLen <= yNormLen -> {
                 val xBitLen = normBitLen(x, xNormLen)
                 val yBitLen = normBitLen(y, yNormLen)

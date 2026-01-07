@@ -7,12 +7,12 @@ package com.decimal128.bigint
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
-import com.decimal128.bigint.Mago.limbLenFromBitLen
-import com.decimal128.bigint.Mago.newNormalizedCopy
 import com.decimal128.bigint.Mago.newWithBitLen
 import com.decimal128.bigint.Mago.normBitLen
+import com.decimal128.bigint.Mago.setOr
 import com.decimal128.bigint.Mago.setShiftLeft
 import com.decimal128.bigint.Mago.setShiftRight
+import com.decimal128.bigint.Mago.setXor
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
@@ -1120,13 +1120,13 @@ class BigInt private constructor(
 
     operator fun div(other: BigInt): BigInt = divImpl(other)
 
-    operator fun div(n: Int): BigInt = divImpl(n < 0, n.absoluteValue.toUInt().toULong())
+    operator fun div(n: Int): BigInt = divImpl32(n < 0, n.absoluteValue.toUInt())
 
-    operator fun div(w: UInt): BigInt = divImpl(false, w.toULong())
+    operator fun div(w: UInt): BigInt = divImpl32(false, w)
 
-    operator fun div(l: Long): BigInt = divImpl(l < 0, l.absoluteValue.toULong())
+    operator fun div(l: Long): BigInt = divImpl64(l < 0, l.absoluteValue.toULong())
 
-    operator fun div(dw: ULong): BigInt = divImpl(false, dw)
+    operator fun div(dw: ULong): BigInt = divImpl64(false, dw)
 
     operator fun rem(other: BigIntNumber): BigInt = remModImpl(other, isMod = false)
 
@@ -1385,10 +1385,17 @@ class BigInt private constructor(
      *
      * The result is always non-negative.
      */
-    infix fun or(other: BigInt): BigInt =
-        fromNormalizedOrZero(
-            Mago.newOr(this.magia, this.meta.normLen,
-                other.magia, other.meta.normLen))
+    infix fun or(other: BigInt): BigInt {
+        val thisNormLen = meta.normLen
+        val otherNormLen = other.meta.normLen
+        val maxLen = max(thisNormLen, otherNormLen)
+        if (maxLen > 0) {
+            val z = Magia(maxLen)
+            val zNormLen = setOr(z, magia, thisNormLen, other.magia, otherNormLen)
+            return fromNormalizedNonZero(z, zNormLen)
+        }
+        return ZERO
+    }
 
     /**
      * Returns a new BigInt representing the bitwise XOR of the magnitudes,
@@ -1396,10 +1403,16 @@ class BigInt private constructor(
      *
      * The result is always non-negative.
      */
-    infix fun xor(other: BigInt): BigInt =
-        fromNonNormalizedOrZero(
-            Mago.newXor(this.magia, this.meta.normLen,
-                other.magia, other.meta.normLen))
+    infix fun xor(other: BigInt): BigInt {
+        val thisNormLen = meta.normLen
+        val otherNormLen = other.meta.normLen
+        val maxLen = max(thisNormLen, otherNormLen)
+        val z = Magia(maxLen)
+        val zNormLen = setXor(z, magia, thisNormLen, other.magia, otherNormLen)
+        if (zNormLen > 0)
+            return fromNormalizedNonZero(z, zNormLen)
+        return ZERO
+    }
 
     /**
      * Performs an unsigned right shift (logical shift) of the magnitude.
@@ -1746,13 +1759,27 @@ class BigInt private constructor(
         } else ZERO
     }
 
-    fun divImpl(dwSign: Boolean, dw: ULong): BigInt {
-        if (dw == 0uL)
-            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+    fun divImpl32(wSign: Boolean, w: UInt): BigInt {
+        ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
+        if (w != 0u) {
+            if (!isZero()) {
+                val z = Magia(meta.normLen)
+                val zNormLen = Mago.setDiv32(z, magia, meta.normLen, w)
+                if (zNormLen > 0)
+                    return fromNormalizedNonZero(this.meta.signFlag xor wSign, z, zNormLen)
+            }
+            return ZERO
+        }
+        throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+    }
+
+    fun divImpl64(dwSign: Boolean, dw: ULong): BigInt {
+        if ((dw shr 32) == 0uL)
+            return divImpl32(dwSign, dw.toUInt())
+        ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
         if (!isZero()) {
-            val q = Mago.newDiv(magia, meta.normLen, dw)
+            val q = Mago.newDiv64(magia, meta.normLen, dw)
             if (q !== Mago.ZERO) {
-                ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
                 return fromNonNormalizedManyNonZero(this.meta.signFlag xor dwSign, q)
             }
         }

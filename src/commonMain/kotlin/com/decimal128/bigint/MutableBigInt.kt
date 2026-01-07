@@ -1092,13 +1092,13 @@ class MutableBigInt private constructor (
      * @throws ArithmeticException if division by zero occurs
      */
     fun setDiv(x: MutableBigInt, n: Int): MutableBigInt =
-        setDivImpl(x, n < 0, n.absoluteValue.toUInt().toULong())
+        setDivImpl32(x, n < 0, n.absoluteValue.toUInt())
     fun setDiv(x: MutableBigInt, w: UInt): MutableBigInt =
-        setDivImpl(x, false, w.toULong())
+        setDivImpl32(x, false, w)
     fun setDiv(x: MutableBigInt, l: Long): MutableBigInt =
-        setDivImpl(x, l < 0L, l.absoluteValue.toULong())
+        setDivImpl64(x, l < 0L, l.absoluteValue.toULong())
     fun setDiv(x: MutableBigInt, dw: ULong): MutableBigInt =
-        setDivImpl(x, false, dw)
+        setDivImpl64(x, false, dw)
     fun setDiv(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
         ensureMagiaCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
         if (! trySetDivFastPath(x, y)) {
@@ -1109,6 +1109,14 @@ class MutableBigInt private constructor (
                 Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)))
             ++BI_OP_COUNTS[MBI_SET_DIV_BI_KNUTH.ordinal]
         }
+        return this
+    }
+
+    private fun setDivImpl32(x: BigIntNumber, ySign: Boolean, yW: UInt): MutableBigInt {
+        ++BI_OP_COUNTS[MBI_SET_DIV_PRIMITIVE.ordinal]
+        ensureMagiaCapacityDiscard(x.meta.normLen)
+        val normLen = Mago.setDiv32(magia, x.magia, x.meta.normLen, yW)
+        updateMeta(Meta(x.meta.signFlag xor ySign, normLen))
         return this
     }
 
@@ -1124,7 +1132,7 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      * @throws ArithmeticException if division by zero is detected
      */
-    private fun setDivImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
+    private fun setDivImpl64(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
         ++BI_OP_COUNTS[MBI_SET_DIV_PRIMITIVE.ordinal]
         ensureMagiaCapacityDiscard(x.meta.normLen - 1 + 1) // yDw might represent a single limb
         if (trySetDivFastPath64(x, ySign, yDw))
