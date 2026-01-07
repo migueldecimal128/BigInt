@@ -90,34 +90,21 @@ class TestMagia {
     fun testArithmetic() {
         for (i in 0..<1000) {
             val jjbiA = randJbi()
-            testAdd(jjbiA, jjbiA)
             testSub(jjbiA, jjbiA)
             testMul(jjbiA, jjbiA)
             testDiv(jjbiA, jjbiA)
 
             val jjbiB = randJbi()
-            testAdd(jjbiA, jjbiB)
             testSub(jjbiA, jjbiB)
             testMul(jjbiA, jjbiB)
             testDiv(jjbiA, jjbiB)
 
             val jbiC = jjbiA.add(BigInteger.ONE)
-            testAdd(jjbiA, jbiC)
             testSub(jjbiA, jbiC)
             testMul(jjbiA, jbiC)
             testDiv(jjbiA, jbiC)
 
         }
-    }
-
-    fun testAdd(jjbiA: BigInteger, jjbiB: BigInteger) {
-        val magiaA = MagiaTransducer.magiaFromBi(jjbiA)
-        val magiaB = MagiaTransducer.magiaFromBi(jjbiB)
-        val magiaSum = Mago.newAdd(magiaA, Mago.normLen(magiaA), magiaB, Mago.normLen(magiaB))
-
-        val jbiSum = jjbiA.add(jjbiB)
-
-        assert(MagiaTransducer.EQ(magiaSum, jbiSum))
     }
 
     fun testSub(jjbiA: BigInteger, jjbiB: BigInteger) {

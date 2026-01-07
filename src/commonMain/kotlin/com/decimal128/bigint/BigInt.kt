@@ -1576,7 +1576,8 @@ class BigInt private constructor(
                 thisNormLen == 0 -> return from(otherSign, dw)
                 // do subtraction
                 thisNormLen > 2 ->
-                    return fromNonNormalizedManyNonZero(thisSign, Mago.newSub64(this.magia, this.meta.normLen, dw))
+                    return fromNonNormalizedManyNonZero(thisSign,
+                        Mago.newSub64(this.magia, this.meta.normLen, dw))
                 else -> {
                     val loLimbs = toULongMagnitude()
                     val cmp = loLimbs.compareTo(dw)
@@ -1600,34 +1601,42 @@ class BigInt private constructor(
      * @return a new BigInt representing the result
      */
     fun addImpl(isSub: Boolean, other: BigIntNumber): BigInt {
-        val otherSign = isSub xor other.meta.isNegative
+        val thisSign = this.meta.signFlag
+        val thisNormLen = this.meta.normLen
+        val otherSign = isSub xor other.meta.signFlag
+        val otherNormLen = other.meta.normLen
         when {
-            other.isZero() -> return this
-            this.isZero() && isSub -> return other.toBigInt().negate()
-            this.isZero() -> other.toBigInt()
-            this.meta.signFlag == otherSign -> {
+            thisSign == otherSign && thisNormLen > 0 && otherNormLen > 0 -> {
                 ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
-                return BigInt.fromNonNormalizedManyNonZero(
-                    this.meta.signFlag,
-                    Mago.newAdd(
-                        this.magia, this.meta.normLen,
-                        other.magia, other.meta.normLen
-                    )
-                )
+                val thisBitLen = this.magnitudeBitLen()
+                val otherBitLen = other.magnitudeBitLen()
+                val zBitLen = max(thisBitLen, otherBitLen) + 1
+                val z = Magia((zBitLen + 31) ushr 5)
+                val zNormLen = Mago.setAdd(z, this.magia, thisNormLen, other.magia, otherNormLen)
+                return fromNormalizedNonZero(thisSign, z, zNormLen)
+            }
+            otherNormLen == 0 -> return this
+            thisNormLen == 0 && isSub -> return other.toBigInt().negate()
+            thisNormLen == 0 -> return other.toBigInt()
+            else -> {
+                val cmp = this.magnitudeCompareTo(other)
+                if (cmp != 0) {
+                    return if (cmp > 0) {
+                        ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
+                        fromNonNormalizedManyNonZero(
+                            this.meta.signFlag,
+                            Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
+                        )
+                    } else {
+                        fromNonNormalizedManyNonZero(
+                            otherSign,
+                            Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen)
+                        )
+                    }
+                }
+                return ZERO
             }
         }
-        val cmp = this.magnitudeCompareTo(other)
-        if (cmp != 0) {
-            return if (cmp > 0) {
-                ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
-                fromNonNormalizedManyNonZero(this.meta.signFlag,
-                    Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen))
-            } else {
-                fromNonNormalizedManyNonZero(otherSign,
-                    Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen))
-            }
-        }
-        return ZERO
     }
 
     fun mulImpl32(dwSign: Boolean, w: UInt): BigInt {

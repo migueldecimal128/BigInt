@@ -344,22 +344,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new limb array representing the sum of [x] and [y].
-     *
-     * The result will sometimes be not normalized.
-     */
-    fun newAdd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        verify { isNormalized(x, xNormLen) }
-        verify { isNormalized(y, yNormLen) }
-        val newLen = max(xNormLen, yNormLen) + 1
-        val z = Magia(newLen)
-        //val newBitLen = max(normBitLen(x, xNormLen), normBitLen(y, yNormLen)) + 1
-        //val z = newWithBitLen(newBitLen)
-        setAdd(z, x, xNormLen, y, yNormLen)
-        return z
-    }
-
-    /**
      * Increments normalized limb array [x] in place and
      * returns the resulting normalized [Magia].
      *
