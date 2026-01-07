@@ -7,8 +7,11 @@ package com.decimal128.bigint
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
+import com.decimal128.bigint.Mago.limbLenFromBitLen
+import com.decimal128.bigint.Mago.newNormalizedCopy
 import com.decimal128.bigint.Mago.newWithBitLen
 import com.decimal128.bigint.Mago.normBitLen
+import com.decimal128.bigint.Mago.setShiftLeft
 import com.decimal128.bigint.Mago.setShiftRight
 import kotlin.math.absoluteValue
 import kotlin.math.max
@@ -1457,9 +1460,14 @@ class BigInt private constructor(
     infix fun shl(bitCount: Int): BigInt {
         return when {
             isZero() || bitCount == 0 -> this
-            bitCount > 0 ->
-                fromNormalizedNonZero(this.meta.signFlag,
-                    Mago.newShiftLeft(magia, meta.normLen, bitCount))
+            bitCount > 0 -> {
+                val thisBitLen = normBitLen(magia, meta.normLen)
+                val zBitLen = thisBitLen + bitCount
+                val z = newWithBitLen(zBitLen)
+                val zNormLen = setShiftLeft(z, magia, meta.normLen, bitCount)
+                verify { zNormLen == z.size }
+                fromNormalizedNonZero(meta.signFlag, z)
+            }
             else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         }
     }

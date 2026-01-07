@@ -845,32 +845,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new [Magia] representing [x] shifted left by [bitCount] bits.
-     *
-     * Bits shifted out of the low end propagate into higher limbs. The returned
-     * array will be longer than [x] to accommodate the resulting value.
-     *
-     * @param x the source magnitude in little-endian limb order.
-     * @param bitCount the number of bits to shift left; must be non-negative.
-     * @return a new [Magia] containing the shifted value.
-     * @throws IllegalArgumentException if [bitCount] is negative.
-     */
-    fun newShiftLeft(x: Magia, xNormLen: Int, bitCount: Int): Magia {
-        val xBitLen = normBitLen(x, xNormLen)
-        if (xBitLen == 0)
-            return ZERO
-        if (bitCount == 0)
-            return newNormalizedCopy(x, xNormLen)
-        val zBitLen = xBitLen + bitCount
-        val zNormLen = limbLenFromBitLen(zBitLen)
-        val z = Magia(zNormLen)
-        val zNormLen2 = setShiftLeft(z, x, xNormLen, bitCount)
-        verify { zNormLen == zNormLen2 }
-        verify { isNormalized(z, zNormLen) }
-        return z
-    }
-
-    /**
      * Shifts `x[0‥xLen)` left by `bitCount` bits and writes the result into `z`
      * (supports in-place use when `z === x`).
      *
@@ -942,7 +916,7 @@ internal object Mago {
         // clear lower limbs
         z.fill(0, 0, wordShift)
 
-        check(isNormalized(z, zNormLen))
+        verify { isNormalized(z, zNormLen) }
         return zNormLen
     }
 
