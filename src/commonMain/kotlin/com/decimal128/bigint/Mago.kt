@@ -624,34 +624,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new limb array representing [x] multiplied by the unsigned 32-bit value [w].
-     *
-     * Only the normalized limbs `[0, xNormLen)` of [x] are used. Returns [ZERO] if [x] is zero
-     * or if [w] is zero.
-     *
-     * Limb storage is preallocated using a bit-length estimate based on [x] and [w]; the
-     * returned array may therefore contain unused high limbs even though the computed
-     * product itself is normalized.
-     *
-     * @param x magnitude limb array for the multiplicand.
-     * @param xNormLen normalized limb length of [x].
-     * @param w unsigned 32-bit multiplier.
-     *
-     * @return [ZERO] or a (possibly non-normalized) [Magia] containing the product.
-     */
-    fun newMul32(x: Magia, xNormLen: Int, w: UInt): Magia {
-        verify { isNormalized(x, xNormLen) }
-        if (xNormLen == 0 || w == 0u)
-            return ZERO
-        val xBitLen = normBitLen(x, xNormLen)
-        val zBitLen = xBitLen + 32 - w.countLeadingZeroBits()
-        val z = newWithBitLen(zBitLen)
-        val zNormLen = setMul32(z, x, xNormLen, w)
-        verify { isNormalized(z, zNormLen) }
-        return z
-    }
-
-    /**
      * Multiplies a normalized multi-limb integer [x] (first [xNormLen] limbs) by a single 32-bit word [w],
      * storing the result in [z]. The operation is safe in-place, so [z] may be the same array as [x].
      *
@@ -688,33 +660,6 @@ internal object Mago {
             }
         }
         throw IllegalArgumentException()
-    }
-
-    /**
-     * Returns a new limb array representing [x] multiplied by the unsigned 64-bit value [dw].
-     *
-     * Only the normalized limbs `[0, xNormLen)` of [x] are used. Returns [ZERO] if [x] is zero
-     * or if [dw] is zero.
-     *
-     * Limb storage is preallocated using a bit-length estimate based on [x] and [dw]; the
-     * returned array may therefore contain unused high limbs even though the computed
-     * product itself is normalized.
-     *
-     * @param x magnitude limb array for the multiplicand.
-     * @param xNormLen normalized limb length of [x].
-     * @param dw unsigned 64-bit multiplier.
-     *
-     * @return [ZERO] or a (possibly non-normalized) [Magia] containing the product.
-     */
-    fun newMul64(x: Magia, xNormLen: Int, dw: ULong): Magia {
-        if (xNormLen == 0 || dw == 0uL)
-            return ZERO
-        val xBitLen = normBitLen(x, xNormLen)
-        val zBitLen = xBitLen + 64 - dw.countLeadingZeroBits()
-        val z = newWithBitLen(zBitLen)
-        val zNormLen = setMul64(z, x, xNormLen, dw)
-        verify { isNormalized(z, zNormLen) }
-        return z
     }
 
     /**

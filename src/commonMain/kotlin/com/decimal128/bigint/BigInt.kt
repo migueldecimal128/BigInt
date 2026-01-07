@@ -1105,13 +1105,13 @@ class BigInt private constructor(
 
     operator fun times(other: BigIntNumber): BigInt = mulImpl(other)
 
-    operator fun times(n: Int): BigInt = mulImpl(n < 0, n.absoluteValue.toUInt().toULong())
+    operator fun times(n: Int): BigInt = mulImpl32(n < 0, n.absoluteValue.toUInt())
 
-    operator fun times(w: UInt): BigInt = mulImpl(false, w.toULong())
+    operator fun times(w: UInt): BigInt = mulImpl32(false, w)
 
-    operator fun times(l: Long): BigInt = mulImpl(l < 0, l.absoluteValue.toULong())
+    operator fun times(l: Long): BigInt = mulImpl64(l < 0, l.absoluteValue.toULong())
 
-    operator fun times(dw: ULong): BigInt = mulImpl(false, dw)
+    operator fun times(dw: ULong): BigInt = mulImpl64(false, dw)
 
     operator fun div(other: BigInt): BigInt = divImpl(other)
 
@@ -1646,22 +1646,32 @@ class BigInt private constructor(
     }
 
     fun mulImpl32(dwSign: Boolean, w: UInt): BigInt {
+        ++BI_OP_COUNTS[BI_MUL_PRIMITIVE.ordinal]
         return if (!isZero() && w != 0u) {
-            ++BI_OP_COUNTS[BI_MUL_PRIMITIVE.ordinal]
-            fromNonNormalizedManyNonZero(
-                this.meta.signFlag xor dwSign,
-                Mago.newMul32(this.magia, this.meta.normLen, w)
-            )
+            val sign = this.meta.signFlag xor dwSign
+            val thisMagia = this.magia
+            val thisNormLen = this.meta.normLen
+            val xBitLen = Mago.normBitLen(thisMagia, thisNormLen)
+            val wBitLen = 32 - w.countLeadingZeroBits()
+            val zBitLen = xBitLen + wBitLen
+            val z = newWithBitLen(zBitLen)
+            val zNormLen = Mago.setMul32(z, thisMagia, thisNormLen, w)
+            fromNormalizedNonZero(sign, z, zNormLen)
         } else ZERO
     }
 
-    fun mulImpl(dwSign: Boolean, dw: ULong): BigInt {
+    fun mulImpl64(dwSign: Boolean, dw: ULong): BigInt {
+        ++BI_OP_COUNTS[BI_MUL_PRIMITIVE.ordinal]
         return if (!isZero() && dw != 0uL) {
-            ++BI_OP_COUNTS[BI_MUL_PRIMITIVE.ordinal]
-            fromNonNormalizedManyNonZero(
-                this.meta.signFlag xor dwSign,
-                Mago.newMul64(this.magia, this.meta.normLen, dw)
-            )
+            val sign = this.meta.signFlag xor dwSign
+            val thisMagia = this.magia
+            val thisNormLen = this.meta.normLen
+            val xBitLen = Mago.normBitLen(thisMagia, thisNormLen)
+            val dwBitLen = 64 - dw.countLeadingZeroBits()
+            val zBitLen = xBitLen + dwBitLen
+            val z = newWithBitLen(zBitLen)
+            val zNormLen = Mago.setMul64(z, thisMagia, thisNormLen, dw)
+            fromNormalizedNonZero(sign, z, zNormLen)
         } else ZERO
     }
 
