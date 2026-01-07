@@ -1538,8 +1538,13 @@ class BigInt private constructor(
 
                 w == 0u -> return this
                 // do subtraction
-                thisNormLen > 1 ->
-                    return fromNonNormalizedManyNonZero(thisSign, Mago.newSub32(this.magia, this.meta.normLen, w))
+                thisNormLen > 1 -> {
+                    val z = Magia(thisNormLen)
+                    val zNormLen = Mago.setSub32(z, this.magia, thisNormLen, w)
+                    if (zNormLen > 0)
+                        return fromNormalizedNonZero(thisSign, z, zNormLen)
+                    return ZERO
+                }
 
                 thisNormLen == 1 -> {
                     val loLimb = magia[0].toUInt()
@@ -1575,15 +1580,19 @@ class BigInt private constructor(
                 dw == 0uL -> return this
                 thisNormLen == 0 -> return from(otherSign, dw)
                 // do subtraction
-                thisNormLen > 2 ->
-                    return fromNonNormalizedManyNonZero(thisSign,
-                        Mago.newSub64(this.magia, this.meta.normLen, dw))
+                thisNormLen > 2 -> {
+                    val z = Magia(thisNormLen)
+                    val zNormLen = Mago.setSub64(z, magia, thisNormLen, dw)
+                    if (zNormLen > 0)
+                        return fromNormalizedNonZero(thisSign, z, zNormLen)
+                    return ZERO
+                }
                 else -> {
-                    val loLimbs = toULongMagnitude()
-                    val cmp = loLimbs.compareTo(dw)
+                    val thisMag = toULongMagnitude()
+                    val cmp = thisMag.compareTo(dw)
                     return when {
-                        cmp > 0 -> from(thisSign, loLimbs - dw)
-                        cmp < 0 -> from(!thisSign, dw - loLimbs)
+                        cmp > 0 -> from(thisSign, thisMag - dw)
+                        cmp < 0 -> from(!thisSign, dw - thisMag)
                         else -> ZERO
                     }
                 }

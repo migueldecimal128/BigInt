@@ -493,49 +493,36 @@ internal object Mago {
         throw IllegalArgumentException()
     }
 
-    /**
-     * Returns a new limb array representing [x] minus the unsigned 64-bit value [dw].
-     * The caller must ensure that x >= y.
-     *
-     * If the result is zero or the subtraction underflows, returns [ZERO].
-     */
-    fun newSub64(x: Magia, xNormLen: Int, dw: ULong): Magia {
+    fun setSub32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
         verify { isNormalized(x, xNormLen) }
         if (xNormLen >= 0 && xNormLen <= x.size) {
-            val dws = dw.toLong()
-            val z = Magia(xNormLen)
-            var orAccumulator = 0
-            var borrow = 0L
-            if (z.isNotEmpty()) {
-                val t0 = x[0].toDws() - (dws and MASK32L)
-                val z0 = t0.toInt()
-                z[0] = z0
-                orAccumulator = z0
-                if (z.size > 1) {
-                    borrow = t0 ushr 63
-                    val t1 = x[1].toDws() - (dws ushr 32) - borrow
-                    val z1 = t1.toInt()
-                    z[1] = z1
-                    orAccumulator = orAccumulator or z1
-                    borrow = t1 ushr 63
-                    var i = 2
-                    while (i < z.size) {
-                        val t = x[i].toDws() - borrow
-                        val zi = t.toInt()
-                        z[i] = zi
-                        orAccumulator = orAccumulator or zi
-                        borrow = t ushr 63
-                        ++i
-                    }
+            val xNormLen = normLen(x, xNormLen)
+            if (xNormLen <= z.size) {
+                if (xNormLen <= 1 && toRawULong(x, xNormLen) < w)
+                    throw ArithmeticException(ERR_MSG_SUB_UNDERFLOW)
+                var lastNonZeroIndex = -1
+                var borrow = w.toLong()
+                var i = 0
+                while (i < xNormLen) {
+                    borrow = x[i].toDws() - borrow
+                    val zi = borrow.toInt()
+                    z[i] = zi
+                    borrow = borrow ushr 63
+                    // branchless update of last non-zero
+                    val nonZeroMask = (zi or -zi) shr 31
+                    lastNonZeroIndex =
+                        (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
+                    ++i
+                }
+                if (borrow == 0L) {
+                    val zNormLen = lastNonZeroIndex + 1
+                    verify { isNormalized(z, zNormLen) }
+                    return zNormLen
                 }
             }
-            if (borrow == 0L)
-                return if (orAccumulator == 0) ZERO else z
         }
         throw IllegalArgumentException()
     }
-
-    fun newSub32(x: Magia, xNormLen: Int, w: UInt): Magia = newSub64(x, xNormLen, w.toULong())
 
     /**
      * Subtracts a 64-bit unsigned integer [dw] from a multi-limb big integer [x] (first [xLen] limbs),
