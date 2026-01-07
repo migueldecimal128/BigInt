@@ -344,35 +344,6 @@ internal object Mago {
     }
 
     /**
-     * Increments normalized limb array [x] in place and
-     * returns the resulting normalized [Magia].
-     *
-     * If the addition overflows all limbs a new array with one
-     * extra limb is returned.
-     *
-     * @return the normalized input [x] or a new normalized [Magia]
-     */
-    fun newOrMutateIncrement(x: Magia): Magia {
-        verify { isNormalized(x, x.size) }
-        var carry = 1L
-        var i = 0
-        while (carry != 0L && i < x.size) {
-            val t = x[i].toDws() + carry
-            x[i] = t.toInt()
-            carry = t ushr 32
-            ++i
-        }
-        if (carry == 0L)
-            return x
-        // the only way we can have a carry is if all limbs
-        // have mutated to zero
-        verify { normLen(x) == 0 }
-        val z = Magia(x.size + 1)
-        z[x.size] = 1
-        return z
-    }
-
-    /**
      * Adds the unsigned 64-bit value `dw` to `x[0‥xNormLen)` and writes the result
      * into `z` (which may be the same array for in-place mutation).
      *
@@ -832,33 +803,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new [Magia] representing [x] logically shifted right by [bitCount] bits.
-     *
-     * Bits shifted out of the least significant end are discarded, and new high bits are filled with zeros.
-     * The original [x] is not modified.
-     *
-     * @param x the source magnitude in little-endian limb order.
-     * @param bitCount the number of bits to shift right; must be non-negative.
-     * @return a new normalized [Magia] containing the shifted result or [ZERO]
-     * @throws IllegalArgumentException if [bitCount] is negative.
-     */
-    fun newShiftRight(x: Magia, xNormLen: Int, bitCount: Int): Magia {
-        if (bitCount >= 0) {
-            verify { isNormalized(x, xNormLen) }
-            require(bitCount >= 0)
-            val newBitLen = normBitLen(x, xNormLen) - bitCount
-            if (newBitLen <= 0)
-                return ZERO
-            val z = newWithBitLen(newBitLen)
-            val zNormLen = setShiftRight(z, x, xNormLen, bitCount)
-            check(zNormLen == z.size)
-            verify { isNormalized(z, zNormLen) }
-            return z
-        }
-        throw IllegalArgumentException()
-    }
-
-    /**
      * Shifts the first [xLen] limbs of [x] right by [bitCount] bits, storing
      * the results in z.
      *
@@ -1314,18 +1258,6 @@ internal object Mago {
         }
         throw IllegalArgumentException()
     }
-
-    /**
-     * Checks if any of the lower [bitCount] bits in [x] are set.
-     *
-     * Considers all limbs of [x]. Efficiently stops scanning as soon as a set bit is found.
-     *
-     * @param x the array of 32-bit limbs representing the integer.
-     * @param bitCount the number of least-significant bits to check.
-     * @return `true` if at least one of the lower [bitCount] bits is set, `false` otherwise.
-     */
-    fun testAnyBitInLowerN(x: Magia, bitCount: Int): Boolean =
-        testAnyBitInLowerN(x, x.size, bitCount)
 
     /**
      * Checks if any of the lower [bitCount] bits in [x] are set.

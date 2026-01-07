@@ -1678,7 +1678,7 @@ class MutableBigInt private constructor (
             zBitLen <= 0 -> setZero()
             else -> {
                 val needsIncrement = x.meta.isNegative &&
-                        Mago.testAnyBitInLowerN(x.magia, bitCount)
+                        Mago.testAnyBitInLowerN(x.magia, x.meta.normLen, bitCount)
 
                 ensureMagiaBitCapacityDiscard(zBitLen)
                 var normLen = Mago.setShiftRight(
@@ -1688,7 +1688,7 @@ class MutableBigInt private constructor (
 
                 if (needsIncrement) {
                     ensureMagiaBitCapacityCopy(zBitLen + 1)
-                    normLen = Mago.setAdd64(magia, magia, normLen, 1u)
+                    normLen = Mago.setAdd32(magia, magia, normLen, 1u)
                 }
                 updateMeta(Meta(x.meta.signFlag, normLen))
             }

@@ -8,6 +8,8 @@ import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
 import com.decimal128.bigint.Mago.newWithBitLen
+import com.decimal128.bigint.Mago.normBitLen
+import com.decimal128.bigint.Mago.setShiftRight
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
@@ -1391,8 +1393,14 @@ class BigInt private constructor(
      */
     infix fun ushr(bitCount: Int): BigInt {
         return when {
-            bitCount > 0 ->
-                fromNormalizedOrZero(Mago.newShiftRight(this.magia, this.meta.normLen, bitCount))
+            bitCount > 0 -> {
+                val newBitLen = normBitLen(magia, meta.normLen) - bitCount
+                if (newBitLen <= 0)
+                    return ZERO
+                val z = newWithBitLen(newBitLen)
+                val zNormLen = setShiftRight(z, magia, meta.normLen, bitCount)
+                fromNormalizedNonZero(z, zNormLen)
+            }
             bitCount == 0 -> abs()
             else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         }
@@ -1409,17 +1417,32 @@ class BigInt private constructor(
     infix fun shr(bitCount: Int): BigInt {
         return when {
             bitCount > 0 -> {
-                val bitLen = magnitudeBitLen()
-                if (bitLen <= bitCount)
+                val newBitLen = normBitLen(magia, meta.normLen) - bitCount
+                if (newBitLen <= 0)
                     return if (meta.isNegative) NEG_ONE else ZERO
-                val willNeedIncrement = meta.isNegative && Mago.testAnyBitInLowerN(magia, bitCount)
-                var magia = Mago.newShiftRight(this.magia, this.meta.normLen, bitCount)
-                verify { Mago.normLen(magia) > 0 }
-                if (willNeedIncrement)
-                    magia = Mago.newOrMutateIncrement(magia)
-                return fromNormalizedNonZero(meta.signFlag, magia)
+                val z = newWithBitLen(newBitLen)
+                val zNormLen = setShiftRight(z, magia, meta.normLen, bitCount)
+                verify { zNormLen == z.size }
+                val needsIncrement = meta.isNegative &&
+                        Mago.testAnyBitInLowerN(magia, meta.normLen, bitCount)
+                if (! needsIncrement) {
+                    fromNormalizedNonZero(meta.signFlag, z, zNormLen)
+                } else {
+                    var i = 0
+                    do {
+                        val t = z[i] + 1
+                        z[i] = t
+                        if (t != 0)
+                            return fromNormalizedNonZero(meta.signFlag, z, zNormLen)
+                        ++i
+                    } while (i < z.size)
+                    // the only way we can have a carry is if all limbs
+                    // have mutated to zero
+                    val z1 = Magia(i + 1)
+                    z1[i] = 1
+                    fromNormalizedNonZero(meta.signFlag, z1, i + 1)
+                }
             }
-
             bitCount == 0 -> this
             else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
         }
