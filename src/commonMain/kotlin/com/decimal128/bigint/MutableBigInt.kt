@@ -1100,14 +1100,30 @@ class MutableBigInt private constructor (
     fun setDiv(x: MutableBigInt, dw: ULong): MutableBigInt =
         setDivImpl64(x, false, dw)
     fun setDiv(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
-        ensureMagiaCapacityDiscard(x.meta.normLen - y.meta.normLen + 1)
+        val xNormLen = x.meta.normLen
+        val yNormLen = y.meta.normLen
+        ensureMagiaCapacityDiscard(xNormLen - yNormLen + 1)
         if (! trySetDivFastPath(x, y)) {
-            ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
-            ensureTmp2Capacity(y.meta.normLen, MBI_RESIZE_TMP2_KNUTH_DIVISOR)
-            updateMeta(Meta(
-                x.meta.signBit xor y.meta.signBit,
-                Mago.setDiv(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)))
-            ++BI_OP_COUNTS[MBI_SET_DIV_BI_KNUTH.ordinal]
+            ensureTmp1Capacity(xNormLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
+            if (yNormLen > 2) {
+                ++BI_OP_COUNTS[MBI_SET_DIV_BI_KNUTH.ordinal]
+                ensureTmp2Capacity(yNormLen, MBI_RESIZE_TMP2_KNUTH_DIVISOR)
+                updateMeta(
+                    Meta(
+                        x.meta.signBit xor y.meta.signBit,
+                        Mago.setDivKnuth(magia, x.magia, xNormLen, tmp1, y.magia, yNormLen, tmp2)
+                    )
+                )
+            } else {
+                verify { yNormLen == 2 }
+                ++BI_OP_COUNTS[MBI_SET_DIV_64_KNUTH.ordinal]
+                updateMeta(
+                    Meta(
+                        x.meta.signBit xor y.meta.signBit,
+                        Mago.setDivKnuth64(magia, x.magia, xNormLen, tmp1, y.toULong())
+                    )
+                )
+            }
         }
         return this
     }
@@ -1138,7 +1154,7 @@ class MutableBigInt private constructor (
         if (trySetDivFastPath64(x, ySign, yDw))
             return this
         ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
-        val normLen = Mago.setDiv64(magia, x.magia, x.meta.normLen, tmp1, yDw)
+        val normLen = Mago.setDivKnuth64(magia, x.magia, x.meta.normLen, tmp1, yDw)
         updateMeta(Meta(x.meta.signFlag xor ySign, normLen))
         return this
     }

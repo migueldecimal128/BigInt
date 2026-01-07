@@ -1777,13 +1777,17 @@ class BigInt private constructor(
         if ((dw shr 32) == 0uL)
             return divImpl32(dwSign, dw.toUInt())
         ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
-        if (!isZero()) {
-            val q = Mago.newDiv64(magia, meta.normLen, dw)
-            if (q !== Mago.ZERO) {
-                return fromNonNormalizedManyNonZero(this.meta.signFlag xor dwSign, q)
-            }
+        if (meta.normLen < 2)
+            return ZERO
+        val sign = meta.signFlag xor dwSign
+        val z = Magia(meta.normLen - 1)
+        val tryFast64 = Mago.trySetDivFastPath64(z, magia, meta.normLen, dw)
+        val zNormLen = when {
+            tryFast64 > 0 -> tryFast64
+            tryFast64 == 0 -> return ZERO
+            else -> Mago.setDivKnuth64(z, magia, meta.normLen, null, dw)
         }
-        return ZERO
+        return fromNormalizedNonZero(sign, z, zNormLen)
     }
 
     fun divImpl(other: BigIntNumber): BigInt {

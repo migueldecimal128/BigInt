@@ -175,12 +175,6 @@ internal object Mago {
         return 2
     }
 
-    fun setUInt(z: Magia, w: UInt): Int {
-        val n = w.toInt()
-        z[0] = n
-        return (n or -n) ushr 31
-    }
-
     /**
      * Returns the normalized limb length of **x**—the index of the highest
      * non-zero limb plus one. If all limbs are zero, returns `0`.
@@ -1376,14 +1370,9 @@ internal object Mago {
      *
      * @return the normalized limb length of the quotient stored in [z].
      */
-    fun setDiv64(z: Magia, x: Magia, xNormLen: Int, unBuf: IntArray?, dw: ULong): Int {
+    fun setDivKnuth64(z: Magia, x: Magia, xNormLen: Int, unBuf: IntArray?, dw: ULong): Int {
         if (xNormLen >= 0 && xNormLen <= x.size && z.size >= xNormLen - 2 + 1) {
             verify { isNormalized(x, xNormLen) }
-
-            val tryLen = trySetDivFastPath64(z, x, xNormLen, dw)
-            if (tryLen >= 0)
-                return tryLen
-
             val u = x
             val m = xNormLen
             val vnDw = dw
@@ -1438,9 +1427,8 @@ internal object Mago {
 
     fun trySetDivFastPath64(zMagia: Magia, xMagia: Magia, xNormLen: Int, yDw: ULong): Int {
         when {
-            yDw == 0uL -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
-            xNormLen == 0 -> return 0
-            xNormLen == 1 -> return setUInt(zMagia, (xMagia[0].toUInt().toULong() / yDw).toUInt())
+            (yDw shr 32) == 0uL -> return setDiv32(zMagia, xMagia, xNormLen, yDw.toUInt())
+            xNormLen < 2 -> return 0
             xNormLen == 2 ->
                 return setULong(zMagia,
                     ((xMagia[1].toULong() shl 32) or xMagia[0].toUInt().toULong()) / yDw)
@@ -1545,34 +1533,6 @@ internal object Mago {
     }
 
     /**
-     * Divides the normalized limb array `x` by the 64-bit unsigned divisor `dw`
-     * and returns a new non-normalized quotient array.
-     *
-     * Uses a specialized Knuth division routine for 64-bit divisors.
-     * Returns:
-     * - [ZERO] if `x < dw`
-     * - [ONE]  if `x == dw`
-     * - the non-normalized quotient otherwise.
-     */
-    fun newDiv64(x: Magia, xNormLen: Int, dw: ULong): Magia {
-        if ((dw shr 32) == 0uL)
-            return newDiv32(x, xNormLen, dw.toUInt())
-        val cmp = compare(x, xNormLen, dw)
-        when {
-            cmp < 0 -> return ZERO
-            cmp == 0 -> return ONE
-        }
-        val u = x
-        val m = xNormLen
-        val vnDw = dw
-        val q = Magia(m - 2 + 1)
-        val r = null
-        val qNormLen = knuthDivide64(q, r, u, vnDw, m, unBuf=null).toInt()
-        verify { isNormalized(q, qNormLen) }
-        return if (qNormLen > 0) q else ZERO
-    }
-
-    /**
      * Divides the normalized limb array `x` by the normalized limb array `y` and
      * returns a new non-normalized quotient array.
      *
@@ -1628,9 +1588,9 @@ internal object Mago {
      * @throws ArithmeticException if `yNormLen == 0`.
      * @throws IllegalArgumentException if [z], [xTmp], or [yTmp] are too small.
      */
-    fun setDiv(z: Magia,
-               x: Magia, xNormLen: Int, xTmp: Magia?,
-               y: Magia, yNormLen: Int, yTmp: Magia?): Int {
+    fun setDivKnuth(z: Magia,
+                    x: Magia, xNormLen: Int, xTmp: Magia?,
+                    y: Magia, yNormLen: Int, yTmp: Magia?): Int {
         verify { isNormalized(x, xNormLen) }
         verify { isNormalized(y, yNormLen) }
         verify { xTmp == null || xTmp.size >= xNormLen + 1 }

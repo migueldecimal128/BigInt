@@ -84,6 +84,7 @@ object BigIntStats {
         MBI_SET_POW,
         MBI_SET_DIV_PRIMITIVE,
         MBI_SET_DIV_BI_FASTPATH,
+        MBI_SET_DIV_64_KNUTH,
         MBI_SET_DIV_BI_KNUTH,
         MBI_SET_REM_PRIMITIVE,
         MBI_SET_REM_BI_FASTPATH,

@@ -142,4 +142,31 @@ class TestDiv64 {
         assertEquals(inverse2, inverse)
     }
 
+    @Test
+    fun testProblemChild3() {
+        val biDividend = 23.toBigInt()
+        val biDivisor = 16414802363296740285uL.toBigInt()
+
+        val biQuot = biDividend / biDivisor
+        assertEquals(BigInt.ZERO, biQuot)
+    }
+
+    @Test
+    fun testProblemChild4() {
+        val biDividend = (-74045).toBigInt()
+        val divisor = -7866892704263223140
+
+        val biQuot = biDividend / divisor
+        assertEquals(BigInt.ZERO, biQuot)
+    }
+
+    @Test
+    fun testProblemChild5() {
+        val biDividend = BigInt.ZERO
+        val divisor = 7866892704263223140
+
+        val biQuot = biDividend / divisor
+        assertEquals(BigInt.ZERO, biQuot)
+    }
+
 }
