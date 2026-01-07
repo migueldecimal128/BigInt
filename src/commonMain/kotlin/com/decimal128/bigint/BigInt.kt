@@ -1610,13 +1610,13 @@ class BigInt private constructor(
      * @return a new BigInt representing the result
      */
     fun addImpl(isSub: Boolean, other: BigIntNumber): BigInt {
+        ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
         val thisSign = this.meta.signFlag
         val thisNormLen = this.meta.normLen
         val otherSign = isSub xor other.meta.signFlag
         val otherNormLen = other.meta.normLen
         when {
             thisSign == otherSign && thisNormLen > 0 && otherNormLen > 0 -> {
-                ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
                 val thisBitLen = this.magnitudeBitLen()
                 val otherBitLen = other.magnitudeBitLen()
                 val zBitLen = max(thisBitLen, otherBitLen) + 1
@@ -1630,22 +1630,19 @@ class BigInt private constructor(
             else -> {
                 val cmp = this.magnitudeCompareTo(other)
                 if (cmp != 0) {
-                    return if (cmp > 0) {
-                        ++BI_OP_COUNTS[BI_ADD_SUB_BI.ordinal]
-                        fromNonNormalizedManyNonZero(
-                            this.meta.signFlag,
-                            Mago.newSub(this.magia, this.meta.normLen, other.magia, other.meta.normLen)
-                        )
-                    } else {
-                        fromNonNormalizedManyNonZero(
-                            otherSign,
-                            Mago.newSub(other.magia, other.meta.normLen, this.magia, this.meta.normLen)
-                        )
-                    }
+                    val sign = !thisSign xor (cmp > 0)
+                    val largeNormLen = if (cmp > 0) thisNormLen else otherNormLen
+                    val smallNormLen = if (cmp > 0) otherNormLen else thisNormLen
+                    val largeMagia = if (cmp > 0) this.magia else other.magia
+                    val smallMagia = if (cmp > 0) other.magia else this.magia
+                    val z = Magia(largeNormLen)
+                    val zNormLen = Mago.setSub(z, largeMagia, largeNormLen, smallMagia, smallNormLen)
+                    if (zNormLen > 0)
+                        return fromNormalizedNonZero(sign, z, zNormLen)
                 }
-                return ZERO
             }
         }
+        return ZERO
     }
 
     fun mulImpl32(dwSign: Boolean, w: UInt): BigInt {

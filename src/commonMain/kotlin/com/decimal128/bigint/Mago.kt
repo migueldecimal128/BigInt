@@ -570,21 +570,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new limb array representing [x] minus [y].
-     *
-     * Requires that [x] is greater than or equal to [y].
-     * If the result is zero, returns [ZERO].
-     */
-    fun newSub(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Magia {
-        verify { isNormalized(x, xNormLen) }
-        verify { isNormalized(y, yNormLen) }
-        val z = Magia(xNormLen)
-        val zNormLen = setSub(z, x, xNormLen, y, yNormLen)
-        verify { isNormalized(z, zNormLen) }
-        return if (zNormLen == 0) ZERO else z
-    }
-
-    /**
      * Computes `z = x - y` using the low-order [xLen] and [yLen] limbs and returns
      * the normalized limb length of the result.
      *
@@ -2042,17 +2027,21 @@ internal object Mago {
                     val cmp = compare(x, xNormLen, y, yNormLen)
                     return when {
                         cmp < 0 && !applyModRingNormalization -> x.copyOf(xNormLen)
-                        cmp < 0 -> newSub(y, yNormLen, x, xNormLen)
+                        cmp < 0 -> {
+                            val z = Magia(yNormLen)
+                            val zNormLen = setSub(z, y, yNormLen, x, xNormLen)
+                            z
+                        }
                         cmp == 0 -> ZERO
                         else -> {
-                            val rem = newSub(x, xNormLen, y, yNormLen)
-                            if (!applyModRingNormalization)
-                                return rem
-                            // setSub will mutate in-place
-                            val mod = rem
-                            val modNormLen = setSub(mod, y, yNormLen, rem, normLen(rem))
-                            mod.fill(0, modNormLen)
-                            mod
+                            val z = Magia(xNormLen)
+                            val zNormLen = setSub(z, x, xNormLen, y, yNormLen)
+                            if (applyModRingNormalization) {
+                                // setSub will mutate in-place
+                                val modNormLen = setSub(z, y, yNormLen, z, zNormLen)
+                                z.fill(0, zNormLen)
+                            }
+                            z
                         }
                     }
                 }
