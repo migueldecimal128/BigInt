@@ -1065,10 +1065,10 @@ class MutableBigInt private constructor (
     }
 
     fun setPow(x: BigIntNumber, exp: Int): MutableBigInt {
-        if (tryPowFastPath(x, exp, this))
+        if (BigIntAlgorithms.tryPowFastPath(x, exp, this))
             return this
         val base: BigIntNumber = if (x === this) x.toBigInt() else x
-        powLeftToRight(base, exp, this)
+        BigIntAlgorithms.powLeftToRight(base, exp, this)
         ++BI_OP_COUNTS[MBI_SET_POW.ordinal]
         return this
     }
@@ -1978,7 +1978,7 @@ class MutableBigInt private constructor (
         val k = modulus.meta.normLen
         require (meta.normLen <= 2 * k + 1)
         ensureMagiaCapacityCopy(2 * k + 1)
-        val normLen = montgomeryRedc(magia, meta.normLen, modulus.magia, k, np)
+        val normLen = BigIntAlgorithms.montgomeryRedc(magia, meta.normLen, modulus.magia, k, np)
         updateMeta(Meta(normLen))
         ++BI_OP_COUNTS[MBI_MONTGOMERY_REDC.ordinal]
         return this

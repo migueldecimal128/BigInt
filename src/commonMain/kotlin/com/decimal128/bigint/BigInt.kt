@@ -992,7 +992,7 @@ class BigInt private constructor(
          *
          * @throws [IllegalArgumentException] for n < 0
          */
-        fun factorial(n: Int): BigInt = factorialImpl(n)
+        fun factorial(n: Int): BigInt = BigIntAlgorithms.factorial(n)
 
         /**
          * Returns the greatest common divisor (GCD) of the two values [a] and [b].
@@ -1006,7 +1006,7 @@ class BigInt private constructor(
          *
          * @return the non-negative greatest common divisor of [a] and [b]
          */
-        fun gcd(a: BigInt, b: BigInt): BigInt = gcdImpl(a, b)
+        fun gcd(a: BigInt, b: BigInt): BigInt = BigIntAlgorithms.gcd(a, b)
 
         /**
          * Returns the least common multiple (LCM) of [a] and [b].
@@ -1017,7 +1017,7 @@ class BigInt private constructor(
          * This implementation divides the smaller magnitude by the GCD to minimize the
          * cost of multiprecision division, then multiplies by the larger magnitude.
          */
-        fun lcm(a: BigInt, b: BigInt): BigInt = lcmImpl(a, b)
+        fun lcm(a: BigInt, b: BigInt): BigInt = BigIntAlgorithms.lcm(a, b)
 
     }
 
@@ -1315,7 +1315,7 @@ class BigInt private constructor(
      * @return `this` raised to [exp]
      * @throws IllegalArgumentException if [exp] is negative
      */
-    fun pow(exp: Int) = powImpl(this, exp)
+    fun pow(exp: Int) = BigIntAlgorithms.pow(this, exp)
 
     /**
      * Returns a new BigInt with the bit at [bitIndex] set to 1.
