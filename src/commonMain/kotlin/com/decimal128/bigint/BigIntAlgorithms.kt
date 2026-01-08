@@ -442,9 +442,9 @@ internal fun montgomeryRedc(t: Magia, tLen: Int, n: Magia, k: Int, np: UInt): In
     // --- Phase 3: conditional subtract modulus ---
     // if T >= N, subtract once
 
-    val tNormLen = Mago.normLen(t, k + 1)
-    if (Mago.compare(t, tNormLen, n, k) < 0)
+    val tNormLen = normLen(t, k + 1)
+    if (compare(t, tNormLen, n, k) < 0)
         return tNormLen
-    return Mago.setSub(t, t, tNormLen, n, k)
+    return setSub(t, t, tNormLen, n, k)
 }
 

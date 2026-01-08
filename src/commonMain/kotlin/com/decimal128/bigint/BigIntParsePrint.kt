@@ -4,14 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Mago.ZERO
-import com.decimal128.bigint.Mago.bitLen
-import com.decimal128.bigint.Mago.isNormalized
-import com.decimal128.bigint.Mago.mutateFmaPow10
-import com.decimal128.bigint.Mago.newCopyWithExactLimbLen
-import com.decimal128.bigint.Mago.newWithBitLen
-import com.decimal128.bigint.Mago.normBitLen
-import com.decimal128.bigint.Mago.normLen
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 import kotlin.math.max
 import kotlin.math.min
@@ -565,7 +557,7 @@ internal object BigIntParsePrint {
             val bitLen = prefixDetermineBitLen(src)
             when {
                 bitLen < 0 -> break@invalid_syntax
-                bitLen == 0 -> return ZERO
+                bitLen == 0 -> return MAGIA_ZERO
                 bitLen == Int.MAX_VALUE -> return fromHex(src.reset())
             }
             val z = newWithBitLen(bitLen)
@@ -586,7 +578,7 @@ internal object BigIntParsePrint {
             }
             bitLen == Int.MAX_VALUE -> return tryParseHexText(src, mbi)
         }
-        val limbLen = Mago.limbLenFromBitLen(bitLen)
+        val limbLen = limbLenFromBitLen(bitLen)
         mbi.updateMeta(Meta(0))
         mbi.ensureMagiaCapacityCopyZeroExtend(limbLen)
         if (! parseHelper(src, mbi.magia, limbLen))
@@ -741,7 +733,7 @@ internal object BigIntParsePrint {
      *
      * The input may include an optional leading sign, an optional `0x`/`0X` prefix, and `_` digit
      * separators. Leading zeros are permitted. The result is always returned in canonical form:
-     * the top limb is non-zero for non-zero values, and zero is returned as [ZERO].
+     * the top limb is non-zero for non-zero values, and zero is returned as [MAGIA_ZERO].
      *
      * @param src the input iterator providing characters in Latin-1 encoding.
      * @return a new normalized [Magia] representing the magnitude of the parsed integer.
@@ -751,7 +743,7 @@ internal object BigIntParsePrint {
         val nybbleCount = hexNybbleCount(src)
         if (nybbleCount >= 0) {
             if (nybbleCount == 0)
-                return ZERO
+                return MAGIA_ZERO
             val z = newWithBitLen(nybbleCount shl 2)
             parseHexHelper(src, nybbleCount, z, z.size)
             return z

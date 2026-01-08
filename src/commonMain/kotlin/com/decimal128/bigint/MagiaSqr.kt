@@ -19,7 +19,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Mago.setMulSchoolbook
 import com.decimal128.bigint.intrinsic.unsignedMulHi
 
 internal const val KARATSUBA_SQR_THRESHOLD = 84

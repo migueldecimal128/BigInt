@@ -1,6 +1,5 @@
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Mago.setMulSchoolbook
 import kotlin.test.Test
 import kotlin.time.TimeSource
 

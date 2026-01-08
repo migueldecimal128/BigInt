@@ -109,8 +109,8 @@ class MutableBigInt private constructor (
 ) : BigIntNumber(meta, magia) {
 
     internal var limbCapacityHint = 0
-    internal var tmp1: Magia = Mago.ZERO
-    internal var tmp2: Magia = Mago.ZERO
+    internal var tmp1: Magia = MAGIA_ZERO
+    internal var tmp2: Magia = MAGIA_ZERO
 
     companion object {
 
@@ -141,7 +141,7 @@ class MutableBigInt private constructor (
 
         operator fun invoke(other: BigIntNumber): MutableBigInt {
             ++BI_OP_COUNTS[MBI_CONSTRUCT_BI.ordinal]
-            val m = Mago.newWithFloorLen(other.meta.normLen)
+            val m = newWithFloorLen(other.meta.normLen)
             other.magia.copyInto(m, 0, 0, other.meta.normLen)
             verify { validateNormLenAndInjectPoison(m, other.meta.normLen) }
             return MutableBigInt(other.meta, m)
@@ -159,7 +159,7 @@ class MutableBigInt private constructor (
         fun withBitCapacityHint(initialBitCapacity: Int): MutableBigInt {
             if (initialBitCapacity >= 0) {
                 val initialLimbCapacity = max(4, limbLenFromBitLen(initialBitCapacity))
-                val magia = Mago.newWithFloorLen(initialLimbCapacity)
+                val magia = newWithFloorLen(initialLimbCapacity)
                 verify { validateNormLenAndInjectPoison(magia, 0) }
                 val mbi = MutableBigInt(Meta(0), magia)
                 verify { mbi.magia.size >= 4 }
@@ -219,7 +219,7 @@ class MutableBigInt private constructor (
             val headroom =
                 if (magia.size <= 4 || requestedLimbLen <= limbCapacityHint) 0
                 else targetLimbLen shr 1
-            _magia = Mago.newWithFloorLen(targetLimbLen + headroom)
+            _magia = newWithFloorLen(targetLimbLen + headroom)
         }
     }
 
@@ -282,7 +282,7 @@ class MutableBigInt private constructor (
             ++BI_OP_COUNTS[counterIndex]
         }
         val headRoom = (requestedLimbLen ushr 1) and ((5 - tmp1.size) shr 31)
-        tmp1 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
+        tmp1 = newWithFloorLen(requestedLimbLen + headRoom)
     }
 
     /**
@@ -313,7 +313,7 @@ class MutableBigInt private constructor (
             ++BI_OP_COUNTS[counterIndex]
         }
         val headRoom = (requestedLimbLen ushr 1) and (-tmp2.size shr 31)
-        tmp2 = Mago.newWithFloorLen(requestedLimbLen + headRoom)
+        tmp2 = newWithFloorLen(requestedLimbLen + headRoom)
     }
 
     /**
@@ -496,7 +496,7 @@ class MutableBigInt private constructor (
             throw IllegalArgumentException()
         limbCapacityHint =
             max(limbCapacityHint,
-                Mago.calcHeapLimbQuantum((bitCapacityHint + 31) ushr 5))
+                calcHeapLimbQuantum((bitCapacityHint + 31) ushr 5))
         return this
     }
 
@@ -763,7 +763,7 @@ class MutableBigInt private constructor (
                 updateMeta(
                     Meta(
                         x.meta.signBit,
-                        Mago.setAdd32(magia, xMagia, x.meta.normLen, yW)
+                        setAdd32(magia, xMagia, x.meta.normLen, yW)
                     )
                 )
             }
@@ -776,7 +776,7 @@ class MutableBigInt private constructor (
                         updateMeta(
                             Meta(
                                 x.meta.signBit,
-                                Mago.setSub64(magia, xMagia, x.meta.normLen, yW.toULong())
+                                setSub64(magia, xMagia, x.meta.normLen, yW.toULong())
                             )
                         )
                     }
@@ -814,7 +814,7 @@ class MutableBigInt private constructor (
                 updateMeta(
                     Meta(
                         x.meta.signBit,
-                        Mago.setAdd64(magia, xMagia, x.meta.normLen, yDw)
+                        setAdd64(magia, xMagia, x.meta.normLen, yDw)
                     )
                 )
             }
@@ -827,7 +827,7 @@ class MutableBigInt private constructor (
                         updateMeta(
                             Meta(
                                 x.meta.signBit,
-                                Mago.setSub64(magia, xMagia, x.meta.normLen, yDw)
+                                setSub64(magia, xMagia, x.meta.normLen, yDw)
                             )
                         )
                     }
@@ -855,7 +855,7 @@ class MutableBigInt private constructor (
      */
     private fun setAddImpl(x: BigIntNumber, yMeta: Meta, yMagia: Magia): MutableBigInt {
         verify { x.isNormalized() }
-        verify { Mago.isNormalized(yMagia, yMeta.normLen) }
+        verify { isNormalized(yMagia, yMeta.normLen) }
         val xMagia = x.magia // save for aliasing
         when {
             yMeta.isZero -> set(x)
@@ -865,7 +865,7 @@ class MutableBigInt private constructor (
                 updateMeta(
                     Meta(
                         x.meta.signBit,
-                        Mago.setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
+                        setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
                     )
                 )
             }
@@ -878,7 +878,7 @@ class MutableBigInt private constructor (
                         updateMeta(
                             Meta(
                                 x.meta.signBit,
-                                Mago.setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
+                                setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
                             )
                         )
                     }
@@ -888,7 +888,7 @@ class MutableBigInt private constructor (
                         updateMeta(
                             Meta(
                                 yMeta.signBit,
-                                Mago.setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen)
+                                setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen)
                             )
                         )
                     }
@@ -932,7 +932,7 @@ class MutableBigInt private constructor (
         swapTmp1()
         updateMeta(Meta(
             x.meta.signBit xor y.meta.signBit,
-            Mago.setMul(magia, xMagia, xNormLen, yMagia, yNormLen)))
+            setMul(magia, xMagia, xNormLen, yMagia, yNormLen)))
         ++BI_OP_COUNTS[MBI_SET_MUL_BI.ordinal]
         return this
     }
@@ -952,7 +952,7 @@ class MutableBigInt private constructor (
         ensureMagiaCapacityDiscard(x.meta.normLen + 1)
         updateMeta(Meta(
             x.meta.signFlag xor wSign,
-            Mago.setMul32(magia, xMagia, x.meta.normLen, w)))
+            setMul32(magia, xMagia, x.meta.normLen, w)))
         ++BI_OP_COUNTS[MBI_SET_MUL_PRIMITIVE.ordinal]
         return this
     }
@@ -972,7 +972,7 @@ class MutableBigInt private constructor (
         ensureMagiaCapacityDiscard(x.meta.normLen + 2)
         updateMeta(Meta(
             x.meta.signFlag xor dwSign,
-            Mago.setMul64(magia, xMagia, x.meta.normLen, dw)))
+            setMul64(magia, xMagia, x.meta.normLen, dw)))
         ++BI_OP_COUNTS[MBI_SET_MUL_PRIMITIVE.ordinal]
         return this
     }
@@ -1111,7 +1111,7 @@ class MutableBigInt private constructor (
                 updateMeta(
                     Meta(
                         x.meta.signBit xor y.meta.signBit,
-                        Mago.setDivKnuth(magia, x.magia, xNormLen, tmp1, y.magia, yNormLen, tmp2)
+                        setDivKnuth(magia, x.magia, xNormLen, tmp1, y.magia, yNormLen, tmp2)
                     )
                 )
             } else {
@@ -1120,7 +1120,7 @@ class MutableBigInt private constructor (
                 updateMeta(
                     Meta(
                         x.meta.signBit xor y.meta.signBit,
-                        Mago.setDivKnuth64(magia, x.magia, xNormLen, tmp1, y.toULong())
+                        setDivKnuth64(magia, x.magia, xNormLen, tmp1, y.toULong())
                     )
                 )
             }
@@ -1131,7 +1131,7 @@ class MutableBigInt private constructor (
     private fun setDivImpl32(x: BigIntNumber, ySign: Boolean, yW: UInt): MutableBigInt {
         ++BI_OP_COUNTS[MBI_SET_DIV_PRIMITIVE.ordinal]
         ensureMagiaCapacityDiscard(x.meta.normLen)
-        val normLen = Mago.setDiv32(magia, x.magia, x.meta.normLen, yW)
+        val normLen = setDiv32(magia, x.magia, x.meta.normLen, yW)
         updateMeta(Meta(x.meta.signFlag xor ySign, normLen))
         return this
     }
@@ -1154,7 +1154,7 @@ class MutableBigInt private constructor (
         if (trySetDivFastPath64(x, ySign, yDw))
             return this
         ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
-        val normLen = Mago.setDivKnuth64(magia, x.magia, x.meta.normLen, tmp1, yDw)
+        val normLen = setDivKnuth64(magia, x.magia, x.meta.normLen, tmp1, yDw)
         updateMeta(Meta(x.meta.signFlag xor ySign, normLen))
         return this
     }
@@ -1170,7 +1170,7 @@ class MutableBigInt private constructor (
      */
     private fun trySetDivFastPath(x: BigIntNumber, y: BigIntNumber): Boolean {
         val qSignFlag = x.meta.signFlag xor y.meta.signFlag
-        val qNormLen = Mago.trySetDivFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
+        val qNormLen = trySetDivFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
         if (qNormLen < 0)
             return false
         updateMeta(Meta(qSignFlag, qNormLen))
@@ -1190,7 +1190,7 @@ class MutableBigInt private constructor (
      */
     private fun trySetDivFastPath64(x: BigIntNumber, ySign: Boolean, yDw: ULong): Boolean {
         val qSignFlag = x.meta.signFlag xor ySign
-        val qNormLen = Mago.trySetDivFastPath64(this.magia, x.magia, x.meta.normLen, yDw)
+        val qNormLen = trySetDivFastPath64(this.magia, x.magia, x.meta.normLen, yDw)
         if (qNormLen < 0)
             return false
         updateMeta(Meta(qSignFlag, qNormLen))
@@ -1208,7 +1208,7 @@ class MutableBigInt private constructor (
      */
     private fun trySetRemFastPath(x: BigIntNumber, y: BigIntNumber): Boolean {
         val rSignFlag = x.meta.signFlag
-        val rNormLen = Mago.trySetRemFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
+        val rNormLen = trySetRemFastPath(this.magia, x.magia, x.meta.normLen, y.magia, y.meta.normLen)
         if (rNormLen < 0)
             return false
         updateMeta(Meta(rSignFlag, rNormLen))
@@ -1247,7 +1247,7 @@ class MutableBigInt private constructor (
             return setRemImpl(x, (y.magia[1].toULong() shl 32) or (y.magia[0].toUInt().toULong()))
         ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
         ensureTmp2Capacity(y.meta.normLen, MBI_RESIZE_TMP2_KNUTH_DIVISOR)
-        val rNormLen = Mago.setRem(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
+        val rNormLen = setRem(magia, x.magia, x.meta.normLen, tmp1, y.magia, y.meta.normLen, tmp2)
         updateMeta(Meta(x.meta.signBit, rNormLen))
         ++BI_OP_COUNTS[MBI_SET_REM_BI_KNUTH.ordinal]
         return this
@@ -1265,7 +1265,7 @@ class MutableBigInt private constructor (
     private fun setRemImpl(x: BigIntNumber, yDw: ULong): MutableBigInt {
         ++BI_OP_COUNTS[MBI_SET_REM_PRIMITIVE.ordinal]
         ensureTmp1Capacity(x.meta.normLen + 1, MBI_RESIZE_TMP1_KNUTH_DIVIDEND)
-        val rem = Mago.calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
+        val rem = calcRem64(x.magia, x.meta.normLen, tmp1, yDw)
         return set(x.meta.signFlag, rem)
     }
 
@@ -1559,7 +1559,7 @@ class MutableBigInt private constructor (
         tmp1[1] = (lo64 shr 32).toInt()
         tmp1[2] = hi64.toInt()
         tmp1[3] = (hi64 shr 32).toInt()
-        val normLen = Mago.normLen(tmp1, 4)
+        val normLen = normLen(tmp1, 4)
         --BI_OP_COUNTS[MBI_SET_ADD_SUB_BI.ordinal]
         return setAddImpl(this, Meta(0, normLen), tmp1)
     }
@@ -1631,7 +1631,7 @@ class MutableBigInt private constructor (
                 ensureMagiaBitCapacityDiscard(x.magnitudeBitLen() + bitCount)
                 updateMeta(Meta(
                     x.meta.signBit,
-                    Mago.setShiftLeft(magia, xMagia, x.meta.normLen, bitCount)))
+                    setShiftLeft(magia, xMagia, x.meta.normLen, bitCount)))
             }
         }
         ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
@@ -1667,7 +1667,7 @@ class MutableBigInt private constructor (
                 ensureMagiaBitCapacityDiscard(zBitLen)
                 updateMeta(Meta(
                     0,
-                    Mago.setShiftRight(magia, x.magia, x.meta.normLen, bitCount)))
+                    setShiftRight(magia, x.magia, x.meta.normLen, bitCount)))
             }
         }
         ++BI_OP_COUNTS[MBI_SET_BITWISE_OP.ordinal]
@@ -1702,17 +1702,17 @@ class MutableBigInt private constructor (
             zBitLen <= 0 -> setZero()
             else -> {
                 val needsIncrement = x.meta.isNegative &&
-                        Mago.testAnyBitInLowerN(x.magia, x.meta.normLen, bitCount)
+                        testAnyBitInLowerN(x.magia, x.meta.normLen, bitCount)
 
                 ensureMagiaBitCapacityDiscard(zBitLen)
-                var normLen = Mago.setShiftRight(
+                var normLen = setShiftRight(
                     magia, x.magia, x.meta.normLen, bitCount
                 )
                 verify { normLen > 0 }
 
                 if (needsIncrement) {
                     ensureMagiaBitCapacityCopy(zBitLen + 1)
-                    normLen = Mago.setAdd32(magia, magia, normLen, 1u)
+                    normLen = setAdd32(magia, magia, normLen, 1u)
                 }
                 updateMeta(Meta(x.meta.signFlag, normLen))
             }
@@ -1765,7 +1765,7 @@ class MutableBigInt private constructor (
             if (wordIndex < meta.normLen) {
                 val isolatedBitMask = (1 shl (bitIndex and 0x1F)).inv()
                 magia[wordIndex] = magia[wordIndex] and isolatedBitMask
-                updateMeta(Meta(meta.signBit, Mago.normLen(magia, meta.normLen)))
+                updateMeta(Meta(meta.signBit, normLen(magia, meta.normLen)))
             }
             return this
         }
@@ -1813,7 +1813,7 @@ class MutableBigInt private constructor (
         magia.fill(0, 0, loIndex)
         val ctz = bitIndex and 0x1F
         magia[loIndex] = magia[loIndex] and (-1 shl ctz)
-        val normLen = Mago.normLen(magia, normLen0)
+        val normLen = normLen(magia, normLen0)
         updateMeta(Meta(normLen))
         verify { isNormalized() }
         return this
@@ -1850,7 +1850,7 @@ class MutableBigInt private constructor (
         updateMeta(
             Meta(
                 0,
-                Mago.setAnd(magia, xMagia, xNormLen, yMagia, yNormLen))
+                setAnd(magia, xMagia, xNormLen, yMagia, yNormLen))
         )
         verify { isNormalized() }
         return this
@@ -1901,7 +1901,7 @@ class MutableBigInt private constructor (
         updateMeta(
             Meta(
                 0,
-                Mago.setOr(magia, xMagia, xNormLen, yMagia, yNormLen))
+                setOr(magia, xMagia, xNormLen, yMagia, yNormLen))
         )
         verify { isNormalized() }
         return this
@@ -1953,7 +1953,7 @@ class MutableBigInt private constructor (
         updateMeta(
             Meta(
                 0,
-                Mago.setXor(magia, xMagia, xNormLen, yMagia, yNormLen))
+                setXor(magia, xMagia, xNormLen, yMagia, yNormLen))
         )
         verify { isNormalized() }
         return this

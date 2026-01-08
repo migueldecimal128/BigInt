@@ -7,15 +7,6 @@ package com.decimal128.bigint
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
-import com.decimal128.bigint.Mago.compare
-import com.decimal128.bigint.Mago.newWithBitLen
-import com.decimal128.bigint.Mago.normBitLen
-import com.decimal128.bigint.Mago.setOr
-import com.decimal128.bigint.Mago.setRem
-import com.decimal128.bigint.Mago.setShiftLeft
-import com.decimal128.bigint.Mago.setShiftRight
-import com.decimal128.bigint.Mago.setSub
-import com.decimal128.bigint.Mago.setXor
 import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
@@ -81,11 +72,11 @@ class BigInt private constructor(
          * This ensures that identity comparisons and optimizations relying on
          * reference equality (`===`) for zero values are valid.
          */
-        val ZERO = BigInt(Meta(0), Mago.ZERO)
+        val ZERO = BigInt(Meta(0), MAGIA_ZERO)
 
-        val ONE = BigInt(Meta(1), Mago.ONE)
+        val ONE = BigInt(Meta(1), MAGIA_ONE)
 
-        val NEG_ONE = BigInt(Meta(1, 1), Mago.ONE) // share magia .. but no mutation allowed
+        val NEG_ONE = BigInt(Meta(1, 1), MAGIA_ONE) // share magia .. but no mutation allowed
 
         val TEN = BigInt(Meta(4), intArrayOf(10))
 
@@ -113,7 +104,7 @@ class BigInt private constructor(
 
         internal fun fromNormalizedOrZero(sign: Boolean, magia: Magia): BigInt {
             if (magia.isEmpty()) {
-                verify { magia === Mago.ZERO }
+                verify { magia === MAGIA_ZERO }
                 return ZERO
             }
             verify { magia.isNotEmpty() }
@@ -125,14 +116,14 @@ class BigInt private constructor(
             fromNonNormalizedManyNonZero(false, magia)
 
         internal fun fromNonNormalizedManyNonZero(sign: Boolean, magia: Magia): BigInt {
-            val normLen = Mago.normLen(magia)
+            val normLen = normLen(magia)
             verify { normLen > 0 }
             verify { validateNormLenAndInjectPoison(magia, normLen) }
             return BigInt(Meta(sign, normLen), magia)
         }
 
         internal fun fromNonNormalized1NonZero(sign: Boolean, magia: Magia): BigInt {
-            //val normLen = Mago.normLen(magia)
+            //val normLen = normLen(magia)
             val normLen = magia.size - if (magia[magia.size - 1] != 0) 0 else 1
             verify { normLen > 0 }
             verify { validateNormLenAndInjectPoison(magia, normLen) }
@@ -143,7 +134,7 @@ class BigInt private constructor(
             fromNonNormalizedOrZero(false, magia)
 
         internal fun fromNonNormalizedOrZero(sign: Boolean, magia: Magia): BigInt {
-            val normLen = Mago.normLen(magia)
+            val normLen = normLen(magia)
             if (normLen > 0) {
                 verify { validateNormLenAndInjectPoison(magia, normLen) }
                 return BigInt(Meta(sign, normLen), magia)
@@ -591,7 +582,7 @@ class BigInt private constructor(
             return when {
                 maxBitLen > 0 -> {
                     var zeroTest = 0
-                    val magia = Mago.newWithBitLen(maxBitLen)
+                    val magia = newWithBitLen(maxBitLen)
                     val topBits = maxBitLen and 0x1F
                     // note parenthesization on this mask creation ... 0 - 1
                     var mask = ((-topBits ushr 31) shl topBits) - 1
@@ -650,7 +641,7 @@ class BigInt private constructor(
             ensureOdd: Boolean = false
         ): BigInt = when {
             bitLen > 0 -> {
-                val magia = Mago.newWithBitLen(bitLen)
+                val magia = newWithBitLen(bitLen)
                 val topBits = bitLen and 0x1F
                 var mask = ((-topBits ushr 31) shl topBits) - 1
                 for (i in magia.lastIndex downTo 0) {
@@ -841,7 +832,7 @@ class BigInt private constructor(
                     isNegative, isBigEndian, bytes, offset,
                     length
                 )
-                if (magia !== Mago.ZERO) {
+                if (magia !== MAGIA_ZERO) {
                     ++BI_OP_COUNTS[BI_CONSTRUCT_BINARY_ARRAY.ordinal]
                     return fromNormalizedNonZero(isNegative, magia)
                 }
@@ -855,7 +846,7 @@ class BigInt private constructor(
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray,
                                      len: Int = littleEndianIntArray.size): BigInt {
             if (len >= 0 && len <= littleEndianIntArray.size) {
-                val normLen = Mago.normLen(littleEndianIntArray, len)
+                val normLen = normLen(littleEndianIntArray, len)
                 if (normLen > 0) {
                     ++BI_OP_COUNTS[BI_CONSTRUCT_BINARY_ARRAY.ordinal]
                     return fromNormalizedNonZero(sign, littleEndianIntArray.copyOf(normLen))
@@ -889,7 +880,7 @@ class BigInt private constructor(
                 throwNegBitIndex()
             if (bitIndex == 0)
                 return ONE
-            val magia = Mago.newWithBitLen(bitIndex + 1)
+            val magia = newWithBitLen(bitIndex + 1)
             magia[magia.lastIndex] = 1 shl (bitIndex and 0x1F)
             ++BI_OP_COUNTS[BI_CONSTRUCT_BITWISE.ordinal]
             return fromNormalizedNonZero(magia)
@@ -919,7 +910,7 @@ class BigInt private constructor(
             }
             // non-zero and more than 1 bit wide
             val bitLen = bitWidth + bitIndex
-            val magia = Mago.newWithBitLen(bitLen)
+            val magia = newWithBitLen(bitLen)
             val loIndex = bitIndex ushr 5
             magia.fill(-1, loIndex)
             val nlz = (magia.size shl 5) - bitLen
@@ -955,7 +946,7 @@ class BigInt private constructor(
                     dwBitLen == 1 -> withSetBit(shiftLeftCount)
                     else -> {
                         val totalBitLen = dwBitLen + shiftLeftCount
-                        val magia = Mago.newWithBitLen(totalBitLen)
+                        val magia = newWithBitLen(totalBitLen)
                         val innerShift = shiftLeftCount and 0x1F
                         val lo = (dw shl innerShift).toInt()
                         if (innerShift == 0) {
@@ -1144,14 +1135,14 @@ class BigInt private constructor(
         val thisNormLen = meta.normLen
         if (thisNormLen >= otherNormLen) {
             if (thisNormLen == otherNormLen) {
-                val cmp = Mago.compare(magia, thisNormLen, other.magia, otherNormLen)
+                val cmp = compare(magia, thisNormLen, other.magia, otherNormLen)
                 if (cmp < 0)
                     return ZERO
                 if (cmp == 0)
                     return ONE
             }
             val z = Magia(thisNormLen - otherNormLen + 1)
-            val zNormLen = Mago.setDivKnuth(z, magia, thisNormLen, null, other.magia, otherNormLen, null)
+            val zNormLen = setDivKnuth(z, magia, thisNormLen, null, other.magia, otherNormLen, null)
             if (zNormLen > 0)
                 return fromNormalizedNonZero(meta.signFlag xor otherSign, z, zNormLen)
         }
@@ -1368,8 +1359,8 @@ class BigInt private constructor(
                 verify { !isSetOp }
                 return ZERO
             }
-            val newBitLen = max(bitIndex + 1, Mago.normBitLen(this.magia, this.meta.normLen))
-            val magia = Mago.newCopyWithExactBitLen(this.magia, this.meta.normLen, newBitLen)
+            val newBitLen = max(bitIndex + 1, normBitLen(this.magia, this.meta.normLen))
+            val magia = newCopyWithExactBitLen(this.magia, this.meta.normLen, newBitLen)
             val wordIndex = bitIndex ushr 5
             val isolatedBit = (1 shl (bitIndex and 0x1F))
             val limb = magia[wordIndex]
@@ -1485,7 +1476,7 @@ class BigInt private constructor(
                 val zNormLen = setShiftRight(z, magia, meta.normLen, bitCount)
                 verify { zNormLen == z.size }
                 val needsIncrement = meta.isNegative &&
-                        Mago.testAnyBitInLowerN(magia, meta.normLen, bitCount)
+                        testAnyBitInLowerN(magia, meta.normLen, bitCount)
                 if (! needsIncrement) {
                     fromNormalizedNonZero(meta.signFlag, z, zNormLen)
                 } else {
@@ -1553,7 +1544,7 @@ class BigInt private constructor(
         }
         // more than 1 bit wide and some overlap
         val clampedBitLen = min(bitWidth + bitIndex, myBitLen)
-        val ret = Mago.newCopyWithExactBitLen(magia, meta.normLen, clampedBitLen)
+        val ret = newCopyWithExactBitLen(magia, meta.normLen, clampedBitLen)
         val nlz = (ret.size shl 5) - clampedBitLen
         ret[ret.lastIndex] = ret[ret.lastIndex] and (-1 ushr nlz)
         val loIndex = bitIndex ushr 5
@@ -1625,12 +1616,12 @@ class BigInt private constructor(
             when {
                 thisNormLen > 0 && thisSign == otherSign && w != 0u -> {
                     val wBitLen = 32 - w.countLeadingZeroBits()
-                    val thisBitLen = Mago.nonZeroNormBitLen(magia, thisNormLen)
+                    val thisBitLen = nonZeroNormBitLen(magia, thisNormLen)
                     val newBitLen = max(thisBitLen, wBitLen) + 1
                     val z = newWithBitLen(newBitLen)
                     return fromNormalizedNonZero(
                         thisSign, z,
-                        Mago.setAdd32(z, this.magia, thisNormLen, w)
+                        setAdd32(z, this.magia, thisNormLen, w)
                     )
                 }
 
@@ -1638,7 +1629,7 @@ class BigInt private constructor(
                 // do subtraction
                 thisNormLen > 1 -> {
                     val z = Magia(thisNormLen)
-                    val zNormLen = Mago.setSub32(z, this.magia, thisNormLen, w)
+                    val zNormLen = setSub32(z, this.magia, thisNormLen, w)
                     if (zNormLen > 0)
                         return fromNormalizedNonZero(thisSign, z, zNormLen)
                     return ZERO
@@ -1667,12 +1658,12 @@ class BigInt private constructor(
             when {
                 thisNormLen > 0 && thisSign == otherSign && dw != 0uL -> {
                     val wBitLen = 64 - dw.countLeadingZeroBits()
-                    val thisBitLen = Mago.nonZeroNormBitLen(magia, thisNormLen)
+                    val thisBitLen = nonZeroNormBitLen(magia, thisNormLen)
                     val newBitLen = max(thisBitLen, wBitLen) + 1
                     val z = newWithBitLen(newBitLen)
                     return fromNormalizedNonZero(
                         thisSign, z,
-                        Mago.setAdd64(z, this.magia, thisNormLen, dw)
+                        setAdd64(z, this.magia, thisNormLen, dw)
                     )
                 }
                 dw == 0uL -> return this
@@ -1680,7 +1671,7 @@ class BigInt private constructor(
                 // do subtraction
                 thisNormLen > 2 -> {
                     val z = Magia(thisNormLen)
-                    val zNormLen = Mago.setSub64(z, magia, thisNormLen, dw)
+                    val zNormLen = setSub64(z, magia, thisNormLen, dw)
                     if (zNormLen > 0)
                         return fromNormalizedNonZero(thisSign, z, zNormLen)
                     return ZERO
@@ -1719,7 +1710,7 @@ class BigInt private constructor(
                 val otherBitLen = other.magnitudeBitLen()
                 val zBitLen = max(thisBitLen, otherBitLen) + 1
                 val z = Magia((zBitLen + 31) ushr 5)
-                val zNormLen = Mago.setAdd(z, this.magia, thisNormLen, other.magia, otherNormLen)
+                val zNormLen = setAdd(z, this.magia, thisNormLen, other.magia, otherNormLen)
                 return fromNormalizedNonZero(thisSign, z, zNormLen)
             }
             otherNormLen == 0 -> return this
@@ -1734,7 +1725,7 @@ class BigInt private constructor(
                     val largeMagia = if (cmp > 0) this.magia else other.magia
                     val smallMagia = if (cmp > 0) other.magia else this.magia
                     val z = Magia(largeNormLen)
-                    val zNormLen = Mago.setSub(z, largeMagia, largeNormLen, smallMagia, smallNormLen)
+                    val zNormLen = setSub(z, largeMagia, largeNormLen, smallMagia, smallNormLen)
                     if (zNormLen > 0)
                         return fromNormalizedNonZero(sign, z, zNormLen)
                 }
@@ -1749,11 +1740,11 @@ class BigInt private constructor(
             val sign = this.meta.signFlag xor dwSign
             val thisMagia = this.magia
             val thisNormLen = this.meta.normLen
-            val thisBitLen = Mago.normBitLen(thisMagia, thisNormLen)
+            val thisBitLen = normBitLen(thisMagia, thisNormLen)
             val wBitLen = 32 - w.countLeadingZeroBits()
             val zBitLen = thisBitLen + wBitLen
             val z = newWithBitLen(zBitLen)
-            val zNormLen = Mago.setMul32(z, thisMagia, thisNormLen, w)
+            val zNormLen = setMul32(z, thisMagia, thisNormLen, w)
             fromNormalizedNonZero(sign, z, zNormLen)
         } else ZERO
     }
@@ -1764,11 +1755,11 @@ class BigInt private constructor(
             val sign = this.meta.signFlag xor dwSign
             val thisMagia = this.magia
             val thisNormLen = this.meta.normLen
-            val thisBitLen = Mago.normBitLen(thisMagia, thisNormLen)
+            val thisBitLen = normBitLen(thisMagia, thisNormLen)
             val dwBitLen = 64 - dw.countLeadingZeroBits()
             val zBitLen = thisBitLen + dwBitLen
             val z = newWithBitLen(zBitLen)
-            val zNormLen = Mago.setMul64(z, thisMagia, thisNormLen, dw)
+            val zNormLen = setMul64(z, thisMagia, thisNormLen, dw)
             fromNormalizedNonZero(sign, z, zNormLen)
         } else ZERO
     }
@@ -1779,11 +1770,11 @@ class BigInt private constructor(
             val sign = this.meta.signFlag xor other.meta.signFlag
             val thisMagia = this.magia
             val thisNormLen = this.meta.normLen
-            val thisBitLen = Mago.normBitLen(thisMagia, thisNormLen)
-            val otherBitLen = Mago.normBitLen(other.magia, other.meta.normLen)
+            val thisBitLen = normBitLen(thisMagia, thisNormLen)
+            val otherBitLen = normBitLen(other.magia, other.meta.normLen)
             val zBitLen = thisBitLen + otherBitLen
             val z = newWithBitLen(zBitLen)
-            val zNormLen = Mago.setMul(z, thisMagia, thisNormLen, other.magia, other.meta.normLen)
+            val zNormLen = setMul(z, thisMagia, thisNormLen, other.magia, other.meta.normLen)
             fromNormalizedNonZero(sign, z, zNormLen)
         } else ZERO
     }
@@ -1794,7 +1785,7 @@ class BigInt private constructor(
             throwDivByZero()
         if (!isZero()) {
             val z = Magia(meta.normLen)
-            val zNormLen = Mago.setDiv32(z, magia, meta.normLen, w)
+            val zNormLen = setDiv32(z, magia, meta.normLen, w)
             if (zNormLen > 0)
                 return fromNormalizedNonZero(this.meta.signFlag xor wSign, z, zNormLen)
         }
@@ -1809,11 +1800,11 @@ class BigInt private constructor(
             return ZERO
         val sign = meta.signFlag xor dwSign
         val z = Magia(meta.normLen - 1)
-        val tryFast64 = Mago.trySetDivFastPath64(z, magia, meta.normLen, dw)
+        val tryFast64 = trySetDivFastPath64(z, magia, meta.normLen, dw)
         val zNormLen = when {
             tryFast64 > 0 -> tryFast64
             tryFast64 == 0 -> return ZERO
-            else -> Mago.setDivKnuth64(z, magia, meta.normLen, null, dw)
+            else -> setDivKnuth64(z, magia, meta.normLen, null, dw)
         }
         return fromNormalizedNonZero(sign, z, zNormLen)
     }
@@ -1822,7 +1813,7 @@ class BigInt private constructor(
         if (dw == 0uL)
             throwDivByZero()
         if (!isZero()) {
-            val rem = Mago.calcRem64(magia, meta.normLen, null, dw)
+            val rem = calcRem64(magia, meta.normLen, null, dw)
             if (rem != 0uL) {
                 return if (meta.isNegative && isMod)
                     from(dw - rem)

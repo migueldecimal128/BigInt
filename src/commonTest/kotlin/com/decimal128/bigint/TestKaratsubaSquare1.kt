@@ -1,7 +1,6 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt
-import com.decimal128.bigint.Mago.normLen
 import kotlin.test.*
 
 class TestKaratsubaSquare1 {

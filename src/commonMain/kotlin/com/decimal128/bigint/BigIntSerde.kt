@@ -172,7 +172,7 @@ object BigIntSerde {
         if (off < 0 || len < 0 || len > bytes.size - off)
             throw IllegalArgumentException()
         if (len == 0)
-            return Mago.ZERO
+            return MAGIA_ZERO
 
         // calculate offsets and stepping direction for BE BigEndian vs LE LittleEndian
         val offB1 = if (isBigEndian) -1 else 1 // BE == -1, LE ==  1
@@ -195,7 +195,7 @@ object BigIntSerde {
             ibMsb += step1HiToLo
             --remaining
             if (remaining == 0)
-                return if (isNegative) Mago.ONE else Mago.ZERO
+                return if (isNegative) MAGIA_ONE else MAGIA_ZERO
         }
 
         val magia = Magia((remaining + 3) ushr 2)

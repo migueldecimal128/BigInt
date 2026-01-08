@@ -1,6 +1,5 @@
 package com.decimal128.bigint
 
-import com.decimal128.bigint.Mago.normLen
 import kotlin.math.absoluteValue
 
 /**
@@ -167,7 +166,7 @@ sealed class BigIntNumber(
      * Returns `true` if the magnitude of this BigInt is a power of two
      * (exactly one bit set).
      */
-    fun isMagnitudePowerOfTwo(): Boolean = Mago.isPowerOfTwo(magia, meta.normLen)
+    fun isMagnitudePowerOfTwo(): Boolean = isPowerOfTwo(magia, meta.normLen)
 
     /**
      * Returns `true` if this value is in normalized form.
@@ -181,7 +180,7 @@ sealed class BigIntNumber(
      * representation avoids unnecessary high-order zero limbs.
      */
     internal fun isNormalized(): Boolean =
-        Mago.isNormalized(magia, meta.normLen) && meta._meta != Int.MIN_VALUE
+        isNormalized(magia, meta.normLen) && meta._meta != Int.MIN_VALUE
 
     internal fun isSuperNormalized(): Boolean =
         isNormalized() && meta.normLen == magia.size
@@ -390,7 +389,7 @@ sealed class BigIntNumber(
     infix fun modInt(n: Int): Int {
         require(n > 0) { "modulus must be > 0" }
         require(!this.isNegative())
-        return Mago.calcRem32(magia, meta.normLen, n.toUInt()).toInt()
+        return calcRem32(magia, meta.normLen, n.toUInt()).toInt()
     }
 
     /**
@@ -401,14 +400,14 @@ sealed class BigIntNumber(
      * @throws IllegalArgumentException if `bitIndex` is negative.
      */
     fun extractULongAtBitIndex(bitIndex: Int): ULong =
-        Mago.extractULongAtBitIndex(magia, meta.normLen, bitIndex)
+        extractULongAtBitIndex(magia, meta.normLen, bitIndex)
 
     /**
      * Returns the bit-length of the magnitude of this BigInt.
      *
      * Equivalent to the number of bits required to represent the absolute value.
      */
-    fun magnitudeBitLen() = Mago.normBitLen(magia, meta.normLen)
+    fun magnitudeBitLen() = normBitLen(magia, meta.normLen)
 
     /**
      * Returns the bit-length in the same style as `java.math.BigInteger.bitLength()`.
@@ -421,7 +420,7 @@ sealed class BigIntNumber(
      * Example: `BigInteger("-1").bitLength() == 0` ... think about ie :)
      */
     fun bitLengthBigIntegerStyle(): Int =
-        Mago.bitLengthBigIntegerStyle(meta.signFlag, magia, meta.normLen)
+        bitLengthBigIntegerStyle(meta.signFlag, magia, meta.normLen)
 
     /**
      * Returns the number of 32-bit integers required to store the binary magnitude.
@@ -458,7 +457,7 @@ sealed class BigIntNumber(
      *
      * @return bit index of the lowest set bit, or -1 if ZERO
      */
-    fun countTrailingZeroBits(): Int = Mago.ctz(magia, meta.normLen)
+    fun countTrailingZeroBits(): Int = ctz(magia, meta.normLen)
 
     /**
      * Counts the number of set bits (population count) in the normalized magnitude.
@@ -483,7 +482,7 @@ sealed class BigIntNumber(
      * @param bitIndex 0-based, starting from the least-significant bit
      * @return true if the bit is set, false otherwise
      */
-    fun testBit(bitIndex: Int): Boolean = Mago.testBit(magia, meta.normLen, bitIndex)
+    fun testBit(bitIndex: Int): Boolean = testBit(magia, meta.normLen, bitIndex)
 
     /**
      * Compares this [BigInt] with another [BigInt] for order.
@@ -501,7 +500,7 @@ sealed class BigIntNumber(
     operator fun compareTo(other: BigIntNumber): Int {
         if (meta.signMask != other.meta.signMask)
             return meta.signMask or 1
-        val cmp = Mago.compare(magia, meta.normLen, other.magia, other.meta.normLen)
+        val cmp = compare(magia, meta.normLen, other.magia, other.meta.normLen)
         return meta.negateIfNegative(cmp)
     }
 
@@ -573,7 +572,7 @@ sealed class BigIntNumber(
     fun compareToHelper(dwSign: Boolean, dwMag: ULong): Int {
         if (meta.isNegative != dwSign)
             return meta.signMask or 1
-        val cmp = Mago.compare(magia, meta.normLen, dwMag)
+        val cmp = compare(magia, meta.normLen, dwMag)
         return if (dwSign) -cmp else cmp
     }
 
@@ -584,19 +583,19 @@ sealed class BigIntNumber(
      * @return -1,0,1
      */
     fun magnitudeCompareTo(n: Int) =
-        Mago.compare(magia, meta.normLen, n.absoluteValue.toUInt().toULong())
+        compare(magia, meta.normLen, n.absoluteValue.toUInt().toULong())
     fun magnitudeCompareTo(w: UInt) =
-        Mago.compare(magia, meta.normLen, w.toULong())
+        compare(magia, meta.normLen, w.toULong())
     fun magnitudeCompareTo(l: Long) =
-        Mago.compare(magia, meta.normLen, l.absoluteValue.toULong())
+        compare(magia, meta.normLen, l.absoluteValue.toULong())
     fun magnitudeCompareTo(dw: ULong) =
-        Mago.compare(magia, meta.normLen, dw)
+        compare(magia, meta.normLen, dw)
     fun magnitudeCompareTo(littleEndianIntArray: IntArray, length: Int = littleEndianIntArray.size) =
-        Mago.compare(magia, meta.normLen, littleEndianIntArray, Mago.normLen(littleEndianIntArray, length))
+        compare(magia, meta.normLen, littleEndianIntArray, normLen(littleEndianIntArray, length))
     fun magnitudeCompareTo(other: BigIntNumber): Int =
-        Mago.compare(magia, meta.normLen, other.magia, other.meta.normLen)
+        compare(magia, meta.normLen, other.magia, other.meta.normLen)
     internal fun magnitudeCompareTo(otherMeta: Meta, otherMagia: Magia) =
-        Mago.compare(magia, meta.normLen, otherMagia, otherMeta.normLen)
+        compare(magia, meta.normLen, otherMagia, otherMeta.normLen)
 
     /**
      * Comparison predicate for numerical equality with another [BigInt] or

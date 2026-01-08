@@ -100,7 +100,7 @@ class TestBigIntMulDivRem {
         if (verbose) {
             println("mbi.magia = ${mbi.magia.joinToString()}")
             println("meta.normLen = ${mbi.meta.normLen}")
-            println("normLen(magia) = ${Mago.normLen(mbi.magia)}")
+            println("normLen(magia) = ${normLen(mbi.magia)}")
         }
     }
 

@@ -70,7 +70,7 @@ class TestKaratsubaSqrBenchmark {
                 setSqrKaratsuba(z, a, n, t)
             }
 
-            bench("Mago.setSqrSchoolbook") {
+            bench("setSqrSchoolbook") {
                 setSqrSchoolbook(z, a, n)
             }
 
