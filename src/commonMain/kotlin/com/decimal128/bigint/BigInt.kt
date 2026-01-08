@@ -1302,14 +1302,14 @@ class BigInt private constructor(
     fun sqr(): BigInt {
         if (this.isNotZero()) {
             val normLen = meta.normLen
-            if (normLen < MagoSqr.KARATSUBA_SQR_THRESHOLD) {
+            if (normLen < KARATSUBA_SQR_THRESHOLD) {
                 val z = IntArray(2 * normLen)
-                val zNormLen = MagoSqr.setSqr(z, magia, normLen)
+                val zNormLen = setSqr(z, magia, normLen)
                 return fromNormalizedNonZero(z, zNormLen)
             }
             val z = IntArray(2 * normLen + 1)
             val t = IntArray(3 * ((normLen + 1) / 2) + 3)
-            val zNormLen = MagoSqr.setSqrKaratsuba(z, magia, normLen, t)
+            val zNormLen = setSqrKaratsuba(z, magia, normLen, t)
             return fromNormalizedNonZero(z, zNormLen)
         }
         return ZERO

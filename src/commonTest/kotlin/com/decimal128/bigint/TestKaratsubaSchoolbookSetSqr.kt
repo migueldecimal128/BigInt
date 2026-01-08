@@ -2,7 +2,6 @@ package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt
 import com.decimal128.bigint.BigIntStats
-import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

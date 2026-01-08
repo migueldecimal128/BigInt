@@ -1,8 +1,6 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigIntStats
-import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
-import com.decimal128.bigint.MagoSqr.karatsubaSqr
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue

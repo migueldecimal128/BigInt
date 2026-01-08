@@ -1031,14 +1031,14 @@ class MutableBigInt private constructor (
         val xNormLen = x.meta.normLen
         when {
             xNormLen == 0 -> return setZero()
-            xNormLen < MagoSqr.KARATSUBA_SQR_THRESHOLD -> {
+            xNormLen < KARATSUBA_SQR_THRESHOLD -> {
                 val xMagia = x.magia
                 ensureTmp1CapacityZeroed(xNormLen + xNormLen, MBI_RESIZE_TMP1_SQR)
                 swapTmp1()
                 updateMeta(
                     Meta(
                         0,
-                        MagoSqr.setSqr(magia, xMagia, xNormLen)
+                        setSqr(magia, xMagia, xNormLen)
                     )
                 )
                 ++BI_OP_COUNTS[MBI_SET_SQR_SCHOOLBOOK.ordinal]
@@ -1057,7 +1057,7 @@ class MutableBigInt private constructor (
         val zLen = 2*n
         ensureTmp1CapacityZeroed(zLen + 1, MBI_RESIZE_TMP1_KARATSUBA_SQR)
         ensureTmp2Capacity(3 * k1 + 3, MBI_RESIZE_TMP2_KARATSUBA_Z1)
-        val zNormLen = MagoSqr.setSqrKaratsuba(tmp1, a.magia, a.meta.normLen, tmp2)
+        val zNormLen = setSqrKaratsuba(tmp1, a.magia, a.meta.normLen, tmp2)
         swapTmp1()
         updateMeta(Meta(zNormLen))
         ++BI_OP_COUNTS[MBI_SET_SQR_KARATSUBA.ordinal]
@@ -1571,7 +1571,7 @@ class MutableBigInt private constructor (
      */
     fun addSquareOf(bi: BigIntNumber) {
         ensureTmp1CapacityZeroed(bi.meta.normLen * 2, MBI_RESIZE_TMP1_SQR)
-        val normLenSqr = MagoSqr.setSqr(tmp1, bi.magia, bi.meta.normLen)
+        val normLenSqr = setSqr(tmp1, bi.magia, bi.meta.normLen)
         setAddImpl(this, Meta(0, normLenSqr), tmp1)
         validate()
         --BI_OP_COUNTS[MBI_SET_ADD_SUB_BI.ordinal]

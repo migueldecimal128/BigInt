@@ -1,6 +1,5 @@
 package com.decimal128.bigint
 
-import com.decimal128.bigint.MagoSqr.ksetAdd
 
 import kotlin.test.*
 

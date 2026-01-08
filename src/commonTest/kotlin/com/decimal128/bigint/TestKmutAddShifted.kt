@@ -1,6 +1,5 @@
 package com.decimal128.bigint
 
-import com.decimal128.bigint.MagoSqr.kmutAddShifted
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 

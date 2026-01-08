@@ -1,8 +1,6 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.Mago.setMulSchoolbook
-import com.decimal128.bigint.MagoSqr.setSqr
-import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.test.Test
 import kotlin.time.TimeSource
 

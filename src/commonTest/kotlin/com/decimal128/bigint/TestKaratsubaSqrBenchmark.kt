@@ -1,8 +1,5 @@
 package com.decimal128.bigint
 
-import com.decimal128.bigint.MagoSqr
-import com.decimal128.bigint.MagoSqr.setSqrKaratsuba
-import com.decimal128.bigint.MagoSqr.setSqrSchoolbook
 import kotlin.test.Test
 import kotlin.time.TimeSource
 
@@ -51,7 +48,7 @@ class TestKaratsubaSqrBenchmark {
 
             if (n <= 4) {
                 bench("hand rolled") {
-                    MagoSqr.setSqr(z, a, n)
+                    setSqr(z, a, n)
                 }
             }
 
