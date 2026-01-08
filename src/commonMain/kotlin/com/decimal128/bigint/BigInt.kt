@@ -5,6 +5,13 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt.Companion.ZERO
+import com.decimal128.bigint.BigIntExceptions.throwBitLenLE0
+import com.decimal128.bigint.BigIntExceptions.throwBoundsCheckViolation
+import com.decimal128.bigint.BigIntExceptions.throwDivByZero
+import com.decimal128.bigint.BigIntExceptions.throwInvalidBitLenRange
+import com.decimal128.bigint.BigIntExceptions.throwModNegDivisor
+import com.decimal128.bigint.BigIntExceptions.throwNegBitIndex
+import com.decimal128.bigint.BigIntExceptions.throwNegBitCount
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
 import com.decimal128.bigint.Mago.compare
@@ -609,7 +616,7 @@ class BigInt private constructor(
                     return ZERO
                 }
                 maxBitLen == 0 -> ZERO
-                else -> throw IllegalArgumentException(ERR_MSG_BITLEN_LE_0)
+                else -> throwBitLenLE0()
             }
         }
 
@@ -668,7 +675,7 @@ class BigInt private constructor(
                 fromNormalizedNonZero(sign, magia)
             }
             bitLen == 0 -> ZERO
-            else -> throw IllegalArgumentException(ERR_MSG_BITLEN_LE_0)
+            else -> throwBitLenLE0()
         }
 
         /**
@@ -785,7 +792,7 @@ class BigInt private constructor(
         ): BigInt {
             val range = bitLenMax - bitLenMin
             if (bitLenMin < 0 || range < 0)
-                throw IllegalArgumentException(ERR_MSG_INVALID_BITLEN_RANGE)
+                throwInvalidBitLenRange()
             val bitLen = bitLenMin + rng.nextInt(range + 1)
             return randomWithMaxBitLen(bitLen, rng, withRandomSign)
         }
@@ -833,7 +840,7 @@ class BigInt private constructor(
             bytes: ByteArray, offset: Int = 0, length: Int = bytes.size
         ): BigInt {
             if (offset < 0 || length < 0 || length > bytes.size - offset)
-                throw IllegalArgumentException()
+                throwBoundsCheckViolation()
             if (length > 0) {
                 val ibSign = offset - 1 + (if (isBigEndian) 1 else length)
                 val isNegative = isTwosComplement && bytes[ibSign] < 0
@@ -862,7 +869,7 @@ class BigInt private constructor(
                 }
                 return ZERO
             }
-            throw IllegalArgumentException()
+            throwBoundsCheckViolation()
         }
 
         fun fromLittleEndianIntArray(sign: Boolean, littleEndianIntArray: IntArray,
@@ -886,7 +893,7 @@ class BigInt private constructor(
          */
         fun withSetBit(bitIndex: Int): BigInt {
             if (bitIndex < 0)
-                throw IllegalArgumentException(ERR_MSG_NEG_BITINDEX)
+                throwNegBitIndex()
             if (bitIndex == 0)
                 return ONE
             val magia = Mago.newWithBitLen(bitIndex + 1)
@@ -913,8 +920,7 @@ class BigInt private constructor(
         fun withBitMask(bitWidth: Int, bitIndex: Int = 0): BigInt {
             when {
                 bitIndex < 0 || bitWidth < 0 ->
-                    throw IllegalArgumentException(
-                        "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
+                    throwInvalidBitLenRange()
                 bitWidth == 0 -> return ZERO
                 bitWidth == 1 -> return withSetBit(bitIndex)
             }
@@ -991,7 +997,7 @@ class BigInt private constructor(
                     }
                 }
             }
-            throw IllegalArgumentException()
+            throwBoundsCheckViolation()
         }
 
         /**
@@ -1139,7 +1145,7 @@ class BigInt private constructor(
                     val divisor = (other.magia[1].toLong() shl 32) or (other.magia[0].toLong() and 0xFFFF_FFFFL)
                     divImpl64(otherSign, divisor.toULong())
                 }
-                else -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+                else -> throwDivByZero()
             }
         }
         val thisNormLen = meta.normLen
@@ -1173,7 +1179,7 @@ class BigInt private constructor(
 
     infix fun mod(n: Int): BigInt {
         if (n < 0)
-            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
+            throwModNegDivisor()
         return remModImpl64(n.absoluteValue.toUInt().toULong(), isMod = true)
     }
 
@@ -1181,7 +1187,7 @@ class BigInt private constructor(
 
     infix fun mod(l: Long): BigInt {
         if (l < 0)
-            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
+            throwModNegDivisor()
         return remModImpl64(l.absoluteValue.toULong(), isMod = true)
     }
 
@@ -1205,7 +1211,7 @@ class BigInt private constructor(
     fun divInverse(numerator: Long) = divInverse(numerator < 0, numerator.absoluteValue.toULong())
     fun divInverse(signNumerator: Boolean, numerator: ULong): BigInt {
         if (this.isZero())
-            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+            throwDivByZero()
         val cmp = this.magnitudeCompareTo(numerator)
         val qSign = this.meta.signFlag xor signNumerator
         return when {
@@ -1235,7 +1241,7 @@ class BigInt private constructor(
     fun remInverse(numerator: Long) = remInverse(numerator < 0, numerator.absoluteValue.toULong())
     fun remInverse(signNumerator: Boolean, numerator: ULong): BigInt {
         if (this.isZero())
-            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+            throwDivByZero()
         val cmp = this.magnitudeCompareTo(numerator)
         return when {
             cmp > 0 -> from(signNumerator, numerator)
@@ -1263,9 +1269,9 @@ class BigInt private constructor(
     fun modInverse(numerator: Long) = modInverse(numerator < 0, numerator.absoluteValue.toULong())
     fun modInverse(signNumerator: Boolean, numerator: ULong): BigInt {
         if (this.isZero())
-            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+            throwDivByZero()
         if (this.isNegative())
-            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
+            throwModNegDivisor()
         val cmp = this.magnitudeCompareTo(numerator)
         return when {
             cmp > 0 -> from(signNumerator, numerator)
@@ -1381,7 +1387,7 @@ class BigInt private constructor(
                     limb and isolatedBit.inv()
             return fromNonNormalizedManyNonZero(this.meta.signFlag, magia)
         }
-        throw IllegalArgumentException()
+        throwBoundsCheckViolation()
     }
 
     /**
@@ -1407,7 +1413,7 @@ class BigInt private constructor(
             }
             return fromNormalizedNonZero(z)
         }
-        throw IllegalStateException()
+        throwBoundsCheckViolation()
     }
 
     /**
@@ -1464,7 +1470,7 @@ class BigInt private constructor(
                 fromNormalizedNonZero(z, zNormLen)
             }
             bitCount == 0 -> abs()
-            else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
+            else -> throwNegBitCount()
         }
     }
 
@@ -1506,7 +1512,7 @@ class BigInt private constructor(
                 }
             }
             bitCount == 0 -> this
-            else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
+            else -> throwNegBitCount()
         }
     }
 
@@ -1527,7 +1533,7 @@ class BigInt private constructor(
                 verify { zNormLen == z.size }
                 fromNormalizedNonZero(meta.signFlag, z)
             }
-            else -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
+            else -> throwNegBitCount()
         }
     }
 
@@ -1547,8 +1553,7 @@ class BigInt private constructor(
         val myBitLen = magnitudeBitLen()
         when {
             bitIndex < 0 || bitWidth < 0 ->
-                throw IllegalArgumentException(
-                    "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth")
+                throwInvalidBitLenRange()
             bitWidth == 0 || bitIndex >= myBitLen -> return ZERO
             bitWidth == 1 && !testBit(bitIndex) -> return ZERO
             bitWidth == 1 -> return BigInt.withSetBit(bitIndex)
@@ -1658,7 +1663,7 @@ class BigInt private constructor(
                 else -> return from(otherSign, w) // thisNormLen == 0
             }
         }
-        throw IllegalStateException()
+        throwBoundsCheckViolation()
     }
 
     fun addImpl64(otherSign: Boolean, dw: ULong): BigInt {
@@ -1698,7 +1703,7 @@ class BigInt private constructor(
                 }
             }
         }
-        throw IllegalStateException()
+        throwBoundsCheckViolation()
     }
 
     /**
@@ -1801,7 +1806,7 @@ class BigInt private constructor(
             }
             return ZERO
         }
-        throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+        throwDivByZero()
     }
 
     fun divImpl64(dwSign: Boolean, dw: ULong): BigInt {
@@ -1823,7 +1828,7 @@ class BigInt private constructor(
 
     fun remModImpl64(dw: ULong, isMod: Boolean): BigInt {
         if (dw == 0uL)
-            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
+            throwDivByZero()
         if (!isZero()) {
             val rem = Mago.calcRem64(magia, meta.normLen, null, dw)
             if (rem != 0uL) {

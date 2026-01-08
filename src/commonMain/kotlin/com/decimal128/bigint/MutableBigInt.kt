@@ -4,6 +4,11 @@
 
 package com.decimal128.bigint
 
+import com.decimal128.bigint.BigIntExceptions.throwBoundsCheckViolation
+import com.decimal128.bigint.BigIntExceptions.throwHashCodeUnsupported
+import com.decimal128.bigint.BigIntExceptions.throwInvalidBitLenRange
+import com.decimal128.bigint.BigIntExceptions.throwModNegDivisor
+import com.decimal128.bigint.BigIntExceptions.throwNegBitCount
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp
 import com.decimal128.bigint.BigIntStats.StatsOp.*
@@ -1293,7 +1298,7 @@ class MutableBigInt private constructor (
         setModImpl(x, false, dw)
     fun setMod(x: BigIntNumber, y: BigIntNumber): MutableBigInt {
         if (y.meta.isNegative)
-            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
+            throwModNegDivisor()
         setRem(x, y)
         if (isNegative())
             setAdd(this, y)
@@ -1316,7 +1321,7 @@ class MutableBigInt private constructor (
      */
     private fun setModImpl(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
         if (ySign)
-            throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
+            throwModNegDivisor()
         setRem(x, yDw)
         if (isNegative())
             setAdd(this, yDw)
@@ -1624,7 +1629,7 @@ class MutableBigInt private constructor (
      */
     fun setShl(x: BigIntNumber, bitCount: Int): MutableBigInt {
         when {
-            bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
+            bitCount < 0 -> throwNegBitCount()
             bitCount == 0 || x.isZero() -> set(x)
             else -> {
                 val xMagia = x.magia
@@ -1660,7 +1665,7 @@ class MutableBigInt private constructor (
     fun setUshr(x: BigIntNumber, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
         when {
-            bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
+            bitCount < 0 -> throwNegBitCount()
             bitCount == 0 -> set(x)
             zBitLen <= 0 -> setZero()
             else -> {
@@ -1696,7 +1701,7 @@ class MutableBigInt private constructor (
     fun setShr(x: BigIntNumber, bitCount: Int): MutableBigInt {
         val zBitLen = x.magnitudeBitLen() - bitCount
         when {
-            bitCount < 0 -> throw IllegalArgumentException(ERR_MSG_NEG_BITCOUNT)
+            bitCount < 0 -> throwNegBitCount()
             bitCount == 0 -> set(x)
             zBitLen <= 0 && x.meta.isNegative -> set(-1)
             zBitLen <= 0 -> setZero()
@@ -1745,7 +1750,7 @@ class MutableBigInt private constructor (
             updateMeta(Meta(meta.signBit, wordIndex + 1))
             return this
         }
-        throw IllegalArgumentException()
+        throwBoundsCheckViolation()
     }
 
 
@@ -1769,7 +1774,7 @@ class MutableBigInt private constructor (
             }
             return this
         }
-        throw IllegalArgumentException()
+        throwBoundsCheckViolation()
     }
 
     /**
@@ -1791,9 +1796,7 @@ class MutableBigInt private constructor (
         val myBitLen = magnitudeBitLen()
         when {
             bitIndex < 0 || bitWidth < 0 ->
-                throw IllegalArgumentException(
-                    "illegal negative arg bitIndex:$bitIndex bitCount:$bitWidth"
-                )
+                throwInvalidBitLenRange()
 
             bitWidth == 0 || bitIndex >= myBitLen -> return setZero()
             bitWidth == 1 && !testBit(bitIndex) -> return setZero()
@@ -2025,7 +2028,6 @@ class MutableBigInt private constructor (
      * @throws UnsupportedOperationException always thrown to forbid use in hashing
      */
     override fun hashCode(): Int =
-        throw UnsupportedOperationException(
-            "mutable MutableBigInt is an invalid key in collections")
+        throwHashCodeUnsupported()
 
 }

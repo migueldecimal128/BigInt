@@ -55,12 +55,7 @@ sealed class BigIntNumber(
     internal val magia:Magia get() = _magia
 
     companion object {
-        internal val ERR_MSG_DIV_BY_ZERO = "div by zero"
-        internal val ERR_MSG_MOD_NEG_DIVISOR = "modulus with a negative divisor is undefined"
-        internal val ERR_MSG_NEG_BITCOUNT = "negative bitCount"
-        internal val ERR_MSG_BITLEN_LE_0 = "invalid bitLen <= 0"
-        internal val ERR_MSG_INVALID_BITLEN_RANGE = "invalid bitLen range: 0 <= bitLenMin <= bitLenMax"
-        internal val ERR_MSG_NEG_BITINDEX = "negative bitIndex"
+
 
         /**
          * Inject `0xDEAD` poison into high, unused limbs of a [BigInt].
