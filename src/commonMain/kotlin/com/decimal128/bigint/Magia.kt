@@ -306,21 +306,22 @@ internal fun newCopyWithExactLimbLen(x: Magia, xLen: Int, exactLimbLen: Int): Ma
  */
 internal fun setAdd32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
     if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
+        if (z !== x)
+            x.copyInto(z)
+        if (w == 0u)
+            return xNormLen
         var carry = w.toDws()
         var i = 0
-        while (carry != 0L && i < xNormLen) {
+        while (i < xNormLen) {
             carry += x[i].toDws()
             z[i] = carry.toInt()
             carry = carry ushr 32
+            if (carry == 0L)
+                return xNormLen
             ++i
         }
-        if (carry == 0L) {
-            if (i < xNormLen && z !== x)
-                x.copyInto(z, i, i, xNormLen)
-            verify { isNormalized(z, xNormLen) }
-            return xNormLen
-        }
         if (i < z.size) {
+            verify { carry != 0L }
             z[i] = carry.toInt()
             ++i
             verify { isNormalized(z, i) }
