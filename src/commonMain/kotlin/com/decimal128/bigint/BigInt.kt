@@ -7,11 +7,15 @@ package com.decimal128.bigint
 import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
+import com.decimal128.bigint.Mago.compare
+import com.decimal128.bigint.Mago.newFromULong
 import com.decimal128.bigint.Mago.newWithBitLen
 import com.decimal128.bigint.Mago.normBitLen
 import com.decimal128.bigint.Mago.setOr
+import com.decimal128.bigint.Mago.setRem
 import com.decimal128.bigint.Mago.setShiftLeft
 import com.decimal128.bigint.Mago.setShiftRight
+import com.decimal128.bigint.Mago.setSub
 import com.decimal128.bigint.Mago.setXor
 import kotlin.math.absoluteValue
 import kotlin.math.max
@@ -1160,29 +1164,29 @@ class BigInt private constructor(
 
     // note that in java/kotlin, the sign of remainder only depends upon
     // the dividend, so we just take the abs value of the divisor
-    operator fun rem(n: Int): BigInt = remModImpl(n.absoluteValue.toUInt().toULong(), isMod = false)
+    operator fun rem(n: Int): BigInt = remModImpl64(n.absoluteValue.toUInt().toULong(), isMod = false)
 
-    operator fun rem(w: UInt): BigInt = remModImpl(w.toULong(), isMod = false)
+    operator fun rem(w: UInt): BigInt = remModImpl64(w.toULong(), isMod = false)
 
-    operator fun rem(l: Long): BigInt = remModImpl(l.absoluteValue.toULong(), isMod = false)
+    operator fun rem(l: Long): BigInt = remModImpl64(l.absoluteValue.toULong(), isMod = false)
 
-    operator fun rem(dw: ULong): BigInt = remModImpl(dw, isMod = false)
+    operator fun rem(dw: ULong): BigInt = remModImpl64(dw, isMod = false)
 
     infix fun mod(n: Int): BigInt {
         if (n < 0)
             throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
-        return remModImpl(n.absoluteValue.toUInt().toULong(), isMod = true)
+        return remModImpl64(n.absoluteValue.toUInt().toULong(), isMod = true)
     }
 
-    infix fun mod(w: UInt): BigInt = remModImpl(w.toULong(), isMod = true)
+    infix fun mod(w: UInt): BigInt = remModImpl64(w.toULong(), isMod = true)
 
     infix fun mod(l: Long): BigInt {
         if (l < 0)
             throw ArithmeticException(ERR_MSG_MOD_NEG_DIVISOR)
-        return remModImpl(l.absoluteValue.toULong(), isMod = true)
+        return remModImpl64(l.absoluteValue.toULong(), isMod = true)
     }
 
-    infix fun mod(dw: ULong): BigInt = remModImpl(dw, isMod = true)
+    infix fun mod(dw: ULong): BigInt = remModImpl64(dw, isMod = true)
 
     infix fun mod(other: BigIntNumber): BigInt = remModImpl(other, isMod = true)
 
@@ -1818,34 +1822,57 @@ class BigInt private constructor(
         return fromNormalizedNonZero(sign, z, zNormLen)
     }
 
-    fun remModImpl(dw: ULong, isMod: Boolean): BigInt {
+    fun remModImpl64(dw: ULong, isMod: Boolean): BigInt {
         if (dw == 0uL)
             throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
         if (!isZero()) {
-            val r = Mago.newRemOrMod64(
-                magia, meta.normLen, applyModRingNormalization = meta.isNegative && isMod, dw)
-            if (r !== Mago.ZERO) {
-                ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
-                return fromNormalizedNonZero(!isMod && meta.isNegative, r)
+            val rem = Mago.calcRem64(magia, meta.normLen, null, dw)
+            if (rem != 0uL) {
+                return if (meta.isNegative && isMod)
+                    from(dw - rem)
+                else
+                    from(meta.isNegative, rem)
             }
         }
         return ZERO
     }
 
     fun remModImpl(other: BigIntNumber, isMod: Boolean): BigInt {
-        if (other.isZero())
-            throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
-        if (!isZero()) {
-            val r = Mago.newRemOrMod(
-                this.magia, this.meta.normLen,
-                applyModRingNormalization = meta.isNegative && isMod,
-                other.magia, other.meta.normLen)
-            if (r !== Mago.ZERO) {
-                ++BI_OP_COUNTS[BI_DIV_BI.ordinal]
-                return fromNonNormalizedManyNonZero(!isMod && meta.isNegative, r)
-            }
+        val xNormLen = meta.normLen
+        val yNormLen = other.meta.normLen
+        when {
+            yNormLen <= 2 -> return remModImpl64(other.toULongMagnitude(), isMod)
+            xNormLen == 0 -> return ZERO
         }
-        return ZERO
+        val x = magia
+        val y = other.magia
+        val applyModRingNormalization = isNegative() && isMod
+        val z: Magia
+        var zNormLen = 0
+        if (normBitLen(x, xNormLen) <= normBitLen(y, yNormLen)) {
+            val cmp = compare(x, xNormLen, y, yNormLen)
+            when {
+                cmp < 0 && !applyModRingNormalization -> return this
+                cmp < 0 -> {
+                    z = Magia(yNormLen)
+                    zNormLen = setSub(z, y, yNormLen, x, xNormLen)
+                    return fromNormalizedNonZero(z, zNormLen)
+                }
+                cmp == 0 -> return ZERO
+                else -> {
+                    z = Magia(xNormLen)
+                    zNormLen = setSub(z, x, xNormLen, y, yNormLen)
+                }
+            }
+        } else {
+            z = Magia(yNormLen)
+            zNormLen = setRem(z, magia, xNormLen, other.magia, yNormLen)
+            if (zNormLen == 0)
+                return ZERO
+        }
+        if (applyModRingNormalization)
+            zNormLen = setSub(z, y, yNormLen, z, zNormLen)
+        return fromNormalizedNonZero(meta.signFlag && !isMod, z, zNormLen)
     }
 
 }
