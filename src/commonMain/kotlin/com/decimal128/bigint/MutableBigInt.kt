@@ -678,7 +678,8 @@ class MutableBigInt private constructor (
      */
     private fun set(yMeta: Meta, y: Magia): MutableBigInt {
         ensureMagiaCapacityDiscard(yMeta.normLen)
-        y.copyInto(magia, 0, 0, yMeta.normLen)
+        if (magia !== y)
+            y.copyInto(magia, 0, 0, yMeta.normLen)
         updateMeta(yMeta)
         return this
     }

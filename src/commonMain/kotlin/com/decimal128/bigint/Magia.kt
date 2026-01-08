@@ -305,17 +305,17 @@ internal fun newCopyWithExactLimbLen(x: Magia, xLen: Int, exactLimbLen: Int): Ma
  * Throws `ArithmeticException` if the sum overflows `z`.
  */
 internal fun setAdd32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
-    if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
+    if (xNormLen >= 0 && xNormLen <= x.size && xNormLen <= z.size) {
         if (z !== x)
-            x.copyInto(z)
+            x.copyInto(z, endIndex = xNormLen)
         if (w == 0u)
             return xNormLen
         var carry = w.toDws()
         var i = 0
         while (i < xNormLen) {
-            carry += x[i].toDws()
-            z[i] = carry.toInt()
-            carry = carry ushr 32
+            val t = x[i].toDws() + carry
+            z[i] = t.toInt()
+            carry = t ushr 32
             if (carry == 0L)
                 return xNormLen
             ++i
@@ -340,22 +340,23 @@ internal fun setAdd32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
  * Throws `ArithmeticException` if the sum overflows `z`.
  */
 internal fun setAdd64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
-    if (xNormLen >= 0 && xNormLen <= x.size && isNormalized(x, xNormLen)) {
+    if (xNormLen >= 0 && xNormLen <= x.size && xNormLen <= z.size) {
+        if (z !== x)
+            x.copyInto(z, endIndex = xNormLen)
+        if (dw == 0uL)
+            return xNormLen
         var carry = dw.toLong()
         var i = 0
-        while (carry != 0L && i < xNormLen) {
+        while (i < xNormLen) {
             val t = x[i].toDws() + (carry and MASK32L)
             z[i] = t.toInt()
             carry = (carry ushr 32) + (t ushr 32)
+            if (carry == 0L)
+                return xNormLen
             ++i
         }
-        if (carry == 0L) {
-            if (i < xNormLen && z !== x)
-                x.copyInto(z, i, i, xNormLen)
-            verify { isNormalized(z, xNormLen) }
-            return xNormLen
-        }
         if (i < z.size) {
+            verify { carry != 0L }
             z[i] = carry.toInt()
             ++i
             carry = carry ushr 32
@@ -400,11 +401,22 @@ internal fun setAdd(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int):
                 ++i
             }
             val longer = if (xNormLen > yNormLen) x else y
-            while (i < maxNormLen && i < z.size) {
-                val t = longer[i].toDws() + carry
-                z[i] = t.toInt()
-                carry = t ushr 32
-                ++i
+            if (z !== longer) {
+                while (i < maxNormLen && i < z.size) {
+                    carry += longer[i].toDws()
+                    z[i] = carry.toInt()
+                    carry = carry ushr 32
+                    ++i
+                }
+            } else {
+                while (i < maxNormLen && i < z.size) {
+                    val t = longer[i].toDws() + carry
+                    z[i] = t.toInt()
+                    carry = t ushr 32
+                    if (carry == 0L)
+                        return maxNormLen
+                    ++i
+                }
             }
             if (carry != 0L) {
                 if (i == z.size)
