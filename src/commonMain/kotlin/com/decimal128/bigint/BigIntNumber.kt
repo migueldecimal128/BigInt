@@ -896,14 +896,14 @@ sealed class BigIntNumber(
      *
      * The result `r` satisfies `r*r ≤ this < (r+1)*(r+1)`.
      */
-    fun isqrt(): BigInt = BigIntAlgorithms.isqrt(this)
+    fun isqrt(): BigInt = isqrtImpl(this)
 
     /**
      * Returns `true` if this value is a perfect square.
      *
      * This is equivalent to checking whether `isqrt().square() == this`.
      */
-    fun isPerfectSquare(): Boolean = BigIntAlgorithms.isPerfectSquare(this)
+    fun isPerfectSquare(): Boolean = isPerfectSquare(this)
 
     /**
      * Computes a hash code for the magnitude [x], ignoring any leading
