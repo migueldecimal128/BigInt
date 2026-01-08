@@ -4,15 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.BigIntExceptions.throwInvalidAllocationLength
-import com.decimal128.bigint.BigIntExceptions.throwAddOverflow
-import com.decimal128.bigint.BigIntExceptions.throwBoundsCheckViolation
-import com.decimal128.bigint.BigIntExceptions.throwMulOverflow
-import com.decimal128.bigint.BigIntExceptions.throwNegBitIndex
-import com.decimal128.bigint.BigIntExceptions.throwShlOverflow
-import com.decimal128.bigint.BigIntExceptions.throwSubUnderflow
-import com.decimal128.bigint.BigIntExceptions.throwDivByZero
-import com.decimal128.bigint.BigIntExceptions.throwBadKnuthArgument
 import kotlin.math.min
 import kotlin.math.max
 
@@ -171,9 +162,11 @@ internal object Mago {
      * garbage upper limbs in values and temps allocated by [MutableBigInt]
      */
     inline fun normLen(x: Magia): Int {
-        for (i in x.size - 1 downTo 0)
+        var i = x.size
+        while (--i >= 0) {
             if (x[i] != 0)
                 return i + 1
+        }
         return 0
     }
 
@@ -184,23 +177,25 @@ internal object Mago {
      * @throws IllegalArgumentException if [xLen] is out of range for [x].
      */
     fun normLen(x: Magia, xLen: Int): Int {
-        if (xLen >= 0 && xLen <= x.size) {
-            for (i in xLen - 1 downTo 0)
-                if (x[i] != 0)
-                    return i + 1
-            return 0
+        if (xLen < 0 || xLen > x.size)
+            return throwBoundsCheckViolation_Int()
+        var i = xLen
+        while (--i >= 0) {
+            if (x[i] != 0)
+                return i + 1
         }
-        throw IllegalArgumentException()
+        return 0
     }
 
     fun normLen(x: Magia, xOff: Int, xLen: Int): Int {
-        if (xOff >= 0 && xLen >= 0 && xOff + xLen <= x.size) {
-            for (i in xLen - 1 downTo 0)
-                if (x[xOff + i] != 0)
-                    return i + 1
-            return 0
+        if (xOff < 0 || xLen < 0 || xOff + xLen > x.size)
+            return throwBoundsCheckViolation_Int()
+        var i = xLen
+        while (--i >= 0) {
+            if (x[xOff + i] != 0)
+                return i + 1
         }
-        throw IllegalArgumentException()
+        return 0
     }
 
     /**
@@ -249,7 +244,7 @@ internal object Mago {
                 Magia(limbLenFromBitLen(bitLen))
             bitLen == 0 -> ZERO
             else ->
-                throwInvalidAllocationLength()
+                throwInvalidAllocationLength_Magia()
         }
     }
 
@@ -271,14 +266,13 @@ internal object Mago {
         Magia(calcHeapLimbQuantum(floorLen))
 
     inline fun calcHeapLimbQuantum(floorLen: Int): Int {
-        if (floorLen in 0..MAX_ALLOC_SIZE) {
+        if (floorLen >= 0 && floorLen <= MAX_ALLOC_SIZE - 3) {
             // if floorLen == 0 then add 1
             val t = floorLen + 1 - (-floorLen ushr 31)
             val allocSize = (t + 3) and 3.inv()
-            if (allocSize <= MAX_ALLOC_SIZE)
-                return allocSize
+            return allocSize
         }
-        throwInvalidAllocationLength()
+        return throwInvalidAllocationLength_Int()
     }
 
     /**
@@ -293,15 +287,14 @@ internal object Mago {
      * If the new length is larger, high-order limbs are zero-filled; if smaller,
      * high-order limbs are truncated.
      */
-    fun newCopyWithExactLimbLen(x: Magia, xLen: Int, exactLimbLen: Int): Magia {
-        if (exactLimbLen in 1..MAX_ALLOC_SIZE) {
+    fun newCopyWithExactLimbLen(x: Magia, xLen: Int, exactLimbLen: Int): Magia = when {
+        exactLimbLen in 1..MAX_ALLOC_SIZE -> {
             val dst = Magia(exactLimbLen)
             x.copyInto(dst, 0, 0, min(xLen, dst.size))
-            return dst
+            dst
         }
-        if (exactLimbLen == 0)
-            return ZERO
-        throwInvalidAllocationLength()
+        exactLimbLen == 0 -> ZERO
+        else -> throwInvalidAllocationLength_Magia()
     }
 
     /**
@@ -937,9 +930,12 @@ internal object Mago {
      */
     internal fun bitLen(x: Magia, xLen: Int): Int {
         if (xLen >= 0 && xLen <= x.size) {
-            for (i in xLen - 1 downTo 0)
+            var i = xLen - 1
+            while (i >= 0) {
                 if (x[i] != 0)
                     return 32 - x[i].countLeadingZeroBits() + (i * 32)
+                --i
+            }
             return 0
         }
         throwBoundsCheckViolation()
@@ -1249,9 +1245,11 @@ internal object Mago {
         if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
             if (xNormLen != yNormLen)
                 return ((xNormLen - yNormLen) shr 31) or 1 // does this really have to be -1 ?
-            for (i in xNormLen - 1 downTo 0) {
+            var i = xNormLen - 1
+            while (i >= 0) {
                 if (x[i] != y[i])
                     return ((x[i].toDws() - y[i].toDws()) shr 63).toInt() or 1
+                --i
             }
             return 0
         }
@@ -1288,7 +1286,7 @@ internal object Mago {
             val ws = w.toInt()
             verify { isNormalized(x, xNormLen) }
             when {
-                ws == 0 -> throwDivByZero()
+                ws == 0 -> return throwDivByZero_Int()
                 xNormLen == 0 -> return 0
                 ws.countOneBits() == 1 ->
                     return setShiftRight(z, x, xNormLen, ws.countTrailingZeroBits())
@@ -1297,12 +1295,14 @@ internal object Mago {
                 // Fast path: signed division gives the same results
                 val dws = ws.toLong()
                 var carry = 0L
-                for (i in xNormLen - 1 downTo 0) {
+                var i = xNormLen - 1
+                while (i >= 0) {
                     val t = (carry shl 32) + x[i].toDws()
                     val q = t / dws
-                    val r = t % dws
+                    val r = t - (q * dws)
                     z[i] = q.toInt()
                     carry = r
+                    --i
                 }
             } else {
                 // Slow path: unsigned division ... requires sign-bit correction on jvm
@@ -1311,7 +1311,7 @@ internal object Mago {
                 for (i in xNormLen - 1 downTo 0) {
                     val t = (carry shl 32) + dw32(x[i])
                     val q = t / dw
-                    val r = t % dw
+                    val r = t - (q * dw)
                     z[i] = q.toInt()
                     carry = r
                 }
@@ -1356,7 +1356,7 @@ internal object Mago {
      */
     fun trySetDivFastPath(zMagia: Magia, xMagia: Magia, xNormLen: Int, yMagia: Magia, yNormLen: Int): Int {
         when {
-            yNormLen == 0 -> throwDivByZero()
+            yNormLen == 0 -> return throwDivByZero_Int()
             xNormLen == 0 -> return 0
             xNormLen < yNormLen -> return 0
             xNormLen <= 2 ->

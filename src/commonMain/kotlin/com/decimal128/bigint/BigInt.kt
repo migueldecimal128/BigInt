@@ -5,13 +5,6 @@
 package com.decimal128.bigint
 
 import com.decimal128.bigint.BigInt.Companion.ZERO
-import com.decimal128.bigint.BigIntExceptions.throwBitLenLE0
-import com.decimal128.bigint.BigIntExceptions.throwBoundsCheckViolation
-import com.decimal128.bigint.BigIntExceptions.throwDivByZero
-import com.decimal128.bigint.BigIntExceptions.throwInvalidBitLenRange
-import com.decimal128.bigint.BigIntExceptions.throwModNegDivisor
-import com.decimal128.bigint.BigIntExceptions.throwNegBitIndex
-import com.decimal128.bigint.BigIntExceptions.throwNegBitCount
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
 import com.decimal128.bigint.Mago.compare
@@ -1145,7 +1138,7 @@ class BigInt private constructor(
                     val divisor = (other.magia[1].toLong() shl 32) or (other.magia[0].toLong() and 0xFFFF_FFFFL)
                     divImpl64(otherSign, divisor.toULong())
                 }
-                else -> throwDivByZero()
+                else -> throwDivByZero_BigInt()
             }
         }
         val thisNormLen = meta.normLen
@@ -1797,16 +1790,15 @@ class BigInt private constructor(
 
     fun divImpl32(wSign: Boolean, w: UInt): BigInt {
         ++BI_OP_COUNTS[BI_DIV_PRIMITIVE.ordinal]
-        if (w != 0u) {
-            if (!isZero()) {
-                val z = Magia(meta.normLen)
-                val zNormLen = Mago.setDiv32(z, magia, meta.normLen, w)
-                if (zNormLen > 0)
-                    return fromNormalizedNonZero(this.meta.signFlag xor wSign, z, zNormLen)
-            }
-            return ZERO
+        if (w == 0u)
+            throwDivByZero()
+        if (!isZero()) {
+            val z = Magia(meta.normLen)
+            val zNormLen = Mago.setDiv32(z, magia, meta.normLen, w)
+            if (zNormLen > 0)
+                return fromNormalizedNonZero(this.meta.signFlag xor wSign, z, zNormLen)
         }
-        throwDivByZero()
+        return ZERO
     }
 
     fun divImpl64(dwSign: Boolean, dw: ULong): BigInt {

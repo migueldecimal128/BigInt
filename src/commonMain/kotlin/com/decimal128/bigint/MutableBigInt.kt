@@ -4,11 +4,6 @@
 
 package com.decimal128.bigint
 
-import com.decimal128.bigint.BigIntExceptions.throwBoundsCheckViolation
-import com.decimal128.bigint.BigIntExceptions.throwHashCodeUnsupported
-import com.decimal128.bigint.BigIntExceptions.throwInvalidBitLenRange
-import com.decimal128.bigint.BigIntExceptions.throwModNegDivisor
-import com.decimal128.bigint.BigIntExceptions.throwNegBitCount
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp
 import com.decimal128.bigint.BigIntStats.StatsOp.*
