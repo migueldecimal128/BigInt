@@ -146,20 +146,6 @@ internal object Mago {
     }
 
     /**
-     * Returns a new limb array representing the given [ULong] value.
-     *
-     * Zero returns [ZERO].
-     */
-    fun newFromULong(dw: ULong): Magia = when {
-        (dw shr 32) != 0uL -> intArrayOf(dw.toInt(), (dw shr 32).toInt())
-        dw != 0uL -> intArrayOf(dw.toInt())
-        else -> ZERO
-    }
-
-    fun newFromUInt(w: UInt): Magia =
-        if (w != 0u) intArrayOf(w.toInt()) else ZERO
-
-    /**
      * Stores the 64-bit unsigned value `dw` into `z` as 32-bit limbs (little-endian)
      * and returns the resulting limb length (0–2).
      */
@@ -292,26 +278,6 @@ internal object Mago {
                 return allocSize
         }
         throw IllegalArgumentException(ERR_MSG_INVALID_ALLOCATION_LENGTH)
-    }
-
-     /**
-      * Returns a normalized copy of the first [len] limbs of [x],
-      * with any leading zero limbs removed.
-      *
-      * Note that len is not necessarily normalized.
-      *
-      * If all limbs are zero, returns [ZERO].
-      *
-      * @throws IllegalArgumentException if [len] is out of range for [x].
-      */
-    fun newNormalizedCopy(x: Magia, len: Int): Magia {
-        val normLen = normLen(x, len)
-        if (normLen > 0) {
-            val z = Magia(normLen)
-            x.copyInto(z, 0, 0, normLen)
-            return z
-        }
-        return ZERO
     }
 
     /**
@@ -1555,41 +1521,6 @@ internal object Mago {
         return qNormLen
     }
 
-    /**
-     * Computes the remainder of dividing the magnitude slice `x[0‥xNormLen)` by the
-     * 64-bit unsigned modulus `dw`, with optional modular-ring normalization.
-     *
-     * The computation is performed on unsigned magnitudes. An unsigned remainder is
-     * obtained first. If `applyModNormalization` is `true` and that remainder is
-     * non-zero, the result is computed as `dw - remainder`, producing the least
-     * non-negative residue in `[0, dw)`. If the flag is `false`, the raw unsigned
-     * remainder is returned without sign normalization.
-     *
-     * Usage convention:
-     *  • `rem` calls pass `false` (raw unsigned remainder semantics).
-     *  • `mod` calls pass `(dividend < 0)` so negative dividends normalize into the
-     *    modular ring.
-     *
-     * Fast paths are used when `dw` fits in 32 bits or when `x` occupies one or
-     * two limbs; otherwise a 2-limb representation of `dw` is used for general
-     * multi-limb remainder.
-     *
-     * @param x   the limbs holding the magnitude of the dividend
-     * @param xNormLen the number of significant limbs in `x`
-     * @param applyModRingNormalization `true` requests modular-ring normalization;
-     *        `false` returns the raw unsigned remainder
-     * @param dw  the 64-bit unsigned modulus
-     *
-     * @return a normalized limb array holding the remainder (raw or normalized),
-     *         or [ZERO] when the result is zero.
-     */
-    fun newRemOrMod64(x: Magia, xNormLen: Int,
-                      applyModRingNormalization: Boolean, dw: ULong): Magia {
-        val rem = calcRem64(x, xNormLen, null, dw)
-        return newFromULong(
-            if (!applyModRingNormalization || rem == 0uL) rem else dw - rem)
-    }
-
     fun setRem64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
         verify { isNormalized(x, xNormLen) }
         return when {
@@ -1604,63 +1535,6 @@ internal object Mago {
             xNormLen <= 2 -> setULong(z, toRawULong(x, xNormLen) % dw)
             else -> setRem(z, x, xNormLen, intArrayOf(dw.toInt(), (dw shr 32).toInt()), 2)
         }
-    }
-
-    /**
-     * Returns a new non-normalized array holding `x mod y`.
-     * Handles 1-limb divisors directly, otherwise delegates to `setRem`
-     * and trims the result. Returns [ZERO] if the remainder is zero.
-     *
-     * @return the non-normalized [Magia] remainder or [ZERO]
-     */
-    fun newRemOrMod(x: Magia, xNormLen: Int,
-                    applyModRingNormalization: Boolean, y: Magia, yNormLen: Int): Magia {
-        verify { isNormalized(x, xNormLen) }
-        verify { isNormalized(y, yNormLen) }
-        when {
-            yNormLen == 0 -> throw ArithmeticException(ERR_MSG_DIV_BY_ZERO)
-            xNormLen == 0 -> return ZERO
-            yNormLen <= 2 -> return newRemOrMod64(
-                x, xNormLen,
-                applyModRingNormalization,
-                y[0].toUInt().toULong() or if (yNormLen == 2) (y[1].toULong() shl 32) else 0uL
-            )
-
-            xNormLen <= yNormLen -> {
-                if (normBitLen(x, xNormLen) <= normBitLen(y, yNormLen)) {
-                    val cmp = compare(x, xNormLen, y, yNormLen)
-                    return when {
-                        cmp < 0 && !applyModRingNormalization -> x.copyOf(xNormLen)
-                        cmp < 0 -> {
-                            val z = Magia(yNormLen)
-                            val zNormLen = setSub(z, y, yNormLen, x, xNormLen)
-                            z
-                        }
-                        cmp == 0 -> ZERO
-                        else -> {
-                            val z = Magia(xNormLen)
-                            val zNormLen = setSub(z, x, xNormLen, y, yNormLen)
-                            if (applyModRingNormalization) {
-                                // setSub will mutate in-place
-                                val modNormLen = setSub(z, y, yNormLen, z, zNormLen)
-                                z.fill(0, zNormLen)
-                            }
-                            z
-                        }
-                    }
-                }
-            }
-        }
-        val z = Magia(yNormLen)
-        val remNormLen = setRem(z, x, xNormLen, y, yNormLen)
-        when {
-            remNormLen == 0 -> return ZERO
-            applyModRingNormalization -> {
-                val modNormLen = setSub(z, y, yNormLen, z, remNormLen)
-                z.fill(0, modNormLen)
-            }
-        }
-        return z
     }
 
     /**

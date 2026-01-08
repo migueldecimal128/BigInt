@@ -8,7 +8,6 @@ import com.decimal128.bigint.BigInt.Companion.ZERO
 import com.decimal128.bigint.BigIntStats.BI_OP_COUNTS
 import com.decimal128.bigint.BigIntStats.StatsOp.*
 import com.decimal128.bigint.Mago.compare
-import com.decimal128.bigint.Mago.newFromULong
 import com.decimal128.bigint.Mago.newWithBitLen
 import com.decimal128.bigint.Mago.normBitLen
 import com.decimal128.bigint.Mago.setOr
