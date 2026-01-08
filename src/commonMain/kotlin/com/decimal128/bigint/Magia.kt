@@ -305,26 +305,30 @@ internal fun newCopyWithExactLimbLen(x: Magia, xLen: Int, exactLimbLen: Int): Ma
  * Throws `ArithmeticException` if the sum overflows `z`.
  */
 internal fun setAdd32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
-    if (xNormLen >= 0 && xNormLen <= x.size && xNormLen <= z.size) {
-        if (z !== x)
-            x.copyInto(z, endIndex = xNormLen)
+    if (z !== x)
+        x.copyInto(z, endIndex = xNormLen)
+    return mutAdd32(z, xNormLen, w)
+}
+
+internal fun mutAdd32(x: Magia, xNormLen: Int, w: UInt): Int {
+    if (xNormLen >= 0 && xNormLen <= x.size) {
         if (w == 0u)
             return xNormLen
         var carry = w.toDws()
         var i = 0
         while (i < xNormLen) {
             val t = x[i].toDws() + carry
-            z[i] = t.toInt()
+            x[i] = t.toInt()
             carry = t ushr 32
             if (carry == 0L)
                 return xNormLen
             ++i
         }
-        if (i < z.size) {
+        if (i < x.size) {
             verify { carry != 0L }
-            z[i] = carry.toInt()
+            x[i] = carry.toInt()
             ++i
-            verify { isNormalized(z, i) }
+            verify { isNormalized(x, i) }
             return i
         }
         throwAddOverflow()
