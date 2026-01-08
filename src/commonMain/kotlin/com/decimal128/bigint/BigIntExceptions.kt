@@ -37,6 +37,10 @@ internal fun throwSubUnderflow(): Nothing {
     throw IllegalStateException(ERR_MSG_SUB_UNDERFLOW)
 }
 
+internal fun throwSubUnderflow_Int(): Int {
+    throw IllegalStateException(ERR_MSG_SUB_UNDERFLOW)
+}
+
 internal fun throwMulOverflow(): Nothing {
     throw IllegalStateException(ERR_MSG_MUL_OVERFLOW)
 }

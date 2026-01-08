@@ -433,33 +433,28 @@ internal fun setAdd(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int):
 
 internal fun setSub32(z: Magia, x: Magia, xNormLen: Int, w: UInt): Int {
     verify { isNormalized(x, xNormLen) }
-    if (xNormLen >= 0 && xNormLen <= x.size) {
-        val xNormLen = normLen(x, xNormLen)
-        if (xNormLen <= z.size) {
-            if (xNormLen <= 1 && toRawULong(x, xNormLen) < w)
-                throwSubUnderflow()
-            var lastNonZeroIndex = -1
-            var borrow = w.toLong()
-            var i = 0
-            while (i < xNormLen) {
-                borrow = x[i].toDws() - borrow
-                val zi = borrow.toInt()
-                z[i] = zi
-                borrow = borrow ushr 63
-                // branchless update of last non-zero
-                val nonZeroMask = (zi or -zi) shr 31
-                lastNonZeroIndex =
-                    (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
-                ++i
-            }
-            if (borrow == 0L) {
-                val zNormLen = lastNonZeroIndex + 1
-                verify { isNormalized(z, zNormLen) }
-                return zNormLen
-            }
+    if (xNormLen >= 0 && xNormLen <= x.size && xNormLen <= z.size) {
+        if (z !== x)
+            x.copyInto(z, 0, 0, xNormLen)
+        var borrow = w.toLong()
+        var i = 0
+        while (i < xNormLen) {
+            if (borrow == 0L)
+                return xNormLen
+            borrow = z[i].toDws() - borrow
+            z[i] = borrow.toInt()
+            borrow = borrow ushr 63
+            ++i
         }
+        if (borrow == 0L) {
+            // The last limb might have become zero
+            val zNormLen = xNormLen - if (z[xNormLen - 1] == 0) 1 else 0
+            verify { isNormalized(z, zNormLen) }
+            return zNormLen
+        }
+        return throwSubUnderflow_Int()
     }
-    throwBoundsCheckViolation()
+    return throwBoundsCheckViolation_Int()
 }
 
 /**
