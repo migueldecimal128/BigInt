@@ -26,7 +26,7 @@ internal object MagoSqr {
 
     const val KARATSUBA_SQR_THRESHOLD = 84
 
-    const val SCHOOLBOOK_SQR_THRESHOLD = 19
+    const val SCHOOLBOOK_SQR_THRESHOLD = 12
 
     /**
      * Returns the 32-bit limb `n` zero-extended to a 64-bit `ULong`.
