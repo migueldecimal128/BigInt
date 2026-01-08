@@ -76,6 +76,8 @@ class BigInt private constructor(
 
         val ONE = BigInt(Meta(1), MAGIA_ONE)
 
+        val TWO = BigInt(Meta(1), intArrayOf(2))
+
         val NEG_ONE = BigInt(Meta(1, 1), MAGIA_ONE) // share magia .. but no mutation allowed
 
         val TEN = BigInt(Meta(4), intArrayOf(10))

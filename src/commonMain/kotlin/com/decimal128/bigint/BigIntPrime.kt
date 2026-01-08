@@ -22,6 +22,10 @@ package com.decimal128.bigint
 object BigIntPrime {
 
     fun nextProbablePrime(n: BigIntNumber): BigInt {
+        if (n <= 1) {
+            require(n >= 0)
+            return BigInt.TWO
+        }
         val tmp = MutableBigInt()
         val candidate = MutableBigInt(n)
         candidate += if (n.isOdd()) 2 else 1
