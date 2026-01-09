@@ -50,19 +50,32 @@ class TestHashCode {
     @Test
     fun testNonNormalized() {
         for (i in 0..<1000) {
-            val hiPos = BigInt.randomWithMaxBitLen(rng.nextInt(500))
-           if (hiPos.isZero())
+            val biPos = BigInt.randomWithMaxBitLen(rng.nextInt(500))
+           if (biPos.isZero())
                continue
-            val biggerBitLen = hiPos.magnitudeBitLen() + rng.nextInt(1000) + 32
+            val biggerBitLen = biPos.magnitudeBitLen() + rng.nextInt(1000) + 32
             // subtraction will generate non-normalized BigInt magia
             // arrays ... which are not SuperNormal
             val bigger = BigInt.withSetBit(biggerBitLen)
-            val hiPos2 = (bigger + hiPos) - bigger
-            check (!hiPos2.isSuperNormalized())
+            val biPos2 = (bigger + biPos) - bigger
+            //biPos2 might be superNormalized
+            //check (!biPos2.isSuperNormalized())
 
-            assertEquals(hiPos, hiPos2)
-            assertEquals(hiPos.hashCode(), hiPos2.hashCode())
+            assertEquals(biPos, biPos2)
+            assertEquals(biPos.hashCode(), biPos2.hashCode())
         }
+    }
+
+    @Test
+    fun testProblem1() {
+        val biPos = 1785.toBigInt()
+        val bigger = 281474976710656.toBigInt()
+        val biPos2 = (bigger + biPos) - bigger
+        // this check is no longer valid ... it could be superNormalized
+        // check(!biPos2.isSuperNormalized())
+        if (verbose)
+            println("biPos:$biPos biPos2:$biPos2")
+        assertEquals(biPos, biPos2)
     }
 
 }

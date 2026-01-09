@@ -85,7 +85,7 @@ internal val MAGIA_ONE = intArrayOf(1)
 /**
  * Returns the 32-bit limb `n` zero-extended to a 64-bit `ULong`.
  */
-private inline fun dw32(n: Int) = n.toUInt().toULong()
+private inline fun dw32(n: Int) = (n.toLong() and MASK32L).toULong()
 
 private inline fun Int.toDws() = this.toLong() and MASK32L
 private inline fun UInt.toDws() = this.toLong()
@@ -131,9 +131,11 @@ internal fun toRawULong(x: Magia, xNormLen: Int): ULong {
     return when (xNormLen) {
         0 -> 0uL
         1 -> dw32(x[0])
-        else -> (dw32(x[1]) shl 32) or dw32(x[0])
+        else -> (x[1].toLong() shl 32).toULong() or dw32(x[0])
     }
 }
+
+internal fun toRawULongExact(x: Magia): ULong = (x[1].toLong() shl 32).toULong() or dw32(x[0])
 
 /**
  * Stores the 64-bit unsigned value `dw` into `z` as 32-bit limbs (little-endian)

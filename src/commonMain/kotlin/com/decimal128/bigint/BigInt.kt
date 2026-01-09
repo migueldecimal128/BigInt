@@ -1707,7 +1707,16 @@ class BigInt private constructor(
         val otherSign = isSub xor other.meta.signFlag
         val otherNormLen = other.meta.normLen
         when {
-            thisSign == otherSign && thisNormLen > 0 && otherNormLen > 0 -> {
+            otherNormLen <= 2 -> {
+                return when (otherNormLen) {
+                    2 -> addImpl64(otherSign, toRawULongExact(other.magia))
+                    1 -> addImpl32(otherSign, other.magia[0].toUInt())
+                    else -> this
+                }
+            }
+            thisNormLen == 0 && isSub -> return other.toBigInt().negate()
+            thisNormLen == 0 -> return other.toBigInt()
+            thisSign == otherSign -> {
                 val thisBitLen = this.magnitudeBitLen()
                 val otherBitLen = other.magnitudeBitLen()
                 val zBitLen = max(thisBitLen, otherBitLen) + 1
@@ -1722,9 +1731,6 @@ class BigInt private constructor(
                     }
                 return fromNormalizedNonZero(thisSign, z, zNormLen)
             }
-            otherNormLen == 0 -> return this
-            thisNormLen == 0 && isSub -> return other.toBigInt().negate()
-            thisNormLen == 0 -> return other.toBigInt()
             else -> {
                 val cmp = this.magnitudeCompareTo(other)
                 if (cmp != 0) {
