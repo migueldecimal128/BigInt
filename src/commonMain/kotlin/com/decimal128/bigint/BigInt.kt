@@ -258,7 +258,10 @@ class BigInt private constructor(
          */
         fun from(other: BigIntNumber): BigInt {
             ++BI_OP_COUNTS[BI_CONSTRUCT_COPY.ordinal]
-            return BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
+            return if (! other.meta.isZero)
+                BigInt(other.meta, other.magia.copyOf(other.meta.normLen))
+            else
+                ZERO
         }
 
         internal fun from(sign: Boolean, biMagnitude: BigIntNumber): BigInt {
@@ -1714,8 +1717,13 @@ class BigInt private constructor(
                     else -> this
                 }
             }
-            thisNormLen == 0 && isSub -> return other.toBigInt().negate()
-            thisNormLen == 0 -> return other.toBigInt()
+            thisNormLen == 0 -> {
+                return if (other is BigInt) {
+                    if (isSub) other.negate() else other
+                } else {
+                    from(other.meta.signFlag xor isSub, other)
+                }
+            }
             thisSign == otherSign -> {
                 val thisBitLen = this.magnitudeBitLen()
                 val otherBitLen = other.magnitudeBitLen()
