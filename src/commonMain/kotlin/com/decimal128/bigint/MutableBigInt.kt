@@ -789,54 +789,40 @@ class MutableBigInt private constructor (
         return this
     }
 
-    /**
-     * Internal helper for implementing addition and subtraction against a 64-bit
-     * unsigned operand. Computes `x ± yDw` depending on [ySign], updates this
-     * instance in place, and reuses or expands limb storage as needed. Zero,
-     * sign-match, and magnitude-comparison cases are optimized. The caller must
-     * supply a normalized [x].
-     *
-     * @param x the normalized source value
-     * @param ySign `true` if the addend should be treated as negative
-     * @param yDw the unsigned 64-bit magnitude of the addend
-     * @return this [MutableBigInt] after mutation
-     */
     private fun setAddImpl64(x: BigIntNumber, ySign: Boolean, yDw: ULong): MutableBigInt {
-        verify { x.isNormalized() }
-        val xMagia = x.magia // use only xMagia in here because of aliasing
-        when {
-            yDw == 0uL -> set(x)
-            x.isZero() -> set(ySign, yDw)
-            x.meta.signFlag == ySign -> {
-                verify { this.magia.size >= 4 }
-                ensureMagiaCapacityDiscard(x.meta.normLen + 1)
-                updateMeta(
-                    Meta(
-                        x.meta.signBit,
-                        setAdd64(magia, xMagia, x.meta.normLen, yDw)
-                    )
-                )
-            }
+        if (this !== x) {
+            updateMeta(Meta(0))
+            ensureMagiaCapacityDiscard(x.meta.normLen + 2)
+            x.magia.copyInto(magia, 0, 0, x.meta.normLen)
+            updateMeta(x.meta)
+        }
+        return mutAddImpl64(ySign, yDw)
+    }
 
+    private fun mutAddImpl64(ySign: Boolean, yDw: ULong): MutableBigInt {
+        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
+        verify { isNormalized() }
+        val normLen = meta.normLen
+        when {
+            yDw == 0uL -> return this
+            isZero() -> set(ySign, yDw)
+            meta.signFlag == ySign -> {
+                ensureMagiaCapacityCopy(normLen + 2)
+                updateMeta(
+                    Meta(meta.signBit, mutAdd64(magia, normLen, yDw)))
+            }
             else -> {
-                val cmp: Int = x.magnitudeCompareTo(yDw)
+                val cmp: Int = magnitudeCompareTo(yDw)
                 when {
                     cmp > 0 -> {
-                        ensureMagiaCapacityDiscard(x.meta.normLen)
                         updateMeta(
-                            Meta(
-                                x.meta.signBit,
-                                setSub64(magia, xMagia, x.meta.normLen, yDw)
-                            )
-                        )
+                            Meta(meta.signBit, mutSub64(magia, normLen, yDw)))
                     }
-
-                    cmp < 0 -> set(ySign, yDw - x.toULongMagnitude())
+                    cmp < 0 -> set(ySign, yDw - toRawULong(magia, normLen))
                     else -> setZero()
                 }
             }
         }
-        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
         return this
     }
 
@@ -1344,14 +1330,14 @@ class MutableBigInt private constructor (
      *
      * @param l the value to add
      */
-    operator fun plusAssign(l: Long) { setAdd(this, l) }
+    operator fun plusAssign(l: Long) { mutAddImpl64(l < 0, l.absoluteValue.toULong()) }
 
     /**
      * Adds an unsigned 64-bit integer to this value in place.
      *
      * @param dw the value to add
      */
-    operator fun plusAssign(dw: ULong) { setAdd(this, dw) }
+    operator fun plusAssign(dw: ULong) { mutAddImpl64(false, dw) }
 
     /**
      * Adds an arbitrary-precision integer to this value in place.
@@ -1380,14 +1366,14 @@ class MutableBigInt private constructor (
      *
      * @param l the value to subtract
      */
-    operator fun minusAssign(l: Long) { setSub(this, l) }
+    operator fun minusAssign(l: Long) { mutAddImpl64(l > 0, l.absoluteValue.toULong()) }
 
     /**
      * Subtracts an unsigned 64-bit integer from this value in place.
      *
      * @param dw the value to subtract
      */
-    operator fun minusAssign(dw: ULong) { setSub(this, dw) }
+    operator fun minusAssign(dw: ULong) { mutAddImpl64(true, dw) }
 
     /**
      * Subtracts an arbitrary-precision integer from this value in place.

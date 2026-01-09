@@ -297,13 +297,6 @@ internal fun newCopyWithExactLimbLen(x: Magia, xLen: Int, exactLimbLen: Int): Ma
     else -> throwInvalidAllocationLength_Magia()
 }
 
-/**
- * Adds the unsigned 64-bit value `dw` to `x[0‥xNormLen)` and writes the result
- * into `z` (which may be the same array for in-place mutation).
- *
- * Returns the resulting normalized limb length.
- * Throws `ArithmeticException` if the sum overflows `z`.
- */
 internal fun mutAdd32(x: Magia, xNormLen: Int, w: UInt): Int {
     if (xNormLen >= 0 && xNormLen <= x.size) {
         if (w == 0u)
@@ -330,41 +323,55 @@ internal fun mutAdd32(x: Magia, xNormLen: Int, w: UInt): Int {
     throwBoundsCheckViolation()
 }
 
-/**
- * Adds the unsigned 64-bit value `dw` to `x[0‥xNormLen)` and writes the result
- * into `z` (which may be the same array for in-place mutation).
- *
- * Returns the resulting normalized limb length.
- * Throws `ArithmeticException` if the sum overflows `z`.
- */
-internal fun setAdd64(z: Magia, x: Magia, xNormLen: Int, dw: ULong): Int {
-    if (xNormLen >= 0 && xNormLen <= x.size && xNormLen <= z.size) {
-        if (z !== x)
-            x.copyInto(z, endIndex = xNormLen)
+internal fun mutSub32(x: Magia, xNormLen: Int, w: UInt): Int {
+    if (xNormLen >= 0 && xNormLen <= x.size) {
+        var borrow = w.toLong()
+        var i = 0
+        while (i < xNormLen) {
+            if (borrow == 0L)
+                return xNormLen
+            borrow = x[i].toDws() - borrow
+            x[i] = borrow.toInt()
+            borrow = borrow ushr 63
+            ++i
+        }
+        if (borrow == 0L) {
+            // The last limb might have become zero
+            val zNormLen = xNormLen - if (x[xNormLen - 1] == 0) 1 else 0
+            verify { isNormalized(x, zNormLen) }
+            return zNormLen
+        }
+        return throwSubUnderflow_Int()
+    }
+    return throwBoundsCheckViolation_Int()
+}
+
+internal fun mutAdd64(x: Magia, xNormLen: Int, dw: ULong): Int {
+    if (xNormLen >= 0 && xNormLen <= x.size) {
         if (dw == 0uL)
             return xNormLen
         var carry = dw.toLong()
         var i = 0
         while (i < xNormLen) {
             val t = x[i].toDws() + (carry and MASK32L)
-            z[i] = t.toInt()
+            x[i] = t.toInt()
             carry = (carry ushr 32) + (t ushr 32)
             if (carry == 0L)
                 return xNormLen
             ++i
         }
-        if (i < z.size) {
+        if (i < x.size) {
             verify { carry != 0L }
-            z[i] = carry.toInt()
+            x[i] = carry.toInt()
             ++i
             carry = carry ushr 32
             if (carry == 0L) {
-                verify { isNormalized(z, i) }
+                verify { isNormalized(x, i) }
                 return i
             }
-            if (i < z.size) {
-                z[i] = carry.toInt()
-                verify { isNormalized(z, i + 1) }
+            if (i < x.size) {
+                x[i] = carry.toInt()
+                verify { isNormalized(x, i + 1) }
                 return i + 1
             }
         }
@@ -429,72 +436,33 @@ internal fun setAdd(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int):
     throwBoundsCheckViolation()
 }
 
-internal fun mutSub32(x: Magia, xNormLen: Int, w: UInt): Int {
+internal fun mutSub64(x: Magia, xNormLen: Int, dw: ULong): Int {
     if (xNormLen >= 0 && xNormLen <= x.size) {
-        var borrow = w.toLong()
+        var borrow = dw.toLong()
         var i = 0
         while (i < xNormLen) {
             if (borrow == 0L)
                 return xNormLen
-            borrow = x[i].toDws() - borrow
-            x[i] = borrow.toInt()
-            borrow = borrow ushr 63
+            val t = x[i].toDws() - (borrow and MASK32L)
+            x[i] = t.toInt()
+            val carryOut = t ushr 63         // 1 if borrow-in consumed more than limb
+            borrow = (borrow ushr 32) + carryOut
             ++i
         }
         if (borrow == 0L) {
-            // The last limb might have become zero
-            val zNormLen = xNormLen - if (x[xNormLen - 1] == 0) 1 else 0
+            // The last limb or two might have become zero
+            var zNormLen = xNormLen
+            if (zNormLen > 0 && x[zNormLen - 1] == 0) {
+                --zNormLen
+                if (zNormLen > 0 && x[zNormLen - 1] == 0)
+                    --zNormLen
+            }
             verify { isNormalized(x, zNormLen) }
             return zNormLen
         }
         return throwSubUnderflow_Int()
     }
     return throwBoundsCheckViolation_Int()
-}
-
-/**
- * Subtracts a 64-bit unsigned integer [dw] from a multi-limb big integer [x] (first [xLen] limbs),
- * storing the result in [z].
- *
- * Returns the normalized length of [z] (excluding trailing zero limbs).
- *
- * @param z the destination array to receive the result; must have size >= normalized length of [x]
- * @param x the source big integer limbs array
- * @param xLen number of limbs from [x] to consider
- * @param dw the 64-bit unsigned integer to subtract from [x]
- * @return normalized length of the subtraction result in [z]
- * @throws IllegalArgumentException if input lengths are invalid or arrays too small
- * @throws ArithmeticException if the subtraction underflows (i.e., dw > x)
- */
-internal fun setSub64(z: Magia, x: Magia, xLen: Int, dw: ULong): Int {
-    if (xLen >= 0 && xLen <= x.size) {
-        val xNormLen = normLen(x, xLen)
-        if (z.size >= xNormLen) {
-            if (xNormLen <= 2 && toRawULong(x, xNormLen) < dw)
-                throwSubUnderflow()
-            var lastNonZeroIndex = -1
-            var borrow = dw.toLong()
-            var i = 0
-            while (i < xNormLen) {
-                val t = x[i].toDws() - (borrow and MASK32L)
-                val zi = t.toInt()
-                z[i] = zi
-                val carryOut = t ushr 63         // 1 if borrow-in consumed more than limb
-                borrow = (borrow ushr 32) + carryOut
-                // branchless update of last non-zero
-                val nonZeroMask = (zi or -zi) shr 31
-                lastNonZeroIndex =
-                    (lastNonZeroIndex and nonZeroMask.inv()) or (i and nonZeroMask)
-                ++i
-            }
-            if (borrow == 0L) {
-                val zNormLen = lastNonZeroIndex + 1
-                verify { isNormalized(z, zNormLen) }
-                return zNormLen
-            }
-        }
-    }
-    throwBoundsCheckViolation()
 }
 
 /**
