@@ -1711,8 +1711,15 @@ class BigInt private constructor(
                 val thisBitLen = this.magnitudeBitLen()
                 val otherBitLen = other.magnitudeBitLen()
                 val zBitLen = max(thisBitLen, otherBitLen) + 1
-                val z = Magia((zBitLen + 31) ushr 5)
-                val zNormLen = setAdd(z, this.magia, thisNormLen, other.magia, otherNormLen)
+                val z = Magia(limbLenFromBitLen(zBitLen))
+                val zNormLen =
+                    if (thisNormLen >= otherNormLen) {
+                        this.magia.copyInto(z, 0, 0, thisNormLen)
+                        mutAdd(z, thisNormLen, other.magia, otherNormLen)
+                    } else {
+                        other.magia.copyInto(z, 0, 0, otherNormLen)
+                        mutAdd(z, otherNormLen, magia, thisNormLen)
+                    }
                 return fromNormalizedNonZero(thisSign, z, zNormLen)
             }
             otherNormLen == 0 -> return this

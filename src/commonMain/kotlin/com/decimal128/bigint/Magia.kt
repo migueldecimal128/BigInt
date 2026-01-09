@@ -380,62 +380,6 @@ internal fun mutAdd64(x: Magia, xNormLen: Int, dw: ULong): Int {
     throwBoundsCheckViolation()
 }
 
-/**
- * Computes `z = x + y` using the low-order [xLen] and [yLen] limbs of the
- * inputs and returns the normalized limb length of the sum. The caller must
- * ensure that [z] is large enough to hold the result; the minimum size is
- * `max(normBitLen(x), normBitLen(y)) + 1` bits.
- *
- * @return the normalized limb count of the sum
- * @throws ArithmeticException if the result does not fit in [z]
- */
-internal fun setAdd(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-    verify { isNormalized(x, xNormLen) }
-    verify { isNormalized(y, yNormLen) }
-    if (xNormLen >= 0 && xNormLen <= x.size && yNormLen >= 0 && yNormLen <= y.size) {
-        val maxNormLen = max(xNormLen, yNormLen)
-        val minNormLen = min(xNormLen, yNormLen)
-        if (z.size >= maxNormLen) {
-            var carry = 0L
-            var i = 0
-            while (i < minNormLen) {
-                val t = x[i].toDws() + y[i].toDws() + carry
-                z[i] = t.toInt()
-                carry = t ushr 32
-                verify { (carry shr 1) == 0L }
-                ++i
-            }
-            val longer = if (xNormLen > yNormLen) x else y
-            if (z !== longer) {
-                while (i < maxNormLen && i < z.size) {
-                    carry += longer[i].toDws()
-                    z[i] = carry.toInt()
-                    carry = carry ushr 32
-                    ++i
-                }
-            } else {
-                while (i < maxNormLen && i < z.size) {
-                    val t = longer[i].toDws() + carry
-                    z[i] = t.toInt()
-                    carry = t ushr 32
-                    if (carry == 0L)
-                        return maxNormLen
-                    ++i
-                }
-            }
-            if (carry != 0L) {
-                if (i == z.size)
-                    throwAddOverflow()
-                z[i] = 1
-                ++i
-            }
-            verify { isNormalized(z, i) }
-            return i
-        }
-    }
-    throwBoundsCheckViolation()
-}
-
 internal fun mutAdd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
     verify { isNormalized(x, xNormLen) }
     verify { isNormalized(y, yNormLen) }
