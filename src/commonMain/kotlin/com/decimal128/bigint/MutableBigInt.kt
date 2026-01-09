@@ -839,51 +839,30 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setAddImpl(x: BigIntNumber, yMeta: Meta, yMagia: Magia): MutableBigInt {
-        verify { x.isNormalized() }
-        verify { isNormalized(yMagia, yMeta.normLen) }
-        val xMagia = x.magia // save for aliasing
-        when {
-            yMeta.isZero -> set(x)
-            x.isZero() -> set(yMeta, yMagia)
-            x.meta.signFlag == yMeta.signFlag -> {
-                ensureMagiaCapacityDiscard(max(x.meta.normLen, yMeta.normLen) + 1)
-                updateMeta(
-                    Meta(
-                        x.meta.signBit,
-                        setAdd(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
-                    )
-                )
-            }
-
-            else -> {
-                val cmp: Int = x.magnitudeCompareTo(yMeta, yMagia)
-                when {
-                    cmp > 0 -> {
-                        ensureMagiaCapacityDiscard(x.meta.normLen)
-                        updateMeta(
-                            Meta(
-                                x.meta.signBit,
-                                setSub(magia, xMagia, x.meta.normLen, yMagia, yMeta.normLen)
-                            )
-                        )
-                    }
-
-                    cmp < 0 -> {
-                        ensureMagiaCapacityDiscard(yMeta.normLen)
-                        updateMeta(
-                            Meta(
-                                yMeta.signBit,
-                                setSub(magia, yMagia, yMeta.normLen, xMagia, x.meta.normLen)
-                            )
-                        )
-                    }
-
-                    else -> setZero()
-                }
-            }
+        if (this === x) {
+            // Already have x, just add y
+            return mutAddImpl(yMeta, yMagia)
         }
-        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_BI.ordinal]
-        return this
+
+        // if y aliases with this.magia, we must use x
+        if (magia === yMagia) {
+            // in the case of subtraction the sign of y will have changed
+            updateMeta(yMeta)
+            return mutAddImpl(x.meta, x.magia)
+        }
+
+        // No aliasing: copy the longer operand to minimize reallocation
+        updateMeta(Meta(0))
+        ensureMagiaCapacityDiscard(max(x.meta.normLen, yMeta.normLen) + 1)
+        if (x.meta.normLen >= yMeta.normLen) {
+            x.magia.copyInto(magia, 0, 0, x.meta.normLen)
+            updateMeta(x.meta)
+            return mutAddImpl(yMeta, yMagia)
+        } else {
+            yMagia.copyInto(magia, 0, 0, yMeta.normLen)
+            updateMeta(yMeta)
+            return mutAddImpl(x.meta, x.magia)
+        }
     }
 
     private fun mutAddImpl(yMeta: Meta, yMagia: Magia): MutableBigInt {
