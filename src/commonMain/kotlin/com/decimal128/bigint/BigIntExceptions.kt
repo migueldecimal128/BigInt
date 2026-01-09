@@ -33,6 +33,10 @@ internal fun throwAddOverflow(): Nothing {
     throw IllegalStateException(ERR_MSG_ADD_OVERFLOW)
 }
 
+internal fun throwAddOverflow_Int(): Nothing {
+    throw IllegalStateException(ERR_MSG_ADD_OVERFLOW)
+}
+
 internal fun throwSubUnderflow(): Nothing {
     throw IllegalStateException(ERR_MSG_SUB_UNDERFLOW)
 }

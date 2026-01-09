@@ -886,6 +886,42 @@ class MutableBigInt private constructor (
         return this
     }
 
+    private fun mutAddImpl(yMeta: Meta, yMagia: Magia): MutableBigInt {
+        verify { isNormalized() }
+        verify { isNormalized(yMagia, yMeta.normLen) }
+        val normLen = meta.normLen
+        when {
+            yMeta.isZero -> return this
+            isZero() -> set(yMeta, yMagia)
+            meta.signFlag == yMeta.signFlag -> {
+                ensureMagiaCapacityCopy(max(normLen, yMeta.normLen) + 1)
+                updateMeta(
+                    Meta(meta.signBit, mutAdd(magia, normLen, yMagia, yMeta.normLen))
+                )
+            }
+            else -> {
+                val cmp: Int = magnitudeCompareTo(yMeta, yMagia)
+                when {
+                    cmp > 0 -> {
+                        updateMeta(
+                            Meta(meta.signBit, mutSub(magia, normLen, yMagia, yMeta.normLen))
+                        )
+                    }
+                    cmp < 0 -> {
+                        val originalMagia = this.magia
+                        ensureMagiaCapacityDiscard(yMeta.normLen)
+                        updateMeta(
+                            Meta(yMeta.signBit, setSub(magia, yMagia, yMeta.normLen, originalMagia, normLen))
+                        )
+                    }
+                    else -> setZero()
+                }
+            }
+        }
+        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_BI.ordinal]
+        return this
+    }
+
     /**
      * Replaces this value with the product of [x] and the given multiplier,
      * storing the result in place. Overloads accept primitive integers,
@@ -1344,7 +1380,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the value to add
      */
-    operator fun plusAssign(bi: BigIntNumber) { setAdd(this, bi) }
+    operator fun plusAssign(bi: BigIntNumber) { mutAddImpl(bi.meta, bi.magia) }
 
     /**
      * Subtracts a signed 32-bit integer from this value in place.
@@ -1380,7 +1416,7 @@ class MutableBigInt private constructor (
      *
      * @param bi the value to subtract
      */
-    operator fun minusAssign(bi: BigIntNumber) { setSub(this, bi) }
+    operator fun minusAssign(bi: BigIntNumber) { mutAddImpl(bi.meta.negate(), bi.magia) }
 
     /**
      * Multiplies this value by a signed 32-bit integer in place. This is the

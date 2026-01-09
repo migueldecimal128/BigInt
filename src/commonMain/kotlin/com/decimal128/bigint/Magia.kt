@@ -436,6 +436,51 @@ internal fun setAdd(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int):
     throwBoundsCheckViolation()
 }
 
+internal fun mutAdd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
+    verify { isNormalized(x, xNormLen) }
+    verify { isNormalized(y, yNormLen) }
+    // require both xNormLen and yNormLen to be non-zero
+    if (xNormLen > 0 && xNormLen <= x.size && yNormLen > 0 && yNormLen <= y.size) {
+        val maxNormLen = max(xNormLen, yNormLen)
+        if (maxNormLen <= x.size) {
+            // Pre-copy any hi limbs from y that extend beyond x
+            if (yNormLen > xNormLen)
+                y.copyInto(x, xNormLen, xNormLen, yNormLen)
+            // Now add the overlapping limbs (minNormLen)
+            val minNormLen = min(xNormLen, yNormLen)
+            var carry = 0L
+            var i = 0
+            do {
+                val t = x[i].toDws() + y[i].toDws() + carry
+                x[i] = t.toInt()
+                carry = t ushr 32
+            } while (++i < minNormLen)
+            // Probability of carry is very low at this point because we reached
+            // the hi limb of at least one value
+            if (carry == 0L)
+                return maxNormLen
+            // Propagate carry through remaining limbs (if any) using single unified path
+            while (i < maxNormLen) {
+                val t = x[i].toDws() + carry
+                x[i] = t.toInt()
+                carry = t ushr 32
+                if (carry == 0L)
+                    return maxNormLen
+                ++i
+            }
+            // Final carry extension
+            if (carry != 0L) {
+                verify { i == maxNormLen && i < x.size }
+                x[i] = 1
+                ++i
+            }
+            verify { isNormalized(x, i) }
+            return i
+        }
+    }
+    return throwBoundsCheckViolation_Int()
+}
+
 internal fun mutSub64(x: Magia, xNormLen: Int, dw: ULong): Int {
     if (xNormLen >= 0 && xNormLen <= x.size) {
         var borrow = dw.toLong()
@@ -517,6 +562,58 @@ internal fun setSub(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int):
         }
     }
     throwBoundsCheckViolation()
+}
+
+internal fun mutSub(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
+    verify { isNormalized(x, xNormLen) }
+    verify { isNormalized(y, yNormLen) }
+    // require both xNormLen and yNormLen to be non-zero
+    if (xNormLen > 0 && xNormLen <= x.size && yNormLen > 0 && yNormLen <= y.size) {
+        if (xNormLen >= yNormLen) {
+            // Subtract overlapping limbs
+            var borrow = 0L
+            var i = 0
+            do {
+                val t = x[i].toDws() - y[i].toDws() - borrow
+                x[i] = t.toInt()
+                borrow = t ushr 63
+            } while (++i < yNormLen)
+
+            // Probability of borrow is very low at this point
+            // Probability of borrow is very low at this point
+            if (borrow == 0L) {
+                // Trim trailing zeros
+                var zNormLen = xNormLen
+                if (x[xNormLen - 1] == 0) {
+                    --zNormLen
+                    // Only when operands had same length can we have multiple trailing zeros
+                    if (yNormLen == xNormLen) {
+                        while (zNormLen > 0 && x[zNormLen - 1] == 0)
+                            --zNormLen
+                    }
+                }
+                verify { isNormalized(x, zNormLen) }
+                return zNormLen
+            }
+
+            // Propagate borrow through remaining limbs
+            while (i < xNormLen) {
+                val t = x[i].toDws() - borrow
+                x[i] = t.toInt()
+                borrow = t ushr 63
+                if (borrow == 0L) {
+                    val zNormLen = xNormLen - if (x[xNormLen - 1] == 0) 1 else 0
+                    verify { isNormalized(x, zNormLen) }
+                    return zNormLen
+                }
+                ++i
+            }
+            verify { borrow != 0L }
+        }
+        // y is longer than x, guaranteed underflow
+        return throwSubUnderflow_Int()
+    }
+    return throwBoundsCheckViolation_Int()
 }
 
 /**
