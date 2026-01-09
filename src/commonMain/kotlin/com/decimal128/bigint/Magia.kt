@@ -9,24 +9,22 @@
  * around [IntArray] and is inappropriate for high-performance internal arithmetic.
  * Kotlin unsigned primitives ([UInt], [ULong]) are used for temporary scalar values.
  *
- * `Magia` stands for Magnitude IntArray. [Magia] is a kotlin typealias for [IntArray].
- * `Mago` stands for Magnitude Operations ... el mago hace magia ...
- * the magician does magic.
+ * `Magia` stands for Magnitude IntArray.
+ * Just solid engineering, no magic (magia) involved.
+ * [Magia] is a kotlin typealias for [IntArray].
  *
  * ### Design Overview
  * - The bit-length (`bitLen`) is restricted to the non-negative range of an `Int`
- *   (i.e., **< 2³¹**). Consequently, an [Magia] may contain up to `2^(31–5)` limbs
- *   (exclusive). For example, an [Magia] of size `2²⁶–1` would consume ~256 MiB and
+ *   (i.e., **< 2³¹**). Consequently, a [Magia] may contain up to `2^(31–5)` limbs
+ *   (exclusive). For example, a [Magia] of size `2²⁶–1` would consume ~256 MiB and
  *   represent an integer with approximately **6.46×10⁸ decimal digits**. In practice,
  *   performance and memory constraints will be reached long before this theoretical
  *   upper bound.
- * - `new*` functions construct generally construct values to be used by [BigInt]
- *   and are generally **immutable** limb arrays.
+ * - `mut*` functions for addition and subtraction are 2-address and mutate in-place.
  * - `set*` functions store the result in the user-supplied first parameter and
  *   return the normalized length. The caller must ensure that there is sufficient
  *   space in the destination for operator and operands. Operators are implemented
- *   to allow aliased operands and result ... `x *= x`. The `set*` functions are used
- *   exclusively by [MutableBigInt].
+ *   to allow aliased operands and result ... `x *= x`.
  *
  * ### Available Functionality
  * - Magia acts as a complete arbitrary-length integer **ALU** (Arithmetic Logic Unit).
@@ -48,8 +46,6 @@
  *
  * Magia forms the computational core used by higher-level abstractions such as
  * [BigInt] and [MutableBigInt].
- *
- * Magus ... ancient Latin word for a Persian magician who works with Magia
  */
 @file:Suppress("NOTHING_TO_INLINE")
 
@@ -87,7 +83,14 @@ internal val MAGIA_ONE = intArrayOf(1)
  */
 private inline fun dw32(n: Int) = (n.toLong() and MASK32L).toULong()
 
+/**
+ * Returns an Int value as a DWS == Double Word Signed.
+ */
 private inline fun Int.toDws() = this.toLong() and MASK32L
+
+/**
+ * Returns a UInt value as a DWS == Double Word Signed.
+ */
 private inline fun UInt.toDws() = this.toLong()
 
 /**
@@ -135,7 +138,10 @@ internal fun toRawULong(x: Magia, xNormLen: Int): ULong {
     }
 }
 
-internal fun toRawULongExact(x: Magia): ULong = (x[1].toLong() shl 32).toULong() or dw32(x[0])
+/**
+ * Returns a ULong from the first 2 limbs without any bounds or normalization checking.
+ */
+internal inline fun toRawULongExact(x: Magia): ULong = (x[1].toLong() shl 32).toULong() or dw32(x[0])
 
 /**
  * Stores the 64-bit unsigned value `dw` into `z` as 32-bit limbs (little-endian)
@@ -187,6 +193,12 @@ internal fun normLen(x: Magia, xLen: Int): Int {
     return 0
 }
 
+/**
+ * Returns the number of nonzero limbs in [xLen] elements of [x] starting at [xOff],
+ * excluding any leading zeros.
+ *
+ * @throws IllegalArgumentException if [xOff], [xLen], or their sum is out of range for [x].
+ */
 internal fun normLen(x: Magia, xOff: Int, xLen: Int): Int {
     if (xOff < 0 || xLen < 0 || xOff + xLen > x.size)
         return throwBoundsCheckViolation_Int()
@@ -266,6 +278,18 @@ internal fun newWithBitLen(bitLen: Int): Magia {
 internal fun newWithFloorLen(floorLen: Int): Magia =
     Magia(calcHeapLimbQuantum(floorLen))
 
+/**
+ * Calculates the allocation size for a limb array with at least [floorLen] elements,
+ * rounded up to the next multiple of 4.
+ *
+ * Ensures non-zero allocation (minimum size 4) and enforces the maximum size limit
+ * of [MAX_ALLOC_SIZE]. The rounding reduces external fragmentation and ensures all
+ * allocated storage is usable.
+ *
+ * @param floorLen minimum required limb count (0 ≤ floorLen ≤ MAX_ALLOC_SIZE − 3)
+ * @return allocation size ≥ max(4, floorLen), rounded up to a multiple of 4
+ * @throws IllegalArgumentException if [floorLen] is negative or exceeds MAX_ALLOC_SIZE − 3
+ */
 internal inline fun calcHeapLimbQuantum(floorLen: Int): Int {
     if (floorLen >= 0 && floorLen <= MAX_ALLOC_SIZE - 3) {
         // if floorLen == 0 then add 1
@@ -299,6 +323,19 @@ internal fun newCopyWithExactLimbLen(x: Magia, xLen: Int, exactLimbLen: Int): Ma
     else -> throwInvalidAllocationLength_Magia()
 }
 
+/**
+ * Adds an unsigned 32-bit value [w] to the multiprecision integer in [x],
+ * modifying [x] in place.
+ * The caller must ensure [x] has at least one bit of extra capacity beyond
+ * max(bitLen(x), bitLen(y)) to accommodate potential carry.
+ *
+ * @param x destination limb array to mutate
+ * @param xNormLen normalized length of [x] (0 ≤ xNormLen ≤ x.size)
+ * @param w unsigned 32-bit value to add
+ * @return new normalized length of [x] after addition
+ * @throws IllegalArgumentException if [xNormLen] is out of range
+ * @throws ArithmeticException if result would exceed [x] capacity
+ */
 internal fun mutAdd32(x: Magia, xNormLen: Int, w: UInt): Int {
     if (xNormLen >= 0 && xNormLen <= x.size) {
         if (w == 0u)
@@ -325,29 +362,19 @@ internal fun mutAdd32(x: Magia, xNormLen: Int, w: UInt): Int {
     throwBoundsCheckViolation()
 }
 
-internal fun mutSub32(x: Magia, xNormLen: Int, w: UInt): Int {
-    if (xNormLen >= 0 && xNormLen <= x.size) {
-        var borrow = w.toLong()
-        var i = 0
-        while (i < xNormLen) {
-            if (borrow == 0L)
-                return xNormLen
-            borrow = x[i].toDws() - borrow
-            x[i] = borrow.toInt()
-            borrow = borrow ushr 63
-            ++i
-        }
-        if (borrow == 0L) {
-            // The last limb might have become zero
-            val zNormLen = xNormLen - if (x[xNormLen - 1] == 0) 1 else 0
-            verify { isNormalized(x, zNormLen) }
-            return zNormLen
-        }
-        return throwSubUnderflow_Int()
-    }
-    return throwBoundsCheckViolation_Int()
-}
-
+/**
+ * Adds an unsigned 64-bit value [dw] to the multiprecision integer in [x],
+ * modifying [x] in place.
+ * The caller must ensure [x] has at least one bit of extra capacity beyond
+ * max(bitLen(x), bitLen(y)) to accommodate potential carry.
+ *
+ * @param x destination limb array to mutate
+ * @param xNormLen normalized length of [x] (0 ≤ xNormLen ≤ x.size)
+ * @param dw unsigned 64-bit value to add
+ * @return new normalized length of [x] after addition
+ * @throws IllegalArgumentException if [xNormLen] is out of range
+ * @throws ArithmeticException if result would exceed [x] capacity
+ */
 internal fun mutAdd64(x: Magia, xNormLen: Int, dw: ULong): Int {
     if (xNormLen >= 0 && xNormLen <= x.size) {
         if (dw == 0uL)
@@ -382,6 +409,21 @@ internal fun mutAdd64(x: Magia, xNormLen: Int, dw: ULong): Int {
     throwBoundsCheckViolation()
 }
 
+/**
+ * Adds the multiprecision integer [y] to [x], modifying [x] in place.
+ *
+ * Computes `x += y` where both operands are represented as normalized limb arrays.
+ * The result is stored in [x].
+ * The caller must ensure [x] has at least one bit of extra capacity beyond
+ * max(bitLen(x), bitLen(y)) to accommodate potential carry.
+ *
+ * @param x destination limb array to mutate (x.size ≥ max(xNormLen, yNormLen) + 1)
+ * @param xNormLen normalized length of [x] (0 < xNormLen ≤ x.size)
+ * @param y source limb array (unchanged)
+ * @param yNormLen normalized length of [y] (0 < yNormLen ≤ y.size)
+ * @return new normalized length of [x] after addition
+ * @throws IllegalArgumentException if bounds are violated or operands are unnormalized
+ */
 internal fun mutAdd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
     verify { isNormalized(x, xNormLen) }
     verify { isNormalized(y, yNormLen) }
@@ -427,6 +469,53 @@ internal fun mutAdd(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
     return throwBoundsCheckViolation_Int()
 }
 
+/**
+ * Subtracts an unsigned 32-bit value [w] from the multiprecision integer in [x],
+ * modifying [x] in place.
+ * Requires x >= w.
+ *
+ * @param x destination limb array to mutate
+ * @param xNormLen normalized length of [x] (0 ≤ xNormLen ≤ x.size)
+ * @param w unsigned 32-bit value to subtract
+ * @return new normalized length of [x] after subtraction
+ * @throws IllegalArgumentException if [xNormLen] is out of range
+ * @throws ArithmeticException if result would be negative (underflow)
+ */
+internal fun mutSub32(x: Magia, xNormLen: Int, w: UInt): Int {
+    if (xNormLen >= 0 && xNormLen <= x.size) {
+        var borrow = w.toLong()
+        var i = 0
+        while (i < xNormLen) {
+            if (borrow == 0L)
+                return xNormLen
+            borrow = x[i].toDws() - borrow
+            x[i] = borrow.toInt()
+            borrow = borrow ushr 63
+            ++i
+        }
+        if (borrow == 0L) {
+            // The last limb might have become zero
+            val zNormLen = xNormLen - if (x[xNormLen - 1] == 0) 1 else 0
+            verify { isNormalized(x, zNormLen) }
+            return zNormLen
+        }
+        return throwSubUnderflow_Int()
+    }
+    return throwBoundsCheckViolation_Int()
+}
+
+/**
+ * Subtracts an unsigned 64-bit value [dw] from the multiprecision integer in [x],
+ * modifying [x] in place.
+ * Requires x >= dw.
+ *
+ * @param x destination limb array to mutate
+ * @param xNormLen normalized length of [x] (0 ≤ xNormLen ≤ x.size)
+ * @param dw unsigned 64-bit value to subtract
+ * @return new normalized length of [x] after subtraction
+ * @throws IllegalArgumentException if [xNormLen] is out of range
+ * @throws ArithmeticException if result would be negative (underflow)
+ */
 internal fun mutSub64(x: Magia, xNormLen: Int, dw: ULong): Int {
     if (xNormLen >= 0 && xNormLen <= x.size) {
         var borrow = dw.toLong()
@@ -451,6 +540,72 @@ internal fun mutSub64(x: Magia, xNormLen: Int, dw: ULong): Int {
             verify { isNormalized(x, zNormLen) }
             return zNormLen
         }
+        return throwSubUnderflow_Int()
+    }
+    return throwBoundsCheckViolation_Int()
+}
+
+/**
+ * Subtracts the multiprecision integer [y] from [x], modifying [x] in place.
+ *
+ * Computes `x -= y` where both operands are represented as normalized limb arrays.
+ * The result is stored in [x]. Requires x ≥ y to avoid underflow.
+ *
+ * @param x destination limb array to mutate
+ * @param xNormLen normalized length of [x] (0 < xNormLen ≤ x.size)
+ * @param y source limb array (unchanged)
+ * @param yNormLen normalized length of [y] (0 < yNormLen ≤ y.size)
+ * @return new normalized length of [x] after subtraction
+ * @throws IllegalArgumentException if bounds are violated or operands are unnormalized
+ * @throws ArithmeticException if x < y (underflow)
+ */
+internal fun mutSub(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
+    verify { isNormalized(x, xNormLen) }
+    verify { isNormalized(y, yNormLen) }
+    // require both xNormLen and yNormLen to be non-zero
+    if (xNormLen > 0 && xNormLen <= x.size && yNormLen > 0 && yNormLen <= y.size) {
+        if (xNormLen >= yNormLen) {
+            // Subtract overlapping limbs
+            var borrow = 0L
+            var i = 0
+            do {
+                val t = x[i].toDws() - y[i].toDws() - borrow
+                x[i] = t.toInt()
+                borrow = t ushr 63
+            } while (++i < yNormLen)
+
+            // Probability of borrow is very low at this point
+            // Probability of borrow is very low at this point
+            if (borrow == 0L) {
+                // Trim trailing zeros
+                var zNormLen = xNormLen
+                if (x[xNormLen - 1] == 0) {
+                    --zNormLen
+                    // Only when operands had same length can we have multiple trailing zeros
+                    if (yNormLen == xNormLen) {
+                        while (zNormLen > 0 && x[zNormLen - 1] == 0)
+                            --zNormLen
+                    }
+                }
+                verify { isNormalized(x, zNormLen) }
+                return zNormLen
+            }
+
+            // Propagate borrow through remaining limbs
+            while (i < xNormLen) {
+                val t = x[i].toDws() - borrow
+                x[i] = t.toInt()
+                borrow = t ushr 63
+                if (borrow == 0L) {
+                    val zNormLen = xNormLen - if (x[xNormLen - 1] == 0) 1 else 0
+                    verify { isNormalized(x, zNormLen) }
+                    return zNormLen
+                }
+                ++i
+            }
+            verify { borrow != 0L }
+        }
+        // y is longer than x, guaranteed underflow
         return throwSubUnderflow_Int()
     }
     return throwBoundsCheckViolation_Int()
@@ -508,58 +663,6 @@ internal fun setSub(z: Magia, x: Magia, xNormLen: Int, y: Magia, yNormLen: Int):
         }
     }
     throwBoundsCheckViolation()
-}
-
-internal fun mutSub(x: Magia, xNormLen: Int, y: Magia, yNormLen: Int): Int {
-    verify { isNormalized(x, xNormLen) }
-    verify { isNormalized(y, yNormLen) }
-    // require both xNormLen and yNormLen to be non-zero
-    if (xNormLen > 0 && xNormLen <= x.size && yNormLen > 0 && yNormLen <= y.size) {
-        if (xNormLen >= yNormLen) {
-            // Subtract overlapping limbs
-            var borrow = 0L
-            var i = 0
-            do {
-                val t = x[i].toDws() - y[i].toDws() - borrow
-                x[i] = t.toInt()
-                borrow = t ushr 63
-            } while (++i < yNormLen)
-
-            // Probability of borrow is very low at this point
-            // Probability of borrow is very low at this point
-            if (borrow == 0L) {
-                // Trim trailing zeros
-                var zNormLen = xNormLen
-                if (x[xNormLen - 1] == 0) {
-                    --zNormLen
-                    // Only when operands had same length can we have multiple trailing zeros
-                    if (yNormLen == xNormLen) {
-                        while (zNormLen > 0 && x[zNormLen - 1] == 0)
-                            --zNormLen
-                    }
-                }
-                verify { isNormalized(x, zNormLen) }
-                return zNormLen
-            }
-
-            // Propagate borrow through remaining limbs
-            while (i < xNormLen) {
-                val t = x[i].toDws() - borrow
-                x[i] = t.toInt()
-                borrow = t ushr 63
-                if (borrow == 0L) {
-                    val zNormLen = xNormLen - if (x[xNormLen - 1] == 0) 1 else 0
-                    verify { isNormalized(x, zNormLen) }
-                    return zNormLen
-                }
-                ++i
-            }
-            verify { borrow != 0L }
-        }
-        // y is longer than x, guaranteed underflow
-        return throwSubUnderflow_Int()
-    }
-    return throwBoundsCheckViolation_Int()
 }
 
 /**
