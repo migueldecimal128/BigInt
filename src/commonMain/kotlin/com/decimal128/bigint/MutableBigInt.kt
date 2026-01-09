@@ -753,41 +753,39 @@ class MutableBigInt private constructor (
      * @return this [MutableBigInt] after mutation
      */
     private fun setAddImpl32(x: BigIntNumber, ySign: Boolean, yW: UInt): MutableBigInt {
-        verify { x.isNormalized() }
-        val xMagia = x.magia // use only xMagia in here because of aliasing
-        when {
-            yW == 0u -> set(x)
-            x.isZero() -> set(ySign, yW.toULong())
-            x.meta.signFlag == ySign -> {
-                verify { this.magia.size >= 4 }
-                ensureMagiaCapacityDiscard(x.meta.normLen + 1)
-                updateMeta(
-                    Meta(
-                        x.meta.signBit,
-                        setAdd32(magia, xMagia, x.meta.normLen, yW)
-                    )
-                )
-            }
+        if (this !== x) {
+            updateMeta(Meta(0))
+            ensureMagiaCapacityDiscard(x.meta.normLen + 1)
+            x.magia.copyInto(magia, 0, 0, x.meta.normLen)
+            updateMeta(x.meta)
+        }
+        return mutAddImpl32(ySign, yW)
+    }
 
+    private fun mutAddImpl32(ySign: Boolean, yW: UInt): MutableBigInt {
+        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
+        verify { isNormalized() }
+        val normLen = meta.normLen
+        when {
+            yW == 0u -> return this
+            isZero() -> set(ySign, yW.toULong())
+            meta.signFlag == ySign -> {
+                ensureMagiaCapacityCopy(normLen + 1)
+                updateMeta(
+                    Meta(meta.signBit, mutAdd32(magia, normLen, yW)))
+            }
             else -> {
-                val cmp: Int = x.magnitudeCompareTo(yW)
+                val cmp: Int = magnitudeCompareTo(yW)
                 when {
                     cmp > 0 -> {
-                        ensureMagiaCapacityDiscard(x.meta.normLen)
                         updateMeta(
-                            Meta(
-                                x.meta.signBit,
-                                setSub64(magia, xMagia, x.meta.normLen, yW.toULong())
-                            )
-                        )
+                            Meta(meta.signBit, mutSub32(magia, normLen, yW)))
                     }
-
-                    cmp < 0 -> set(ySign, yW.toULong() - x.toULongMagnitude())
+                    cmp < 0 -> set(ySign, (yW - magia[0].toUInt()).toULong())
                     else -> setZero()
                 }
             }
         }
-        ++BI_OP_COUNTS[MBI_SET_ADD_SUB_PRIMITIVE.ordinal]
         return this
     }
 
@@ -1331,14 +1329,14 @@ class MutableBigInt private constructor (
      *
      * @param n the value to add
      */
-    operator fun plusAssign(n: Int) { setAddImpl32(this, n < 0, n.absoluteValue.toUInt()) }
+    operator fun plusAssign(n: Int) { mutAddImpl32(n < 0, n.absoluteValue.toUInt()) }
 
     /**
      * Adds an unsigned 32-bit integer to this value in place.
      *
      * @param w the value to add
      */
-    operator fun plusAssign(w: UInt) { setAddImpl32(this, false, w) }
+    operator fun plusAssign(w: UInt) { mutAddImpl32(false, w) }
 
     /**
      * Adds a signed 64-bit integer to this value in place. This is the canonical
@@ -1367,14 +1365,14 @@ class MutableBigInt private constructor (
      *
      * @param n the value to subtract
      */
-    operator fun minusAssign(n: Int) { setAddImpl32(this, n > 0, n.absoluteValue.toUInt()) }
+    operator fun minusAssign(n: Int) { mutAddImpl32(n > 0, n.absoluteValue.toUInt()) }
 
     /**
      * Subtracts an unsigned 32-bit integer from this value in place.
      *
      * @param w the value to subtract
      */
-    operator fun minusAssign(w: UInt) { setAddImpl32(this, true, w) }
+    operator fun minusAssign(w: UInt) { mutAddImpl32(true, w) }
 
     /**
      * Subtracts a signed 64-bit integer from this value in place. This is the
@@ -1713,7 +1711,7 @@ class MutableBigInt private constructor (
 
                 if (needsIncrement) {
                     ensureMagiaBitCapacityCopy(zBitLen + 1)
-                    normLen = setAdd32(magia, magia, normLen, 1u)
+                    normLen = mutAdd32(magia, normLen, 1u)
                 }
                 updateMeta(Meta(x.meta.signFlag, normLen))
             }

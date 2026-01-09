@@ -1620,18 +1620,18 @@ class BigInt private constructor(
                     val wBitLen = 32 - w.countLeadingZeroBits()
                     val thisBitLen = nonZeroNormBitLen(magia, thisNormLen)
                     val newBitLen = max(thisBitLen, wBitLen) + 1
-                    val z = newWithBitLen(newBitLen)
+                    val z = this.magia.copyOf(limbLenFromBitLen(newBitLen))
                     return fromNormalizedNonZero(
                         thisSign, z,
-                        setAdd32(z, this.magia, thisNormLen, w)
+                        mutAdd32(z, thisNormLen, w)
                     )
                 }
 
                 w == 0u -> return this
                 // do subtraction
                 thisNormLen > 1 -> {
-                    val z = Magia(thisNormLen)
-                    val zNormLen = setSub32(z, this.magia, thisNormLen, w)
+                    val z = this.magia.copyOf()
+                    val zNormLen = mutSub32(z, thisNormLen, w)
                     if (zNormLen > 0)
                         return fromNormalizedNonZero(thisSign, z, zNormLen)
                     return ZERO
