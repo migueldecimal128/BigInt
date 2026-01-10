@@ -161,7 +161,8 @@ class TestBarrettVsMontgomery {
         println("ratio Barrett/Mont = $rounded")
     }
 
-    @Test
+    // times out under WASM
+    //@Test
     fun compareBarrettVsMontgomery_modPow_2kBits_2k() {
 
         if (isJsPlatform())

@@ -105,7 +105,17 @@ kotlin {
     }
 
     wasmJs {
-        browser()
+        browser {
+            testTask {
+                // Extend timeout for browser tests
+                testLogging.showStandardStreams = true
+
+                // Use Karma configuration
+                useMocha {
+                    timeout = "60s" // or "60000" for milliseconds
+                }
+            }
+        }
         nodejs()
     }
 
@@ -113,15 +123,7 @@ kotlin {
         nodejs()
     }
 
-    // Uncomment the commented targets
-    macosX64 {
-        compilations.named("test") {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-opt")
-            }
-        }
-    }
-
+    macosX64()
     linuxX64()
 
 // Configure cinterop for ALL native targets
